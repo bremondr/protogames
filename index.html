@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hexagon Drawing App</title>
+    <style>
+        /* Styling for the overlay control box */
+        .controls-overlay {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background-color: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        /* Styling for the buttons and color picker */
+        button, select {
+            padding: 10px;
+            font-size: 14px;
+            width: 150px;
+        }
+
+        /* Styling for the canvas */
+        body {
+            margin: 0;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        canvas {
+            display: block;
+            background-color: #f0f0f0;
+            margin: 0;
+            height: 100%;
+            width: 100%;
+        }
+
+    </style>
+</head>
+<body>
+    <!-- Fixed control panel in the upper-left corner -->
+    <div class="controls-overlay">
+        <button id="drawMode">Draw Mode</button>
+        <button id="colorMode">Color Mode</button>
+        <button id="toggleOutlines">Toggle Shape Outlines</button>
+        
+        <!-- Color Picker Dropdown for selecting colors -->
+        <select id="colorPicker">
+            <option value="red">Red</option>
+            <option value="orange">Orange</option>
+            <option value="yellow">Yellow</option>
+            <option value="green">Green</option>
+            <option value="blue">Blue</option>
+            <option value="indigo">Indigo</option>
+            <option value="violet">Violet</option>
+        </select>
+    </div>
+
+    <!-- Canvas for drawing shapes and hexagons -->
+    <canvas id="drawCanvas"></canvas>
+
+    <script src="app.js"></script> <!-- Link to the external JavaScript file -->
+</body>
+</html>
