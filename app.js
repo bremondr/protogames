@@ -24,7 +24,7 @@ function clearCanvas() {
     hexGrid = []; // Clear the hex grid data
 }
 
-function drawHexagon(x, y, color, rotation = 0) {
+function drawHexagon(x, y, color, rotation = 0, strColor = 'rgba(128, 128, 128, 0.1)') {
     ctx.save(); // Save the current drawing state
     ctx.translate(x, y); // Move the origin to the hexagon's center
     ctx.rotate(rotation); // Rotate by the specified angle
@@ -41,7 +41,7 @@ function drawHexagon(x, y, color, rotation = 0) {
         }
     }
     ctx.closePath();
-    ctx.strokeStyle = 'black';
+    ctx.strokeStyle = strColor;
     ctx.stroke();
     ctx.fillStyle = color;
     ctx.fill();
@@ -144,9 +144,14 @@ function isPointInPointyTopHexagon(px, py, hex) {
 }
 
 function updateHexagonColor(hexagon, color) {
-    if (hexagon.color !== color) {
+    console.log(color);
+    if (color == 'grey-border'){
+        console.log(hexagon.color);
+        drawHexagon(hexagon.x, hexagon.y, hexagon.color, hexagon.rotation, 'black'); // Redraw hexagon with new border color
+    }
+    else if (hexagon.color !== color) {
         hexagon.color = color;
-        drawHexagon(hexagon.x, hexagon.y, color, hexagon.rotation); // Redraw hexagon with new color
+        drawHexagon(hexagon.x, hexagon.y, color, hexagon.rotation, "black"); // Redraw hexagon with new color
     }
 }
 
