@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hexagon Drawing App</title>
+    <title>Shape Tiling App</title>
     <style>
         /* Styling for the overlay control box */
         .controls-overlay {
@@ -21,11 +21,57 @@
             gap: 10px;
         }
 
-        /* Styling for the buttons and color picker */
+        /* Styling for the buttons, select and toggle switch */
         button, select {
             padding: 10px;
             font-size: 14px;
             width: 150px;
+        }
+
+        /* Toggle switch styling */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #2196F3;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
         }
 
         /* Styling for the canvas */
@@ -43,13 +89,27 @@
             width: 100%;
         }
 
+        .mode-label {
+            font-size: 12px;
+            text-align: center;
+        }
+
     </style>
 </head>
 <body>
     <!-- Fixed control panel in the upper-left corner -->
     <div class="controls-overlay">
-        <button id="drawMode">Draw Mode</button>
-        <button id="colorMode">Color Mode</button>
+        <div>
+            <!-- Mode Toggle Switch -->
+            <label class="switch">
+                <input type="checkbox" id="modeToggle">
+                <span class="slider"></span>
+            </label>
+            <div class="mode-label">
+                <span id="modeText">Draw Mode</span>
+            </div>
+        </div>
+
         <button id="toggleOutlines">Toggle Shape Outlines</button>
         
         <!-- Color Picker Dropdown for selecting colors -->
@@ -62,9 +122,13 @@
             <option value="indigo">Indigo</option>
             <option value="violet">Violet</option>
         </select>
+
+        <!-- Buttons for generating hexagon and triangle grids -->
+        <button id="generateGrid">Generate Hexagon Grid</button>
+        <button id="generateTriangleGrid">Generate Triangle Grid</button>
     </div>
 
-    <!-- Canvas for drawing shapes and hexagons -->
+    <!-- Canvas for drawing shapes and grids -->
     <canvas id="drawCanvas"></canvas>
 
     <script src="app.js"></script> <!-- Link to the external JavaScript file -->
