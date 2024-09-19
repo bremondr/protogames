@@ -1,0 +1,13 @@
+pages:
+  stage: deploy
+  image: {alpine-image-ci-latest}
+  script:
+    - mkdir -p public/
+    # .fit-pages.yml must be in public/
+    - cp .fit-pages.yml public/
+    # Do whatever you need to generate static content of your web, for example:
+    - cp *.html public/
+  artifacts:
+    paths:
+      - public/
+    expire_in: 1 hour
