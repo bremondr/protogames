@@ -11,6 +11,13 @@ const hexHeight = Math.sqrt(3) * hexRadius; // Height of a hexagon
 const hexWidth = 2 * hexRadius; // Width of a hexagon
 const margin = 100;
 let hexGrid = []; // 2D array for hexagons
+let selectedColor = colorPicker.value; // Default color for brushing
+let isBrushing = false;
+let isFlatTop = true; // Default orientation, change as needed
+
+colorPicker.addEventListener('change', (e) => {
+    selectedColor = e.target.value;
+});
 
 function clearCanvas() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -42,6 +49,15 @@ function drawHexagon(x, y, color, rotation = 0) {
     ctx.restore(); // Restore the previous drawing state
 }
 
+function redrawHexagon(hexagon) {
+    clearCanvas(); // Clear the entire canvas
+    for (const row of hexGrid) {
+        for (const hex of row) {
+            drawHexagon(hex.x, hex.y, hex.color, hex.rotation); // Redraw all hexagons
+        }
+    }
+}
+
 function generateFlatTopGrid() {
     clearCanvas(); // Clear canvas before drawing
 
@@ -60,20 +76,18 @@ function generateFlatTopGrid() {
             let x = q * horiz + margin;
             let y = r * vert + margin;
 
-            // Apply vertical offset for odd rows
+            // Apply vertical offset for odd columns
             if (q % 2 !== 0) {
                 y += vert / 2;
             }
 
             if (x + hexRadius <= canvas.width - margin && y + hexHeight / 2 <= canvas.height - margin) {
-                hexGrid[r][q] = { x, y, active: true, color: 'white' };
-                drawHexagon(x, y, 'white'); // No rotation for flat-top orientation
+                hexGrid[r][q] = { x, y, color: 'white', rotation: 0 }; // Default rotation is 0
+                drawHexagon(x, y, 'white'); // Draw hexagon with initial color
             }
         }
     }
 }
-
-
 
 function generatePointyTopGrid() {
     clearCanvas(); // Clear canvas before drawing
@@ -99,14 +113,95 @@ function generatePointyTopGrid() {
             }
 
             if (x + hexWidth / 2 <= canvas.width - margin && y + hexHeight / 2 <= canvas.height - margin) {
-                hexGrid[r][q] = { x, y, active: true, color: 'white' };
-                drawHexagon(x, y, 'white', Math.PI / 6); // Apply 30-degree rotation
+                hexGrid[r][q] = { x, y, color: 'white', rotation: Math.PI / 6 }; // Default rotation is π/6
+                drawHexagon(x, y, 'white', Math.PI / 6); // Draw hexagon with initial color and rotation
             }
         }
     }
 }
 
+function isPointInFlatTopHexagon(px, py, hex) {
+    const dx = px - hex.x;
+    const dy = py - hex.y;
+    
+    // Check if point is within hexagon bounds
+    const q = Math.abs(dx) <= hexRadius;
+    const r = Math.abs(dy) <= hexRadius * Math.sqrt(3) / 2;
+    const inside = q && r;
+    
+    return inside;
+}
 
+function isPointInPointyTopHexagon(px, py, hex) {
+    const dx = px - hex.x;
+    const dy = py - hex.y;
 
-// Initialize canvas (you can call one of these to start with a default grid)
-clearCanvas();
+    const rotatedX = dx * Math.cos(Math.PI / 6) - dy * Math.sin(Math.PI / 6);
+    const rotatedY = dx * Math.sin(Math.PI / 6) + dy * Math.cos(Math.PI / 6);
+
+    const withinX = Math.abs(rotatedX) <= hexRadius;
+    const withinY = Math.abs(rotatedY) <= hexRadius * Math.sqrt(3) / 2;
+
+    return withinX && withinY;
+}
+
+function updateHexagonColor(hexagon, color) {
+    if (hexagon.color !== color) {
+        hexagon.color = color;
+        drawHexagon(hexagon.x, hexagon.y, color, hexagon.rotation); // Redraw hexagon with new color
+    }
+}
+
+function paintHexagons(x, y) {
+    for (const row of hexGrid) {
+        for (const hex of row) {
+            if (isFlatTop) {
+                if (isPointInFlatTopHexagon(x, y, hex)) {
+                    updateHexagonColor(hex, selectedColor);
+                }
+            } else {
+                if (isPointInPointyTopHexagon(x, y, hex)) {
+                    updateHexagonColor(hex, selectedColor);
+                }
+            }
+        }
+    }
+}
+
+canvas.addEventListener('mousedown', (e) => {
+    isBrushing = true;
+    paintHexagons(e.offsetX, e.offsetY);
+});
+
+canvas.addEventListener('mouseup', () => {
+    isBrushing = false;
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    if (isBrushing) {
+        paintHexagons(e.offsetX, e.offsetY);
+    }
+});
+
+// Handle touch events for mobile devices
+canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault(); // Prevent scrolling
+    isBrushing = true;
+    const touch = e.touches[0];
+    paintHexagons(touch.clientX - canvas.getBoundingClientRect().left, touch.clientY - canvas.getBoundingClientRect().top);
+});
+
+canvas.addEventListener('touchend', () => {
+    isBrushing = false;
+});
+
+canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault(); // Prevent scrolling
+    if (isBrushing) {
+        const touch = e.touches[0];
+        paintHexagons(touch.clientX - canvas.getBoundingClientRect().left, touch.clientY - canvas.getBoundingClientRect().top);
+    }
+});
+
+// Initialize grid on page load
+generateFlatTopGrid(); // Or generatePointyTopGrid() based on your default orientation
