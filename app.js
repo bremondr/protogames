@@ -1,219 +1,39 @@
 const canvas = document.getElementById('drawCanvas');
 const ctx = canvas.getContext('2d');
+const colorPicker = document.getElementById('colorPicker');
 
 // Resize canvas to full window size
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-let isDrawing = false;
-let isColorMode = false;  // Default to draw mode
-let points = [];
-let shapes = []; // Store all drawn shapes
-let hexagons = []; // Store hexagon data globally
-let triangles = []; // Store triangle data globally
-let showOutlines = true; // Track whether to show or hide shape outlines
-let selectedColor = 'red'; // Default color is red
-let currentTiling = null; // Track the current grid type (hexagons or triangles)
+let hexRadius = 30;
+let hexHeight = Math.sqrt(3) * hexRadius; // Height of a hexagon
+let hexWidth = 2 * hexRadius; // Width of a hexagon
+const margin = 100;
+let hexGrid = []; // 2D array for hexagons
+let selectedColor = colorPicker.value; // Default color for brushing
+let isBrushing = false;
+let isFlatTop = true; // Default orientation, change as needed
 
-// Hexagon settings
-const hexRadius = 30;
-const hexHeight = Math.sqrt(3) * hexRadius;
-const hexWidth = 2 * hexRadius;
-
-// Triangle settings
-const triangleSize = 30; // Side length of an equilateral triangle
-const triangleHeight = (Math.sqrt(3) / 2) * triangleSize; // Height of an equilateral triangle
-
-// Add event listener for the toggle switch
-document.getElementById('modeToggle').addEventListener('change', (e) => {
-    isColorMode = e.target.checked; // Toggle between draw mode and color mode
-
-    // Update the mode label text
-    const modeText = document.getElementById('modeText');
-    modeText.textContent = isColorMode ? 'Color Mode' : 'Draw Mode';
-
-    // Update cursor style
-    canvas.style.cursor = isColorMode ? 'pointer' : 'crosshair';
+colorPicker.addEventListener('change', (e) => {
+    selectedColor = e.target.value;
 });
 
-// Add event listener for toggling shape outlines
-document.getElementById('toggleOutlines').addEventListener('click', () => {
-    showOutlines = !showOutlines;
-    drawShapes(); // Redraw canvas when toggling the outlines
-});
-
-// Add event listener for color picker changes
-document.getElementById('colorPicker').addEventListener('change', (e) => {
-    selectedColor = e.target.value; // Set the selected color to be used for hexagons/triangles
-});
-
-// Add event listener for the "Generate Hexagon Grid" button
-document.getElementById('generateGrid').addEventListener('click', () => {
-    clearGrid(); // Clear any existing grids
-    fillWithHexagons(); // Only generate hexagons when this button is clicked
-    currentTiling = 'hexagons'; // Set the current tiling type to hexagons
-});
-
-// Add event listener for the "Generate Triangle Grid" button
-document.getElementById('generateTriangleGrid').addEventListener('click', () => {
-    clearGrid(); // Clear any existing grids
-    fillWithTriangles(); // Only generate triangles when this button is clicked
-    currentTiling = 'triangles'; // Set the current tiling type to triangles
-});
-
-// Start drawing a new shape
-canvas.addEventListener('mousedown', (e) => {
-    if (isColorMode) return; // Do nothing if in color mode
-
-    isDrawing = true;
-    points = [{ x: e.offsetX, y: e.offsetY }];
-});
-
-canvas.addEventListener('mousemove', (e) => {
-    if (!isDrawing || isColorMode) return; // Do nothing if not drawing or in color mode
-
-    points.push({ x: e.offsetX, y: e.offsetY });
-    drawShapes();  // Redraw shapes while drawing
-});
-
-canvas.addEventListener('mouseup', () => {
-    if (!isDrawing || isColorMode) return; // Do nothing if not drawing or in color mode
-
-    isDrawing = false;
-    shapes.push([...points]); // Store the drawn shape
-    points = [];  // Clear points after finishing the shape
-    drawShapes();  // Ensure shapes are redrawn after drawing
-});
-
-// Event listener for clicking on hexagons or triangles
-canvas.addEventListener('click', (e) => {
-    if (!isColorMode) return; // Do nothing if not in color mode
-
-    const clickX = e.offsetX;
-    const clickY = e.offsetY;
-
-    if (currentTiling === 'hexagons') {
-        hexagons.forEach(hex => {
-            if (isPointInHexagon(clickX, clickY, hex.x, hex.y)) {
-                hex.color = selectedColor; // Change hexagon color
-                drawHexagon(hex.x, hex.y, hex.color);
-            }
-        });
-    } else if (currentTiling === 'triangles') {
-        triangles.forEach(triangle => {
-            if (isPointInTriangle(clickX, clickY, triangle)) {
-                triangle.color = selectedColor; // Change triangle color
-                drawTriangle(triangle);
-            }
-        });
-    }
-});
-
-// Draw all shapes on the canvas
-function drawShapes() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
-    
-    // Conditionally draw each shape based on showOutlines
-    if (showOutlines) {
-        shapes.forEach(shapePoints => {
-            ctx.beginPath();
-            ctx.moveTo(shapePoints[0].x, shapePoints[0].y);
-            for (let i = 1; i < shapePoints.length; i++) {
-                ctx.lineTo(shapePoints[i].x, shapePoints[i].y);
-            }
-            ctx.closePath();
-            ctx.stroke();
-        });
-
-        // Draw the current in-progress shape if outlines are enabled
-        if (points.length > 0) {
-            ctx.beginPath();
-            ctx.moveTo(points[0].x, points[0].y);
-            for (let i = 1; i < points.length; i++) {
-                ctx.lineTo(points[i].x, points[i].y);
-            }
-            ctx.stroke();
-        }
-    }
-
-    // Redraw hexagons or triangles based on current grid
-    if (currentTiling === 'hexagons') {
-        hexagons.forEach(hex => drawHexagon(hex.x, hex.y, hex.color));
-    } else if (currentTiling === 'triangles') {
-        triangles.forEach(triangle => drawTriangle(triangle));
-    }
+function clearCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    hexGrid = []; // Clear the hex grid data
 }
 
-// Clear existing grids
-function clearGrid() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
-    hexagons = [];
-    triangles = [];
-}
+function drawHexagon(x, y, color, rotation = 0, strColor = 'rgba(128, 128, 128, 0.1)') {
+    ctx.save(); // Save the current drawing state
+    ctx.translate(x, y); // Move the origin to the hexagon's center
+    ctx.rotate(rotation); // Rotate by the specified angle
 
-// Check if a point is inside a drawn shape (ray-casting algorithm)
-function isPointInShape(x, y, shape) {
-    let inside = false;
-    for (let i = 0, j = shape.length - 1; i < shape.length; j = i++) {
-        const xi = shape[i].x, yi = shape[i].y;
-        const xj = shape[j].x, yj = shape[j].y;
-
-        const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-        if (intersect) inside = !inside;
-    }
-    return inside;
-}
-
-// Check if a point is inside a specific hexagon
-function isPointInHexagon(px, py, hx, hy) {
-    const dx = Math.abs(px - hx);
-    const dy = Math.abs(py - hy);
-
-    if (dx > hexWidth / 2 || dy > hexHeight / 2) return false;
-
-    const slope = hexHeight / hexWidth;
-    return dy <= slope * (hexWidth / 2 - dx);
-}
-
-// Fill all drawn shapes with hexagons
-function fillWithHexagons() {
-    const cols = Math.ceil(canvas.width / (1.5 * hexRadius));
-    const rows = Math.ceil(canvas.height / hexHeight);
-
-    shapes.forEach(shape => {
-        for (let row = 0; row < rows; row++) {
-            for (let col = 0; col < cols; col++) {
-                let x = col * (1.5 * hexRadius);
-                let y = row * hexHeight;
-
-                if (col % 2 === 1) {
-                    y += hexHeight / 2; // Staggered rows
-                }
-
-                // Check if this hexagon already exists in hexagons array
-                let hex = hexagons.find(h => h.x === x && h.y === y);
-
-                // If hexagon doesn't exist and is fully inside the shape, create a new one
-                if (!hex && isHexagonFullyInside(x, y, shape)) {
-                    hexagons.push({ x: x, y: y, color: 'blue' });
-                    drawHexagon(x, y, 'blue');
-                } 
-                // If hexagon exists, just redraw it with its current color
-                else if (hex && isHexagonFullyInside(x, y, shape)) {
-                    drawHexagon(x, y, hex.color);
-                }
-            }
-        }
-    });
-}
-
-// Draw hexagon
-function drawHexagon(x, y, color) {
     ctx.beginPath();
     for (let i = 0; i < 6; i++) {
         const angle = (Math.PI / 3) * i;
-        const xOffset = x + hexRadius * Math.cos(angle);
-        const yOffset = y + hexRadius * Math.sin(angle);
+        const xOffset = hexRadius * Math.cos(angle);
+        const yOffset = hexRadius * Math.sin(angle);
         if (i === 0) {
             ctx.moveTo(xOffset, yOffset);
         } else {
@@ -221,85 +41,191 @@ function drawHexagon(x, y, color) {
         }
     }
     ctx.closePath();
-    ctx.strokeStyle = 'black';
+    ctx.strokeStyle = strColor;
     ctx.stroke();
     ctx.fillStyle = color;
     ctx.fill();
+
+    ctx.restore(); // Restore the previous drawing state
 }
 
-// Check if a triangle is fully inside the shape
-function isTriangleFullyInside(triangle, shape) {
-    return (
-        isPointInShape(triangle.x1, triangle.y1, shape) &&
-        isPointInShape(triangle.x2, triangle.y2, shape) &&
-        isPointInShape(triangle.x3, triangle.y3, shape)
-    );
+function redrawHexagon(hexagon) {
+    clearCanvas(); // Clear the entire canvas
+    for (const row of hexGrid) {
+        for (const hex of row) {
+            drawHexagon(hex.x, hex.y, hex.color, hex.rotation); // Redraw all hexagons
+        }
+    }
 }
 
-// Fill all drawn shapes with triangles
-function fillWithTriangles() {
-    const cols = Math.ceil(canvas.width / triangleSize);
-    const rows = Math.ceil(canvas.height / triangleHeight);
+function generateFlatTopGrid() {
+    clearCanvas();
 
-    shapes.forEach(shape => {
-        for (let row = 0; row < rows; row++) {
-            for (let col = 0; col < cols; col++) {
-                let x = col * triangleSize;
-                let y = row * triangleHeight;
+    const horiz = (3 / 2) * hexRadius;
+    const vert = hexHeight;
 
-                // Two triangles per grid cell
-                const triangle1 = {
-                    x1: x, y1: y,
-                    x2: x + triangleSize, y2: y,
-                    x3: x + triangleSize / 2, y3: y + triangleHeight,
-                    color: 'blue'
-                };
+    const cols = Math.floor((canvas.width - 2 * margin) / horiz);
+    const rows = Math.floor((canvas.height - 2 * margin) / vert);
 
-                const triangle2 = {
-                    x1: x + triangleSize / 2, y1: y + triangleHeight,
-                    x2: x, y2: y + triangleHeight * 2,
-                    x3: x + triangleSize, y3: y + triangleHeight,
-                    color: 'blue'
-                };
+    hexGrid = [];
 
-                if (isTriangleFullyInside(triangle1, shape)) {
-                    triangles.push(triangle1);
-                    drawTriangle(triangle1);
+    for (let r = 0; r < rows; r++) {
+        hexGrid[r] = [];
+
+        for (let q = 0; q < cols; q++) {
+            let x = q * horiz + margin;
+            let y = r * vert + margin;
+
+            if (q % 2 !== 0) {
+                y += vert / 2;
+            }
+
+            if (x + hexRadius <= canvas.width - margin && y + hexHeight / 2 <= canvas.height - margin) {
+                hexGrid[r][q] = { x, y, color: 'white', rotation: 0 };
+                drawHexagon(x, y, 'white');
+            }
+        }
+    }
+}
+
+function generatePointyTopGrid() {
+    clearCanvas();
+
+    const horiz = Math.sqrt(3) * hexRadius;
+    const vert = (3 / 2) * hexRadius;
+
+    const cols = Math.floor((canvas.width - 2 * margin) / horiz);
+    const rows = Math.floor((canvas.height - 2 * margin) / vert);
+
+    hexGrid = [];
+
+    for (let r = 0; r < rows; r++) {
+        hexGrid[r] = [];
+
+        for (let q = 0; q < cols; q++) {
+            let x = q * horiz + margin;
+            let y = r * vert + margin;
+
+            if (r % 2 !== 0) {
+                x += (hexRadius * Math.sqrt(3)) / 2;
+            }
+
+            if (x + hexWidth / 2 <= canvas.width - margin && y + hexHeight / 2 <= canvas.height - margin) {
+                hexGrid[r][q] = { x, y, color: 'white', rotation: Math.PI / 6 };
+                drawHexagon(x, y, 'white', Math.PI / 6);
+            }
+        }
+    }
+}
+
+function isPointInFlatTopHexagon(px, py, hex) {
+    const dx = px - hex.x;
+    const dy = py - hex.y;
+    
+    // Check if point is within hexagon bounds
+    const q = Math.abs(dx) <= hexRadius;
+    const r = Math.abs(dy) <= hexRadius * Math.sqrt(3) / 2;
+    const inside = q && r;
+    
+    return inside;
+}
+
+function isPointInPointyTopHexagon(px, py, hex) {
+    const dx = px - hex.x;
+    const dy = py - hex.y;
+
+    const rotatedX = dx * Math.cos(Math.PI / 6) - dy * Math.sin(Math.PI / 6);
+    const rotatedY = dx * Math.sin(Math.PI / 6) + dy * Math.cos(Math.PI / 6);
+
+    const withinX = Math.abs(rotatedX) <= hexRadius;
+    const withinY = Math.abs(rotatedY) <= hexRadius * Math.sqrt(3) / 2;
+
+    return withinX && withinY;
+}
+
+function updateHexagonColor(hexagon, color) {
+    console.log(color);
+    if (color == 'grey-border'){
+        console.log(hexagon.color);
+        drawHexagon(hexagon.x, hexagon.y, hexagon.color, hexagon.rotation, 'black'); // Redraw hexagon with new border color
+    }
+    else if (hexagon.color !== color) {
+        hexagon.color = color;
+        drawHexagon(hexagon.x, hexagon.y, color, hexagon.rotation, "black"); // Redraw hexagon with new color
+    }
+}
+
+function paintHexagons(x, y) {
+    for (const row of hexGrid) {
+        for (const hex of row) {
+            if (isFlatTop) {
+                if (isPointInFlatTopHexagon(x, y, hex)) {
+                    updateHexagonColor(hex, selectedColor);
                 }
-
-                if (isTriangleFullyInside(triangle2, shape)) {
-                    triangles.push(triangle2);
-                    drawTriangle(triangle2);
+            } else {
+                if (isPointInPointyTopHexagon(x, y, hex)) {
+                    updateHexagonColor(hex, selectedColor);
                 }
             }
         }
-    });
-}
-
-// Draw triangle
-function drawTriangle(triangle) {
-    const { x1, y1, x2, y2, x3, y3, color } = triangle;
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.lineTo(x3, y3);
-    ctx.closePath();
-    ctx.strokeStyle = 'black';
-    ctx.stroke();
-    ctx.fillStyle = color;
-    ctx.fill();
-}
-
-// Check if the entire hexagon is inside the shape
-function isHexagonFullyInside(x, y, shape) {
-    for (let i = 0; i < 6; i++) {
-        const angle = (Math.PI / 3) * i;
-        const xOffset = x + hexRadius * Math.cos(angle);
-        const yOffset = y + hexRadius * Math.sin(angle);  // Corrected here
-        if (!isPointInShape(xOffset, yOffset, shape)) {
-            return false; // If any point is outside the shape, return false
-        }
     }
-    return true; // If all points are inside the shape, return true
 }
 
+function redrawGrid() {
+    if (isFlatTop) {
+        generateFlatTopGrid();
+    } else {
+        generatePointyTopGrid();
+    }
+}
+
+
+canvas.addEventListener('mousedown', (e) => {
+    isBrushing = true;
+    paintHexagons(e.offsetX, e.offsetY);
+});
+
+canvas.addEventListener('mouseup', () => {
+    isBrushing = false;
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    if (isBrushing) {
+        paintHexagons(e.offsetX, e.offsetY);
+    }
+});
+
+// Handle touch events for mobile devices
+canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault(); // Prevent scrolling
+    isBrushing = true;
+    const touch = e.touches[0];
+    paintHexagons(touch.clientX - canvas.getBoundingClientRect().left, touch.clientY - canvas.getBoundingClientRect().top);
+});
+
+canvas.addEventListener('touchend', () => {
+    isBrushing = false;
+});
+
+canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault(); // Prevent scrolling
+    if (isBrushing) {
+        const touch = e.touches[0];
+        paintHexagons(touch.clientX - canvas.getBoundingClientRect().left, touch.clientY - canvas.getBoundingClientRect().top);
+    }
+});
+
+const hexSizeSlider = document.getElementById('hexSize');
+
+
+hexSizeSlider.addEventListener('input', (e) => {
+    console.log(e.target.value);
+    hexRadius = Number(e.target.value);
+    hexHeight = Math.sqrt(3) * hexRadius;
+    hexWidth = 2 * hexRadius;
+    redrawGrid();
+});
+
+
+// Initialize grid on page load
+generateFlatTopGrid(); // Or generatePointyTopGrid() based on your default orientation
