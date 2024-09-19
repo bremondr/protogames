@@ -12,6 +12,7 @@ const hexWidth = 2 * hexRadius;
 const margin = 100; // Add a 100px margin around the grid
 let hexagons = []; // Store hexagon data globally with state (active/inactive)
 let selectedColor = 'red'; // Default color for active hexagons
+let isBrushing = false; // Flag to track if we are currently brushing
 
 // Set canvas background to light grey
 ctx.fillStyle = '#d3d3d3';
@@ -22,19 +23,35 @@ document.getElementById('colorPicker').addEventListener('change', (e) => {
     selectedColor = e.target.value; // Set the selected color for active hexagons
 });
 
-// Add event listener for clicking on hexagons
-canvas.addEventListener('click', (e) => {
-    const clickX = e.offsetX;
-    const clickY = e.offsetY;
+// Add event listeners for mouse actions (brush effect)
+canvas.addEventListener('mousedown', (e) => {
+    isBrushing = true;
+    colorHexagonsUnderCursor(e); // Color the hexagons when starting to brush
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    if (isBrushing) {
+        colorHexagonsUnderCursor(e); // Color hexagons while dragging the mouse
+    }
+});
+
+canvas.addEventListener('mouseup', () => {
+    isBrushing = false; // Stop brushing when the mouse button is released
+});
+
+// Function to color hexagons under the cursor
+function colorHexagonsUnderCursor(e) {
+    const mouseX = e.offsetX;
+    const mouseY = e.offsetY;
 
     hexagons.forEach(hex => {
-        if (isPointInHexagon(clickX, clickY, hex.x, hex.y)) {
-            hex.active = !hex.active; // Toggle hexagon active state
-            hex.color = hex.active ? selectedColor : 'transparent'; // Active: selected color, Inactive: transparent
-            drawHexagon(hex.x, hex.y, hex.color); // Redraw the hexagon with its new state
+        if (isPointInHexagon(mouseX, mouseY, hex.x, hex.y)) {
+            hex.active = true; // Mark hexagon as active
+            hex.color = selectedColor; // Set the color to the selected brush color
+            drawHexagon(hex.x, hex.y, hex.color); // Redraw the hexagon
         }
     });
-});
+}
 
 // Generate the hexagonal grid for the entire canvas
 function generateHexagonalGrid() {
