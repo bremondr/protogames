@@ -6,9 +6,9 @@ const colorPicker = document.getElementById('colorPicker');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-const hexRadius = 30;
-const hexHeight = Math.sqrt(3) * hexRadius; // Height of a hexagon
-const hexWidth = 2 * hexRadius; // Width of a hexagon
+let hexRadius = 30;
+let hexHeight = Math.sqrt(3) * hexRadius; // Height of a hexagon
+let hexWidth = 2 * hexRadius; // Width of a hexagon
 const margin = 100;
 let hexGrid = []; // 2D array for hexagons
 let selectedColor = colorPicker.value; // Default color for brushing
@@ -59,10 +59,10 @@ function redrawHexagon(hexagon) {
 }
 
 function generateFlatTopGrid() {
-    clearCanvas(); // Clear canvas before drawing
+    clearCanvas();
 
-    const horiz = (3 / 2) * hexRadius; // Horizontal distance between centers
-    const vert = hexHeight; // Vertical distance between centers
+    const horiz = (3 / 2) * hexRadius;
+    const vert = hexHeight;
 
     const cols = Math.floor((canvas.width - 2 * margin) / horiz);
     const rows = Math.floor((canvas.height - 2 * margin) / vert);
@@ -76,24 +76,23 @@ function generateFlatTopGrid() {
             let x = q * horiz + margin;
             let y = r * vert + margin;
 
-            // Apply vertical offset for odd columns
             if (q % 2 !== 0) {
                 y += vert / 2;
             }
 
             if (x + hexRadius <= canvas.width - margin && y + hexHeight / 2 <= canvas.height - margin) {
-                hexGrid[r][q] = { x, y, color: 'white', rotation: 0 }; // Default rotation is 0
-                drawHexagon(x, y, 'white'); // Draw hexagon with initial color
+                hexGrid[r][q] = { x, y, color: 'white', rotation: 0 };
+                drawHexagon(x, y, 'white');
             }
         }
     }
 }
 
 function generatePointyTopGrid() {
-    clearCanvas(); // Clear canvas before drawing
+    clearCanvas();
 
-    const horiz = Math.sqrt(3) * hexRadius; // Horizontal distance between centers
-    const vert = (3 / 2) * hexRadius; // Vertical distance between centers
+    const horiz = Math.sqrt(3) * hexRadius;
+    const vert = (3 / 2) * hexRadius;
 
     const cols = Math.floor((canvas.width - 2 * margin) / horiz);
     const rows = Math.floor((canvas.height - 2 * margin) / vert);
@@ -107,14 +106,13 @@ function generatePointyTopGrid() {
             let x = q * horiz + margin;
             let y = r * vert + margin;
 
-            // Apply horizontal offset for odd rows
             if (r % 2 !== 0) {
                 x += (hexRadius * Math.sqrt(3)) / 2;
             }
 
             if (x + hexWidth / 2 <= canvas.width - margin && y + hexHeight / 2 <= canvas.height - margin) {
-                hexGrid[r][q] = { x, y, color: 'white', rotation: Math.PI / 6 }; // Default rotation is π/6
-                drawHexagon(x, y, 'white', Math.PI / 6); // Draw hexagon with initial color and rotation
+                hexGrid[r][q] = { x, y, color: 'white', rotation: Math.PI / 6 };
+                drawHexagon(x, y, 'white', Math.PI / 6);
             }
         }
     }
@@ -168,6 +166,15 @@ function paintHexagons(x, y) {
     }
 }
 
+function redrawGrid() {
+    if (isFlatTop) {
+        generateFlatTopGrid();
+    } else {
+        generatePointyTopGrid();
+    }
+}
+
+
 canvas.addEventListener('mousedown', (e) => {
     isBrushing = true;
     paintHexagons(e.offsetX, e.offsetY);
@@ -202,6 +209,18 @@ canvas.addEventListener('touchmove', (e) => {
         paintHexagons(touch.clientX - canvas.getBoundingClientRect().left, touch.clientY - canvas.getBoundingClientRect().top);
     }
 });
+
+const hexSizeSlider = document.getElementById('hexSize');
+
+
+hexSizeSlider.addEventListener('input', (e) => {
+    console.log(e.target.value);
+    hexRadius = Number(e.target.value);
+    hexHeight = Math.sqrt(3) * hexRadius;
+    hexWidth = 2 * hexRadius;
+    redrawGrid();
+});
+
 
 // Initialize grid on page load
 generateFlatTopGrid(); // Or generatePointyTopGrid() based on your default orientation
