@@ -10,8 +10,8 @@ const hexRadius = 30;
 const hexHeight = Math.sqrt(3) * hexRadius;
 const hexWidth = 2 * hexRadius;
 const margin = 100; // Add a 100px margin around the grid
-let hexagons = []; // Store hexagon data globally
-let selectedColor = 'red'; // Default color for clicking
+let hexagons = []; // Store hexagon data globally with state (active/inactive)
+let selectedColor = 'red'; // Default color for active hexagons
 
 // Set canvas background to light grey
 ctx.fillStyle = '#d3d3d3';
@@ -19,7 +19,7 @@ ctx.fillRect(0, 0, canvas.width, canvas.height);
 
 // Add event listener for color picker changes
 document.getElementById('colorPicker').addEventListener('change', (e) => {
-    selectedColor = e.target.value; // Set the selected color for hexagons
+    selectedColor = e.target.value; // Set the selected color for active hexagons
 });
 
 // Add event listener for clicking on hexagons
@@ -29,8 +29,9 @@ canvas.addEventListener('click', (e) => {
 
     hexagons.forEach(hex => {
         if (isPointInHexagon(clickX, clickY, hex.x, hex.y)) {
-            hex.color = selectedColor; // Change hexagon color
-            drawHexagon(hex.x, hex.y, hex.color); // Redraw the hexagon with the new color
+            hex.active = !hex.active; // Toggle hexagon active state
+            hex.color = hex.active ? selectedColor : 'transparent'; // Active: selected color, Inactive: transparent
+            drawHexagon(hex.x, hex.y, hex.color); // Redraw the hexagon with its new state
         }
     });
 });
@@ -53,8 +54,8 @@ function generateHexagonalGrid() {
 
             // Add hexagons only if they fit fully within the canvas dimensions and margin
             if (x + hexRadius <= canvas.width - margin && y + hexHeight / 2 <= canvas.height - margin) {
-                hexagons.push({ x: x, y: y, color: 'white' }); // Default color is white
-                drawHexagon(x, y, 'white');
+                hexagons.push({ x: x, y: y, active: true, color: 'white' }); // Active hexagons are white by default
+                drawHexagon(x, y, 'white'); // Initially draw all hexagons as active and white
             }
         }
     }
@@ -76,7 +77,7 @@ function drawHexagon(x, y, color) {
     ctx.closePath();
     ctx.strokeStyle = 'black';
     ctx.stroke();
-    ctx.fillStyle = color;
+    ctx.fillStyle = color === 'transparent' ? 'rgba(0, 0, 0, 0)' : color; // Transparent if inactive
     ctx.fill();
 }
 
