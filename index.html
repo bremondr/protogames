@@ -3,9 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shape Tiling App</title>
+    <title>Hexagonal Tile Grid</title>
     <style>
-        /* Styling for the overlay control box */
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+        }
+
         .controls-overlay {
             position: fixed;
             top: 10px;
@@ -16,102 +24,19 @@
             border-radius: 5px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
             z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
         }
 
-        /* Styling for the buttons, select and toggle switch */
-        button, select {
+        select {
             padding: 10px;
             font-size: 14px;
             width: 150px;
         }
-
-        /* Toggle switch styling */
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 60px;
-            height: 34px;
-        }
-
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: #ccc;
-            transition: 0.4s;
-            border-radius: 34px;
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 26px;
-            width: 26px;
-            left: 4px;
-            bottom: 4px;
-            background-color: white;
-            transition: 0.4s;
-            border-radius: 50%;
-        }
-
-        input:checked + .slider {
-            background-color: #2196F3;
-        }
-
-        input:checked + .slider:before {
-            transform: translateX(26px);
-        }
-
-        /* Styling for the canvas */
-        body {
-            margin: 0;
-            overflow: hidden;
-            height: 100vh;
-        }
-
-        canvas {
-            display: block;
-            background-color: #f0f0f0;
-            margin: 0;
-            height: 100%;
-            width: 100%;
-        }
-
-        .mode-label {
-            font-size: 12px;
-            text-align: center;
-        }
-
     </style>
 </head>
 <body>
+
     <!-- Fixed control panel in the upper-left corner -->
     <div class="controls-overlay">
-        <div>
-            <!-- Mode Toggle Switch -->
-            <label class="switch">
-                <input type="checkbox" id="modeToggle">
-                <span class="slider"></span>
-            </label>
-            <div class="mode-label">
-                <span id="modeText">Draw Mode</span>
-            </div>
-        </div>
-
-        <button id="toggleOutlines">Toggle Shape Outlines</button>
-        
         <!-- Color Picker Dropdown for selecting colors -->
         <select id="colorPicker">
             <option value="red">Red</option>
@@ -122,15 +47,12 @@
             <option value="indigo">Indigo</option>
             <option value="violet">Violet</option>
         </select>
-
-        <!-- Buttons for generating hexagon and triangle grids -->
-        <button id="generateGrid">Generate Hexagon Grid</button>
-        <button id="generateTriangleGrid">Generate Triangle Grid</button>
     </div>
 
-    <!-- Canvas for drawing shapes and grids -->
+    <!-- Canvas for drawing hexagonal grid -->
     <canvas id="drawCanvas"></canvas>
 
-    <script src="app.js"></script> <!-- Link to the external JavaScript file -->
+    <script src="app.js"></script> <!-- Link to the JavaScript file -->
+
 </body>
 </html>
