@@ -26,10 +26,24 @@
             z-index: 1000;
         }
 
-        select {
+        select, button {
             padding: 10px;
             font-size: 14px;
-            width: 150px;
+            margin-bottom: 10px;
+            display: block;
+            width: 100%;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #0056b3;
         }
     </style>
 </head>
@@ -47,6 +61,13 @@
             <option value="indigo">Indigo</option>
             <option value="violet">Violet</option>
         </select>
+
+        <!-- Buttons for hexagon orientation -->
+        <button onclick="generateFlatTopGrid()">Generate Flat Top Hexagons</button>
+        <button onclick="generatePointyTopGrid()">Generate Pointy Top Hexagons</button>
+
+        <!-- Clear Canvas Button -->
+        <button onclick="clearCanvas()">Clear Canvas</button>
     </div>
 
     <!-- Canvas for drawing hexagonal grid -->

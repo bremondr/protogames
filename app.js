@@ -1,90 +1,32 @@
 const canvas = document.getElementById('drawCanvas');
 const ctx = canvas.getContext('2d');
+const colorPicker = document.getElementById('colorPicker');
 
 // Resize canvas to full window size
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// Hexagon settings
 const hexRadius = 30;
-const hexHeight = Math.sqrt(3) * hexRadius;
-const hexWidth = 2 * hexRadius;
-const margin = 100; // Add a 100px margin around the grid
-let hexagons = []; // Store hexagon data globally with state (active/inactive)
-let selectedColor = 'red'; // Default color for active hexagons
-let isBrushing = false; // Flag to track if we are currently brushing
+const hexHeight = Math.sqrt(3) * hexRadius; // Height of a hexagon
+const hexWidth = 2 * hexRadius; // Width of a hexagon
+const margin = 100;
+let hexGrid = []; // 2D array for hexagons
 
-// Set canvas background to light grey
-ctx.fillStyle = '#d3d3d3';
-ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-// Add event listener for color picker changes
-document.getElementById('colorPicker').addEventListener('change', (e) => {
-    selectedColor = e.target.value; // Set the selected color for active hexagons
-});
-
-// Add event listeners for mouse actions (brush effect)
-canvas.addEventListener('mousedown', (e) => {
-    isBrushing = true;
-    colorHexagonsUnderCursor(e); // Color the hexagons when starting to brush
-});
-
-canvas.addEventListener('mousemove', (e) => {
-    if (isBrushing) {
-        colorHexagonsUnderCursor(e); // Color hexagons while dragging the mouse
-    }
-});
-
-canvas.addEventListener('mouseup', () => {
-    isBrushing = false; // Stop brushing when the mouse button is released
-});
-
-// Function to color hexagons under the cursor
-function colorHexagonsUnderCursor(e) {
-    const mouseX = e.offsetX;
-    const mouseY = e.offsetY;
-
-    hexagons.forEach(hex => {
-        if (isPointInHexagon(mouseX, mouseY, hex.x, hex.y)) {
-            hex.active = true; // Mark hexagon as active
-            hex.color = selectedColor; // Set the color to the selected brush color
-            drawHexagon(hex.x, hex.y, hex.color); // Redraw the hexagon
-        }
-    });
+function clearCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    hexGrid = []; // Clear the hex grid data
 }
 
-// Generate the hexagonal grid for the entire canvas
-function generateHexagonalGrid() {
-    const cols = Math.ceil((canvas.width - 2 * margin) / (1.5 * hexRadius)); // Adjust for margins
-    const rows = Math.ceil((canvas.height - 2 * margin) / hexHeight); // Adjust for margins
+function drawHexagon(x, y, color, rotation = 0) {
+    ctx.save(); // Save the current drawing state
+    ctx.translate(x, y); // Move the origin to the hexagon's center
+    ctx.rotate(rotation); // Rotate by the specified angle
 
-    hexagons = []; // Clear the hexagons array
-
-    for (let row = 0; row < rows; row++) {
-        for (let col = 0; col < cols; col++) {
-            let x = col * (1.5 * hexRadius) + hexRadius + margin; // Adjust for margin and shift right
-            let y = row * hexHeight + hexHeight / 2 + margin; // Adjust for margin and shift down
-
-            if (col % 2 === 1) {
-                y += hexHeight / 2; // Staggered rows
-            }
-
-            // Add hexagons only if they fit fully within the canvas dimensions and margin
-            if (x + hexRadius <= canvas.width - margin && y + hexHeight / 2 <= canvas.height - margin) {
-                hexagons.push({ x: x, y: y, active: true, color: 'white' }); // Active hexagons are white by default
-                drawHexagon(x, y, 'white'); // Initially draw all hexagons as active and white
-            }
-        }
-    }
-}
-
-// Draw a single hexagon
-function drawHexagon(x, y, color) {
     ctx.beginPath();
     for (let i = 0; i < 6; i++) {
         const angle = (Math.PI / 3) * i;
-        const xOffset = x + hexRadius * Math.cos(angle);
-        const yOffset = y + hexRadius * Math.sin(angle);
+        const xOffset = hexRadius * Math.cos(angle);
+        const yOffset = hexRadius * Math.sin(angle);
         if (i === 0) {
             ctx.moveTo(xOffset, yOffset);
         } else {
@@ -94,20 +36,77 @@ function drawHexagon(x, y, color) {
     ctx.closePath();
     ctx.strokeStyle = 'black';
     ctx.stroke();
-    ctx.fillStyle = color === 'transparent' ? 'rgba(0, 0, 0, 0)' : color; // Transparent if inactive
+    ctx.fillStyle = color;
     ctx.fill();
+
+    ctx.restore(); // Restore the previous drawing state
 }
 
-// Check if a point is inside a specific hexagon
-function isPointInHexagon(px, py, hx, hy) {
-    const dx = Math.abs(px - hx);
-    const dy = Math.abs(py - hy);
+function generateFlatTopGrid() {
+    clearCanvas(); // Clear canvas before drawing
 
-    if (dx > hexWidth / 2 || dy > hexHeight / 2) return false;
+    const horiz = (3 / 2) * hexRadius; // Horizontal distance between centers
+    const vert = hexHeight; // Vertical distance between centers
 
-    const slope = hexHeight / hexWidth;
-    return dy <= slope * (hexWidth / 2 - dx);
+    const cols = Math.floor((canvas.width - 2 * margin) / horiz);
+    const rows = Math.floor((canvas.height - 2 * margin) / vert);
+
+    hexGrid = [];
+
+    for (let r = 0; r < rows; r++) {
+        hexGrid[r] = [];
+
+        for (let q = 0; q < cols; q++) {
+            let x = q * horiz + margin;
+            let y = r * vert + margin;
+
+            // Apply vertical offset for odd rows
+            if (q % 2 !== 0) {
+                y += vert / 2;
+            }
+
+            if (x + hexRadius <= canvas.width - margin && y + hexHeight / 2 <= canvas.height - margin) {
+                hexGrid[r][q] = { x, y, active: true, color: 'white' };
+                drawHexagon(x, y, 'white'); // No rotation for flat-top orientation
+            }
+        }
+    }
 }
 
-// Generate the hexagonal grid when the page loads
-generateHexagonalGrid();
+
+
+function generatePointyTopGrid() {
+    clearCanvas(); // Clear canvas before drawing
+
+    const horiz = Math.sqrt(3) * hexRadius; // Horizontal distance between centers
+    const vert = (3 / 2) * hexRadius; // Vertical distance between centers
+
+    const cols = Math.floor((canvas.width - 2 * margin) / horiz);
+    const rows = Math.floor((canvas.height - 2 * margin) / vert);
+
+    hexGrid = [];
+
+    for (let r = 0; r < rows; r++) {
+        hexGrid[r] = [];
+
+        for (let q = 0; q < cols; q++) {
+            let x = q * horiz + margin;
+            let y = r * vert + margin;
+
+            // Apply horizontal offset for odd rows
+            if (r % 2 !== 0) {
+                x += (hexRadius * Math.sqrt(3)) / 2;
+            }
+
+            if (x + hexWidth / 2 <= canvas.width - margin && y + hexHeight / 2 <= canvas.height - margin) {
+                hexGrid[r][q] = { x, y, active: true, color: 'white' };
+                drawHexagon(x, y, 'white', Math.PI / 6); // Apply 30-degree rotation
+            }
+        }
+    }
+}
+
+
+
+// Initialize canvas (you can call one of these to start with a default grid)
+clearCanvas();
