@@ -1,6 +1,6 @@
 pages:
   stage: deploy
-  image: $CI_REGISTRY/ict/images/alpine:3.19
+  image: $CI_REGISTRY/ict/images/alpine/ci:latest
   script:
     - mkdir -p public/
     # .fit-pages.yml must be in public/
