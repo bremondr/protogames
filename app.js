@@ -16,8 +16,16 @@ let isBrushing = false;
 let isFlatTop = true; // Default orientation, change as needed
 
 colorPicker.addEventListener('change', (e) => {
-    selectedColor = e.target.value;
+    const selectedValue = e.target.value;
+    if (selectedValue === 'grey-border') {
+        selectedColor = 'grey-border'; // Special mode for grey border
+    } else if (selectedValue === 'eraser') {
+        selectedColor = 'eraser'; // Special mode for eraser
+    } else {
+        selectedColor = selectedValue; // Normal color mode
+    }
 });
+
 
 function clearCanvas() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -148,6 +156,10 @@ function updateHexagonColor(hexagon, color) {
     if (color == 'grey-border'){
         console.log(hexagon.color);
         drawHexagon(hexagon.x, hexagon.y, hexagon.color, hexagon.rotation, 'black'); // Redraw hexagon with new border color
+    } else if (color === 'eraser') {
+        color = 'white'; // Eraser mode sets hexagon to white
+        hexagon.color = color;
+        drawHexagon(hexagon.x, hexagon.y, color, hexagon.rotation, 'black');
     }
     else if (hexagon.color !== color) {
         hexagon.color = color;
