@@ -7,6 +7,7 @@ pages:
     - cp .fit-pages.yml public/
     # Do whatever you need to generate static content of your web, for example:
     - cp *.html public/
+    - cp *.js public/
   artifacts:
     paths:
       - public/
