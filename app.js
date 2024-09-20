@@ -66,6 +66,28 @@ function redrawHexagon(hexagon) {
     }
 }
 
+function drawTriangle(x, y, size, flipped) {
+    ctx.beginPath();
+
+    if (flipped) {
+        // Downward-pointing triangle
+        ctx.moveTo(x, y);
+        ctx.lineTo(x - size / 2, y + (Math.sqrt(3) / 2) * size);
+        ctx.lineTo(x + size / 2, y + (Math.sqrt(3) / 2) * size);
+    } else {
+        // Upward-pointing triangle
+        ctx.moveTo(x, y);
+        ctx.lineTo(x - size / 2, y - (Math.sqrt(3) / 2) * size);
+        ctx.lineTo(x + size / 2, y - (Math.sqrt(3) / 2) * size);
+    }
+
+    ctx.closePath();
+    ctx.strokeStyle = 'black';
+    ctx.stroke();
+    ctx.fillStyle = 'white'; // Default fill color
+    ctx.fill();
+}
+
 function generateFlatTopGrid() {
     clearCanvas();
 
@@ -121,6 +143,34 @@ function generatePointyTopGrid() {
             if (x + hexWidth / 2 <= canvas.width - margin && y + hexHeight / 2 <= canvas.height - margin) {
                 hexGrid[r][q] = { x, y, color: 'white', rotation: Math.PI / 6 };
                 drawHexagon(x, y, 'white', Math.PI / 6);
+            }
+        }
+    }
+}
+
+function generateTriangleGrid() {
+    clearCanvas();
+
+    const triangleHeight = (Math.sqrt(3) / 2) * hexRadius; // Height of an equilateral triangle
+    const triangleWidth = hexRadius; // Base of the equilateral triangle
+    const cols = Math.ceil((canvas.width - 2 * margin) / triangleWidth);
+    const rows = Math.ceil((canvas.height - 2 * margin) / triangleHeight);
+
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            let x = c * triangleWidth + margin;
+            let y = r * triangleHeight + margin;
+
+            // Offset every second row
+            if (r % 2 === 1) {
+                x += triangleWidth / 2;
+            }
+
+            // Adjust triangle orientation
+            if ((r + c) % 2 === 0) {
+                drawTriangle(x, y, hexRadius, false); // Draw upwards-pointing triangle
+            } else {
+                drawTriangle(x, y, hexRadius, true); // Draw downwards-pointing triangle
             }
         }
     }
