@@ -7,6 +7,9 @@ access:
   main:
     /:
       allow: [ANONYMOUS]
+  master:
+    /:
+      allow: [ANONYMOUS]
   '*':
     /:
       allow: [AUTHENTICATED]
