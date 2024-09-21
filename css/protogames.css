@@ -32,6 +32,7 @@
   height: var(--button-size);
   background-color: #fff0;
   padding: 10px;
+  border: 0;
 }
 
 .image {
