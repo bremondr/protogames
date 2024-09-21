@@ -228,54 +228,42 @@ function isPointInPointyTopHexagon(px, py, hex) {
     return withinX && withinY;
 }
 
-/* function isPointInTriangle(px, py, triangle) {
+function sign(p1, p2, p3) {
+    return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
+}
+
+function isPointInTriangle(px, py, triangle) {
     const { x, y, flipped } = triangle;
     const height = (Math.sqrt(3) / 2) * hexRadius;
-    
-    // Check if point is within bounds for both upright and flipped triangles
-    if (flipped) {
-        return (px > x - hexRadius / 2 && px < x + hexRadius / 2 && py > y - height && py < y);
-    } else {
-        return (px > x - hexRadius / 2 && px < x + hexRadius / 2 && py > y && py < y + height);
-    }
-} */
 
-    function sign(p1, p2, p3) {
-        return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
+    // Define triangle vertices
+    let v1, v2, v3;
+    if (flipped) {
+        // Flipped triangle (base at top)
+        v1 = { x: x - hexRadius / 2, y: y };           // Top-left
+        v2 = { x: x + hexRadius / 2, y: y };           // Top-right
+        v3 = { x: x, y: y + height };                   // Bottom
+    } else {
+        // Upright triangle (base at bottom)
+        v1 = { x: x - hexRadius / 2, y: y + height };  // Bottom-left
+        v2 = { x: x + hexRadius / 2, y: y + height };  // Bottom-right
+        v3 = { x: x, y: y };                            // Top
     }
-    
-    function isPointInTriangle(px, py, triangle) {
-        const { x, y, flipped } = triangle;
-        const height = (Math.sqrt(3) / 2) * hexRadius;
-    
-        // Define triangle vertices
-        let v1, v2, v3;
-        if (flipped) {
-            // Flipped triangle (base at top)
-            v1 = { x: x - hexRadius / 2, y: y };           // Top-left
-            v2 = { x: x + hexRadius / 2, y: y };           // Top-right
-            v3 = { x: x, y: y + height };                   // Bottom
-        } else {
-            // Upright triangle (base at bottom)
-            v1 = { x: x - hexRadius / 2, y: y + height };  // Bottom-left
-            v2 = { x: x + hexRadius / 2, y: y + height };  // Bottom-right
-            v3 = { x: x, y: y };                            // Top
-        }
-    
-        // Create point object
-        const pt = { x: px, y: py };
-    
-        // Calculate signs
-        const d1 = sign(pt, v1, v2);
-        const d2 = sign(pt, v2, v3);
-        const d3 = sign(pt, v3, v1);
-    
-        // Check if the point is inside the triangle
-        const has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
-        const has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
-    
-        return !(has_neg && has_pos);
-    }
+
+    // Create point object
+    const pt = { x: px, y: py };
+
+    // Calculate signs
+    const d1 = sign(pt, v1, v2);
+    const d2 = sign(pt, v2, v3);
+    const d3 = sign(pt, v3, v1);
+
+    // Check if the point is inside the triangle
+    const has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+    const has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+
+    return !(has_neg && has_pos);
+}
     
     
 
