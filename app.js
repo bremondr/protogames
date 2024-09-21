@@ -13,6 +13,9 @@ const margin = 100;
 let shapeGrid = []; // 2D array for hexagons
 let selectedColor = colorPicker.value; // Default color for brushing
 let isBrushing = false;
+let defaultColor = 'rgba(0, 0, 0, 0)';
+
+
 
 
 colorPicker.addEventListener('change', (e) => {
@@ -93,7 +96,7 @@ function drawTriangle(x, y, size, flipped, color, strColor = 'rgba(128, 128, 128
     // Draw the stroke and fill
     ctx.strokeStyle = strColor;
     ctx.stroke();
-    ctx.fillStyle = color || 'white'; // Use passed color or default to white
+    ctx.fillStyle = color || defaultColor; // Use passed color or default to white
     ctx.fill();
 
     ctx.restore(); // Restore the previous canvas state
@@ -122,8 +125,8 @@ function generateFlatTopGrid() {
             }
 
             if (x + hexRadius <= canvas.width - margin && y + hexHeight / 2 <= canvas.height - margin) {
-                shapeGrid[r][q] = { x, y, color: 'white', rotation: 0, type: 'FlatTopHex' };
-                drawHexagon(x, y, 'white');
+                shapeGrid[r][q] = { x, y, color: defaultColor, rotation: 0, type: 'FlatTopHex' };
+                drawHexagon(x, y, defaultColor);
             }
         }
     }
@@ -152,8 +155,8 @@ function generatePointyTopGrid() {
             }
 
             if (x + hexWidth / 2 <= canvas.width - margin && y + hexHeight / 2 <= canvas.height - margin) {
-                shapeGrid[r][q] = { x, y, color: 'white', rotation: Math.PI / 6, type: 'PointyTopHex' };
-                drawHexagon(x, y, 'white', Math.PI / 6);
+                shapeGrid[r][q] = { x, y, color: defaultColor, rotation: Math.PI / 6, type: 'PointyTopHex' };
+                drawHexagon(x, y, defaultColor, Math.PI / 6);
             }
         }
     }
@@ -191,13 +194,13 @@ function generateTriangleGrid() {
                 shapeGrid[r][c] = {
                     x: x,
                     y: y,
-                    color: 'white',
+                    color: defaultColor,
                     flipped: flipped,
                     type: 'triangle'
                 };
 
                 // Draw triangle with color
-                drawTriangle(x, y, hexRadius, flipped, 'white');
+                drawTriangle(x, y, hexRadius, flipped, defaultColor);
             }
         }
     }
@@ -382,3 +385,10 @@ hexSizeSlider.addEventListener('input', (e) => {
     }
 });
 
+function exportCanvasAsPNG() {
+    const canvas = document.getElementById('drawCanvas');
+    const link = document.createElement('a');
+    link.download = 'canvas_image.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+}
