@@ -67,26 +67,39 @@ function redrawHexagon(hexagon) {
 }
 
 function drawTriangle(x, y, size, flipped) {
-    ctx.beginPath();
+    const height = (Math.sqrt(3) / 2) * size; // Height of the equilateral triangle
+
+    ctx.save(); // Save the current state of the canvas
 
     if (flipped) {
-        // Downward-pointing triangle
-        ctx.moveTo(x, y);
-        ctx.lineTo(x - size / 2, y + (Math.sqrt(3) / 2) * size);
-        ctx.lineTo(x + size / 2, y + (Math.sqrt(3) / 2) * size);
-    } else {
-        // Upward-pointing triangle
-        ctx.moveTo(x, y);
-        ctx.lineTo(x - size / 2, y - (Math.sqrt(3) / 2) * size);
-        ctx.lineTo(x + size / 2, y - (Math.sqrt(3) / 2) * size);
+        // When flipped, rotate 180 degrees around the top point (x, y)
+        ctx.translate(x, y);
+        ctx.rotate(Math.PI); // Rotate 180 degrees
+        ctx.translate(-x, -y); // Translate back
+        y -= height; // Adjust position to align properly with the top vertex of the original triangle
     }
 
+    // Start drawing the triangle assuming it's upright
+    ctx.beginPath();
+
+    // Draw the triangle
+    ctx.moveTo(x, y); // Top vertex (or bottom after rotation)
+    ctx.lineTo(x - size / 2, y + height); // Bottom left
+    ctx.lineTo(x + size / 2, y + height); // Bottom right
+
     ctx.closePath();
+
+    // Draw the stroke and fill
     ctx.strokeStyle = 'black';
     ctx.stroke();
-    ctx.fillStyle = 'white'; // Default fill color
+    ctx.fillStyle = 'white';
     ctx.fill();
+
+    ctx.restore(); // Restore the previous canvas state
 }
+
+
+
 
 function generateFlatTopGrid() {
     clearCanvas();
@@ -153,27 +166,45 @@ function generateTriangleGrid() {
 
     const triangleHeight = (Math.sqrt(3) / 2) * hexRadius; // Height of an equilateral triangle
     const triangleWidth = hexRadius; // Base of the equilateral triangle
-    const cols = Math.ceil((canvas.width - 2 * margin) / triangleWidth);
-    const rows = Math.ceil((canvas.height - 2 * margin) / triangleHeight);
+    const cols = Math.floor((canvas.width - 2 * margin) / (triangleWidth/2)); // Use Math.floor to avoid overflow
+    const rows = Math.floor((canvas.height - 2 * margin) / triangleHeight); // Use Math.floor to avoid overflow
+
+    // Initialize triangle grid
+    let triangleGrid = [];
 
     for (let r = 0; r < rows; r++) {
+        triangleGrid[r] = []; // Initialize row
+
         for (let c = 0; c < cols; c++) {
-            let x = c * triangleWidth + margin;
+            let x = c * triangleWidth/2 + margin;
             let y = r * triangleHeight + margin;
 
-            // Offset every second row
+            // Shift every second row by one triangle width
             if (r % 2 === 1) {
                 x += triangleWidth / 2;
             }
+            // Ensure that triangles are within the canvas bounds before drawing
+            if (x + hexRadius / 2 <= canvas.width - margin && y + triangleHeight / 2 <= canvas.height - margin) {
+                // Rotate every second triangle within a row
+                const flipped = (c % 2 === 1);
+                const rotation = flipped ? 180 : 0;
 
-            // Adjust triangle orientation
-            if ((r + c) % 2 === 0) {
-                drawTriangle(x, y, hexRadius, false); // Draw upwards-pointing triangle
-            } else {
-                drawTriangle(x, y, hexRadius, true); // Draw downwards-pointing triangle
+                // Store triangle data in the 2D array
+                triangleGrid[r][c] = {
+                    x: x,
+                    y: y,
+                    color: 'white',
+                    rotation: rotation
+                };
+
+                // Draw triangle
+                drawTriangle(x, y, hexRadius, flipped);
             }
         }
     }
+
+    // Now `triangleGrid` contains all triangles with their x, y coordinates, color, and rotation
+    console.log(triangleGrid); // Debug to check the array
 }
 
 function isPointInFlatTopHexagon(px, py, hex) {
@@ -281,7 +312,7 @@ const hexSizeSlider = document.getElementById('hexSize');
 
 
 hexSizeSlider.addEventListener('input', (e) => {
-    console.log(e.target.value);
+    //console.log(e.target.value);
     hexRadius = Number(e.target.value);
     hexHeight = Math.sqrt(3) * hexRadius;
     hexWidth = 2 * hexRadius;
@@ -290,4 +321,4 @@ hexSizeSlider.addEventListener('input', (e) => {
 
 
 // Initialize grid on page load
-generateFlatTopGrid(); // Or generatePointyTopGrid() based on your default orientation
+//generateFlatTopGrid(); // Or generatePointyTopGrid() based on your default orientation
