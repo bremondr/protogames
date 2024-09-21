@@ -8,8 +8,8 @@ pages:
     # Do whatever you need to generate static content of your web, for example:
     - cp *.html public/
     - cp *.js public/
-    - cp images public/images
-    - cp css public/css
+    - cp -r images public/images
+    - cp -r css public/css
   artifacts:
     paths:
       - public/
