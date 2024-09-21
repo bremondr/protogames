@@ -265,9 +265,6 @@ function isPointInTriangle(px, py, triangle) {
     return !(has_neg && has_pos);
 }
     
-    
-
-
 function updateHexagonColor(hexagon, color) {
     if (color == 'grey-border'){
         drawHexagon(hexagon.x, hexagon.y, hexagon.color, hexagon.rotation, 'black'); // Redraw hexagon with new border color
@@ -385,6 +382,3 @@ hexSizeSlider.addEventListener('input', (e) => {
     }
 });
 
-
-// Initialize grid on page load
-//generateFlatTopGrid(); // Or generatePointyTopGrid() based on your default orientation
