@@ -3,78 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hexagonal Tile Grid</title>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-        }
+    <title>ProtoGames</title>
+    <link href="css/protogames.css" rel="stylesheet" type="text/css">
 
-        canvas {
-            display: block;
-        }
-
-        .controls-overlay {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            background-color: rgba(255, 255, 255, 0.9);
-            padding: 15px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            z-index: 1000;
-        }
-
-        select, button {
-            padding: 10px;
-            font-size: 14px;
-            margin-bottom: 10px;
-            display: block;
-            width: 100%;
-        }
-
-        button {
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background-color: #0056b3;
-        }
-    </style>
 </head>
 <body>
-
-    <!-- Fixed control panel in the upper-left corner -->
-    <div class="controls-overlay">
-        <!-- Color Picker Dropdown for selecting colors -->
-        <select id="colorPicker">
-            <option value="red">Red</option>
-            <option value="orange">Orange</option>
-            <option value="yellow">Yellow</option>
-            <option value="green">Green</option>
-            <option value="blue">Blue</option>
-            <option value="indigo">Indigo</option>
-            <option value="violet">Violet</option>
-            <option value="grey-border">Grey Border</option> <!-- New option -->
-        </select>
+    <section class="section">
+        <canvas id="drawCanvas" class="canvas"></canvas>
+        <div class="shapes">
+            <button onclick="generatePointyTopGrid()" class="button"><img src="images/Regular_hexagon-pointy.svg" loading="lazy" alt="" class="image"></button>
+            <button onclick="generateFlatTopGrid()" class="button"><img src="images/Regular_hexagon-flat.svg" loading="lazy" alt="" class="image"></button>
+            <button onclick="generateTriangleGrid()" class="button"><img src="images/Regular_Triangle.svg" loading="lazy" alt="" class="image"></button>
+        </div>
+        <div class="size">
+            <label for="hexSize">Size:</label>
+            <input type="range" id="hexSize" min="10" max="100" value="30" step="1">
+        </div>
+        <div class="admin">
+            <button onclick="exportCanvasAsPNG()" class="text-button">Export PNG</button>
+            <button onclick="clearCanvas()" class="text-button">Clear Canvas</button>
+        </div>
         
-
-        <!-- Buttons for hexagon orientation -->
-        <button onclick="generateFlatTopGrid()">Generate Flat Top Hexagons</button>
-        <button onclick="generatePointyTopGrid()">Generate Pointy Top Hexagons</button>
-        <label for="hexSize">Hexagon Size:</label>
-        <input type="range" id="hexSize" min="10" max="100" value="30" step="1">
-        <!-- Clear Canvas Button -->
-        <button onclick="clearCanvas()">Clear Canvas</button>
-    </div>
-
-    <!-- Canvas for drawing hexagonal grid -->
-    <canvas id="drawCanvas"></canvas>
+        <div class="colors">
+            <select id="colorPicker">
+                <option value="red">Red</option>
+                <option value="orange">Orange</option>
+                <option value="yellow">Yellow</option>
+                <option value="green">Green</option>
+                <option value="blue">Blue</option>
+                <option value="indigo">Indigo</option>
+                <option value="violet">Violet</option>
+                <option value="active-border">Grey Border</option> 
+                <option value="eraser">Eraser</option> 
+    
+            </select>
+        </div>
+      </section>
 
     <script src="app.js"></script> <!-- Link to the JavaScript file -->
 

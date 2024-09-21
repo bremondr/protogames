@@ -10,18 +10,29 @@ let hexRadius = 30;
 let hexHeight = Math.sqrt(3) * hexRadius; // Height of a hexagon
 let hexWidth = 2 * hexRadius; // Width of a hexagon
 const margin = 100;
-let hexGrid = []; // 2D array for hexagons
+let shapeGrid = []; // 2D array for hexagons
 let selectedColor = colorPicker.value; // Default color for brushing
 let isBrushing = false;
-let isFlatTop = true; // Default orientation, change as needed
+let defaultColor = 'rgba(0, 0, 0, 0)';
+
+
+
 
 colorPicker.addEventListener('change', (e) => {
-    selectedColor = e.target.value;
+    const selectedValue = e.target.value;
+    if (selectedValue === 'grey-border') {
+        selectedColor = 'grey-border'; // Special mode for grey border
+    } else if (selectedValue === 'eraser') {
+        selectedColor = 'eraser'; // Special mode for eraser
+    } else {
+        selectedColor = selectedValue; // Normal color mode
+    }
 });
+
 
 function clearCanvas() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    hexGrid = []; // Clear the hex grid data
+    shapeGrid = []; // Clear the hex grid data
 }
 
 function drawHexagon(x, y, color, rotation = 0, strColor = 'rgba(128, 128, 128, 0.1)') {
@@ -51,11 +62,44 @@ function drawHexagon(x, y, color, rotation = 0, strColor = 'rgba(128, 128, 128, 
 
 function redrawHexagon(hexagon) {
     clearCanvas(); // Clear the entire canvas
-    for (const row of hexGrid) {
+    for (const row of shapeGrid) {
         for (const hex of row) {
             drawHexagon(hex.x, hex.y, hex.color, hex.rotation); // Redraw all hexagons
         }
     }
+}
+
+function drawTriangle(x, y, size, flipped, color, strColor = 'rgba(128, 128, 128, 0.1)') {
+    const height = (Math.sqrt(3) / 2) * size; // Height of the equilateral triangle
+
+    ctx.save(); // Save the current state of the canvas
+    ctx.lineWidth = 1;
+
+    if (flipped) {
+        // When flipped, rotate 180 degrees around the top point (x, y)
+        ctx.translate(x, y);
+        ctx.rotate(Math.PI); // Rotate 180 degrees
+        ctx.translate(-x, -y); // Translate back
+        y -= height; // Adjust position to align properly with the top vertex of the original triangle
+    }
+
+    // Start drawing the triangle assuming it's upright
+    ctx.beginPath();
+
+    // Draw the triangle
+    ctx.moveTo(x, y); // Top vertex (or bottom after rotation)
+    ctx.lineTo(x - size / 2, y + height); // Bottom left
+    ctx.lineTo(x + size / 2, y + height); // Bottom right
+
+    ctx.closePath();
+
+    // Draw the stroke and fill
+    ctx.strokeStyle = strColor;
+    ctx.stroke();
+    ctx.fillStyle = color || defaultColor; // Use passed color or default to white
+    ctx.fill();
+
+    ctx.restore(); // Restore the previous canvas state
 }
 
 function generateFlatTopGrid() {
@@ -67,10 +111,10 @@ function generateFlatTopGrid() {
     const cols = Math.floor((canvas.width - 2 * margin) / horiz);
     const rows = Math.floor((canvas.height - 2 * margin) / vert);
 
-    hexGrid = [];
+    shapeGrid = [];
 
     for (let r = 0; r < rows; r++) {
-        hexGrid[r] = [];
+        shapeGrid[r] = [];
 
         for (let q = 0; q < cols; q++) {
             let x = q * horiz + margin;
@@ -81,8 +125,8 @@ function generateFlatTopGrid() {
             }
 
             if (x + hexRadius <= canvas.width - margin && y + hexHeight / 2 <= canvas.height - margin) {
-                hexGrid[r][q] = { x, y, color: 'white', rotation: 0 };
-                drawHexagon(x, y, 'white');
+                shapeGrid[r][q] = { x, y, color: defaultColor, rotation: 0, type: 'FlatTopHex' };
+                drawHexagon(x, y, defaultColor);
             }
         }
     }
@@ -97,10 +141,10 @@ function generatePointyTopGrid() {
     const cols = Math.floor((canvas.width - 2 * margin) / horiz);
     const rows = Math.floor((canvas.height - 2 * margin) / vert);
 
-    hexGrid = [];
+    shapeGrid = [];
 
     for (let r = 0; r < rows; r++) {
-        hexGrid[r] = [];
+        shapeGrid[r] = [];
 
         for (let q = 0; q < cols; q++) {
             let x = q * horiz + margin;
@@ -111,8 +155,52 @@ function generatePointyTopGrid() {
             }
 
             if (x + hexWidth / 2 <= canvas.width - margin && y + hexHeight / 2 <= canvas.height - margin) {
-                hexGrid[r][q] = { x, y, color: 'white', rotation: Math.PI / 6 };
-                drawHexagon(x, y, 'white', Math.PI / 6);
+                shapeGrid[r][q] = { x, y, color: defaultColor, rotation: Math.PI / 6, type: 'PointyTopHex' };
+                drawHexagon(x, y, defaultColor, Math.PI / 6);
+            }
+        }
+    }
+}
+
+function generateTriangleGrid() {
+    clearCanvas();
+
+    const triangleHeight = (Math.sqrt(3) / 2) * hexRadius; // Height of an equilateral triangle
+    const triangleWidth = hexRadius; // Base of the equilateral triangle
+    const cols = Math.floor((canvas.width - 2 * margin) / (triangleWidth / 2)); // Use Math.floor to avoid overflow
+    const rows = Math.floor((canvas.height - 2 * margin) / triangleHeight); // Use Math.floor to avoid overflow
+
+    // Initialize triangle grid
+    shapeGrid = [];
+
+    for (let r = 0; r < rows; r++) {
+        shapeGrid[r] = []; // Initialize row
+
+        for (let c = 0; c < cols; c++) {
+            let x = c * triangleWidth / 2 + margin;
+            let y = r * triangleHeight + margin;
+
+            // Shift every second row by one triangle width
+            if (r % 2 === 1) {
+                x += triangleWidth / 2;
+            }
+            // Ensure that triangles are within the canvas bounds before drawing
+            if (x + hexRadius / 2 <= canvas.width - margin && y + triangleHeight / 2 <= canvas.height - margin) {
+                // Rotate every second triangle within a row
+                const flipped = (c % 2 === 1);
+                const rotation = flipped ? 180 : 0;
+
+                // Store triangle data in the 2D array
+                shapeGrid[r][c] = {
+                    x: x,
+                    y: y,
+                    color: defaultColor,
+                    flipped: flipped,
+                    type: 'triangle'
+                };
+
+                // Draw triangle with color
+                drawTriangle(x, y, hexRadius, flipped, defaultColor);
             }
         }
     }
@@ -143,11 +231,50 @@ function isPointInPointyTopHexagon(px, py, hex) {
     return withinX && withinY;
 }
 
+function sign(p1, p2, p3) {
+    return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
+}
+
+function isPointInTriangle(px, py, triangle) {
+    const { x, y, flipped } = triangle;
+    const height = (Math.sqrt(3) / 2) * hexRadius;
+
+    // Define triangle vertices
+    let v1, v2, v3;
+    if (flipped) {
+        // Flipped triangle (base at top)
+        v1 = { x: x - hexRadius / 2, y: y };           // Top-left
+        v2 = { x: x + hexRadius / 2, y: y };           // Top-right
+        v3 = { x: x, y: y + height };                   // Bottom
+    } else {
+        // Upright triangle (base at bottom)
+        v1 = { x: x - hexRadius / 2, y: y + height };  // Bottom-left
+        v2 = { x: x + hexRadius / 2, y: y + height };  // Bottom-right
+        v3 = { x: x, y: y };                            // Top
+    }
+
+    // Create point object
+    const pt = { x: px, y: py };
+
+    // Calculate signs
+    const d1 = sign(pt, v1, v2);
+    const d2 = sign(pt, v2, v3);
+    const d3 = sign(pt, v3, v1);
+
+    // Check if the point is inside the triangle
+    const has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+    const has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+
+    return !(has_neg && has_pos);
+}
+    
 function updateHexagonColor(hexagon, color) {
-    console.log(color);
     if (color == 'grey-border'){
-        console.log(hexagon.color);
         drawHexagon(hexagon.x, hexagon.y, hexagon.color, hexagon.rotation, 'black'); // Redraw hexagon with new border color
+    } else if (color === 'eraser') {
+        color = 'white'; // Eraser mode sets hexagon to white
+        hexagon.color = color;
+        drawHexagon(hexagon.x, hexagon.y, color, hexagon.rotation, 'black');
     }
     else if (hexagon.color !== color) {
         hexagon.color = color;
@@ -155,34 +282,64 @@ function updateHexagonColor(hexagon, color) {
     }
 }
 
-function paintHexagons(x, y) {
-    for (const row of hexGrid) {
-        for (const hex of row) {
-            if (isFlatTop) {
-                if (isPointInFlatTopHexagon(x, y, hex)) {
-                    updateHexagonColor(hex, selectedColor);
-                }
-            } else {
-                if (isPointInPointyTopHexagon(x, y, hex)) {
-                    updateHexagonColor(hex, selectedColor);
-                }
+function updateTriangleColor(triangle, color) {
+    console.log("triangle");
+    if (color === 'grey-border') {
+        drawTriangle(triangle.x, triangle.y, hexRadius, triangle.flipped, triangle.color, 'black'); // Redraw with grey border
+/*         ctx.strokeStyle = 'black'; // Add grey border
+        ctx.stroke(); */
+    } else if (color === 'eraser') {
+        triangle.color = 'white'; // Erase color
+        drawTriangle(triangle.x, triangle.y, hexRadius, triangle.flipped, 'white');
+    } else {
+        triangle.color = color;
+        drawTriangle(triangle.x, triangle.y, hexRadius, triangle.flipped, color, 'black');
+    }
+}
+
+function redrawGrid() {
+    switch(shapeGrid[0][0].type){
+        case 'FlatTopHex':
+            generateFlatTopGrid();
+            break;
+        case 'PointyTopHex':
+            generatePointyTopGrid();
+            break;
+        case 'triangle':
+            generateTriangleGrid();
+            break;
+    }
+}
+
+function paintShapes(x,y){
+    for (const row of shapeGrid) {
+        for (const shape of row) {
+            switch (shape.type){
+                case 'triangle':
+                    if (isPointInTriangle(x, y, shape)) {
+                        updateTriangleColor(shape, selectedColor);
+                    }
+                    break;
+                case 'PointyTopHex':
+                    if (isPointInPointyTopHexagon(x, y, shape)){
+                        updateHexagonColor(shape, selectedColor);
+                    } 
+                    break;
+                case 'FlatTopHex':
+                    if (isPointInFlatTopHexagon(x, y, shape)) {
+                        updateHexagonColor(shape, selectedColor);
+                    }
+                    break;
+                default:
+                    console.log("unknown shape");
             }
         }
     }
 }
 
-function redrawGrid() {
-    if (isFlatTop) {
-        generateFlatTopGrid();
-    } else {
-        generatePointyTopGrid();
-    }
-}
-
-
 canvas.addEventListener('mousedown', (e) => {
     isBrushing = true;
-    paintHexagons(e.offsetX, e.offsetY);
+    paintShapes(e.offsetX, e.offsetY);
 });
 
 canvas.addEventListener('mouseup', () => {
@@ -191,7 +348,7 @@ canvas.addEventListener('mouseup', () => {
 
 canvas.addEventListener('mousemove', (e) => {
     if (isBrushing) {
-        paintHexagons(e.offsetX, e.offsetY);
+        paintShapes(e.offsetX, e.offsetY);
     }
 });
 
@@ -219,13 +376,19 @@ const hexSizeSlider = document.getElementById('hexSize');
 
 
 hexSizeSlider.addEventListener('input', (e) => {
-    console.log(e.target.value);
+    //console.log(e.target.value);
     hexRadius = Number(e.target.value);
     hexHeight = Math.sqrt(3) * hexRadius;
     hexWidth = 2 * hexRadius;
-    redrawGrid();
+    if(shapeGrid.length > 1){
+        redrawGrid();
+    }
 });
 
-
-// Initialize grid on page load
-generateFlatTopGrid(); // Or generatePointyTopGrid() based on your default orientation
+function exportCanvasAsPNG() {
+    const canvas = document.getElementById('drawCanvas');
+    const link = document.createElement('a');
+    link.download = 'canvas_image.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+}
