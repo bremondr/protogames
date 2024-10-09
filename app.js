@@ -207,28 +207,23 @@ function generateTriangleGrid() {
 }
 
 function isPointInFlatTopHexagon(px, py, hex) {
-    const dx = px - hex.x;
-    const dy = py - hex.y;
-    
-    // Check if point is within hexagon bounds
-    const q = Math.abs(dx) <= hexRadius;
-    const r = Math.abs(dy) <= hexRadius * Math.sqrt(3) / 2;
-    const inside = q && r;
-    
-    return inside;
+    const x2 = hex.x;
+    const y2 = hex.y;
+
+    const deltaX = x2 - px;
+    const deltaY = y2 - py;
+
+    return (Math.sqrt(deltaX * deltaX + deltaY * deltaY) < hexHeight/2) ? true : false;
 }
 
 function isPointInPointyTopHexagon(px, py, hex) {
-    const dx = px - hex.x;
-    const dy = py - hex.y;
+    const x2 = hex.x;
+    const y2 = hex.y;
 
-    const rotatedX = dx * Math.cos(Math.PI / 6) - dy * Math.sin(Math.PI / 6);
-    const rotatedY = dx * Math.sin(Math.PI / 6) + dy * Math.cos(Math.PI / 6);
+    const deltaX = x2 - px;
+    const deltaY = y2 - py;
 
-    const withinX = Math.abs(rotatedX) <= hexRadius;
-    const withinY = Math.abs(rotatedY) <= hexRadius * Math.sqrt(3) / 2;
-
-    return withinX && withinY;
+    return (Math.sqrt(deltaX * deltaX + deltaY * deltaY) < hexHeight/2) ? true : false;
 }
 
 function sign(p1, p2, p3) {
@@ -391,4 +386,28 @@ function exportCanvasAsPNG() {
     link.download = 'canvas_image.png';
     link.href = canvas.toDataURL('image/png');
     link.click();
+}
+
+
+function drawPointsOnCanvas(pointsArray) {
+    const canvas = document.getElementById('drawCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Iterate through each group of points
+    pointsArray.forEach(row => {
+        row.forEach(point => {
+            drawPoint(ctx, point.x, point.y);
+        });
+    });
+}
+
+// Helper function to draw a point
+function drawPoint(ctx, x, y) {
+    const radius = hexHeight/2; // Set point size (radius)
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, 2 * Math.PI);
+    ctx.fillStyle = 'grey'; // Color of the points
+    ctx.strokeStyle = 'black'
+    ctx.stroke();
+    ctx.closePath();
 }
