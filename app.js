@@ -15,9 +15,6 @@ let selectedColor = colorPicker.value; // Default color for brushing
 let isBrushing = false;
 let defaultColor = 'rgba(0, 0, 0, 0)';
 
-
-
-
 colorPicker.addEventListener('change', (e) => {
     const selectedValue = e.target.value;
     if (selectedValue === 'grey-border') {
@@ -28,7 +25,6 @@ colorPicker.addEventListener('change', (e) => {
         selectedColor = selectedValue; // Normal color mode
     }
 });
-
 
 function clearCanvas() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -213,7 +209,7 @@ function isPointInFlatTopHexagon(px, py, hex) {
     const deltaX = x2 - px;
     const deltaY = y2 - py;
 
-    return (Math.sqrt(deltaX * deltaX + deltaY * deltaY) < hexHeight/2) ? true : false;
+    return (Math.sqrt(deltaX * deltaX + deltaY * deltaY) < hexHeight / 2) ? true : false;
 }
 
 function isPointInPointyTopHexagon(px, py, hex) {
@@ -223,7 +219,7 @@ function isPointInPointyTopHexagon(px, py, hex) {
     const deltaX = x2 - px;
     const deltaY = y2 - py;
 
-    return (Math.sqrt(deltaX * deltaX + deltaY * deltaY) < hexHeight/2) ? true : false;
+    return (Math.sqrt(deltaX * deltaX + deltaY * deltaY) < hexHeight / 2) ? true : false;
 }
 
 function sign(p1, p2, p3) {
@@ -262,9 +258,9 @@ function isPointInTriangle(px, py, triangle) {
 
     return !(has_neg && has_pos);
 }
-    
+
 function updateHexagonColor(hexagon, color) {
-    if (color == 'grey-border'){
+    if (color == 'grey-border') {
         drawHexagon(hexagon.x, hexagon.y, hexagon.color, hexagon.rotation, 'black'); // Redraw hexagon with new border color
     } else if (color === 'eraser') {
         color = 'white'; // Eraser mode sets hexagon to white
@@ -281,8 +277,6 @@ function updateTriangleColor(triangle, color) {
     console.log("triangle");
     if (color === 'grey-border') {
         drawTriangle(triangle.x, triangle.y, hexRadius, triangle.flipped, triangle.color, 'black'); // Redraw with grey border
-/*         ctx.strokeStyle = 'black'; // Add grey border
-        ctx.stroke(); */
     } else if (color === 'eraser') {
         triangle.color = 'white'; // Erase color
         drawTriangle(triangle.x, triangle.y, hexRadius, triangle.flipped, 'white');
@@ -293,7 +287,7 @@ function updateTriangleColor(triangle, color) {
 }
 
 function redrawGrid() {
-    switch(shapeGrid[0][0].type){
+    switch (shapeGrid[0][0].type) {
         case 'FlatTopHex':
             generateFlatTopGrid();
             break;
@@ -306,19 +300,19 @@ function redrawGrid() {
     }
 }
 
-function paintShapes(x,y){
+function paintShapes(x, y) {
     for (const row of shapeGrid) {
         for (const shape of row) {
-            switch (shape.type){
+            switch (shape.type) {
                 case 'triangle':
                     if (isPointInTriangle(x, y, shape)) {
                         updateTriangleColor(shape, selectedColor);
                     }
                     break;
                 case 'PointyTopHex':
-                    if (isPointInPointyTopHexagon(x, y, shape)){
+                    if (isPointInPointyTopHexagon(x, y, shape)) {
                         updateHexagonColor(shape, selectedColor);
-                    } 
+                    }
                     break;
                 case 'FlatTopHex':
                     if (isPointInFlatTopHexagon(x, y, shape)) {
@@ -352,7 +346,7 @@ canvas.addEventListener('touchstart', (e) => {
     e.preventDefault(); // Prevent scrolling
     isBrushing = true;
     const touch = e.touches[0];
-    paintHexagons(touch.clientX - canvas.getBoundingClientRect().left, touch.clientY - canvas.getBoundingClientRect().top);
+    paintShapes(touch.clientX - canvas.getBoundingClientRect().left, touch.clientY - canvas.getBoundingClientRect().top);
 });
 
 canvas.addEventListener('touchend', () => {
@@ -363,19 +357,18 @@ canvas.addEventListener('touchmove', (e) => {
     e.preventDefault(); // Prevent scrolling
     if (isBrushing) {
         const touch = e.touches[0];
-        paintHexagons(touch.clientX - canvas.getBoundingClientRect().left, touch.clientY - canvas.getBoundingClientRect().top);
+        paintShapes(touch.clientX - canvas.getBoundingClientRect().left, touch.clientY - canvas.getBoundingClientRect().top);
     }
 });
 
 const hexSizeSlider = document.getElementById('hexSize');
-
 
 hexSizeSlider.addEventListener('input', (e) => {
     //console.log(e.target.value);
     hexRadius = Number(e.target.value);
     hexHeight = Math.sqrt(3) * hexRadius;
     hexWidth = 2 * hexRadius;
-    if(shapeGrid.length > 1){
+    if (shapeGrid.length > 1) {
         redrawGrid();
     }
 });
@@ -387,7 +380,6 @@ function exportCanvasAsPNG() {
     link.href = canvas.toDataURL('image/png');
     link.click();
 }
-
 
 function drawPointsOnCanvas(pointsArray) {
     const canvas = document.getElementById('drawCanvas');
@@ -403,7 +395,7 @@ function drawPointsOnCanvas(pointsArray) {
 
 // Helper function to draw a point
 function drawPoint(ctx, x, y) {
-    const radius = hexHeight/2; // Set point size (radius)
+    const radius = hexHeight / 2; // Set point size (radius)
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, 2 * Math.PI);
     ctx.fillStyle = 'grey'; // Color of the points
