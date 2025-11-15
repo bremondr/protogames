@@ -27,6 +27,12 @@ const HISTORY_LIMIT = 50;
 const DEFAULT_FILL = '#ffffff';
 const GRID_STROKE = '#333741';
 const HOVER_OUTLINE = '#2f6fed';
+const AUTO_SAVE_KEY = 'protogames_autosave';
+const AUTO_SAVE_INTERVAL = 30000;
+const DEFAULT_PROJECT_NAME = 'protogames-board';
+
+let notificationTimerId = null;
+let autoSaveIntervalId = null;
 
 /**
  * APPLICATION STATE
@@ -48,7 +54,10 @@ const appState = {
     currentColor: '#0b3d1d', // Active palette color used when painting
     hoverPolygonId: null, // Polygon currently under the pointer (for highlighting)
     history: [], // Stack of previous color states to power undo/redo
-    historyIndex: -1 // Cursor into the history array (-1 means no snapshots yet)
+    historyIndex: -1, // Cursor into the history array (-1 means no snapshots yet)
+    currentProjectName: null, // User-defined project label used for exports
+    lastSaveTime: null, // Timestamp of the last manual or auto-save
+    isDirty: false // Indicates there are unsaved modifications
 };
 
 /**
@@ -62,9 +71,29 @@ window.addEventListener('DOMContentLoaded', () => {
     cacheUIReferences();
     initializeCanvas();
     setupEventListeners();
+    setupFileUpload();
+    setupExportButtons();
     initializePaletteState();
     syncBoardConfigFromUI();
-    generateBoard(appState.boardConfig);
+    setupAutoSave();
+
+    const autoSaved = loadAutoSave();
+    if (autoSaved) {
+        const savedLabel = autoSaved.timestamp
+            ? new Date(autoSaved.timestamp).toLocaleString()
+            : 'a previous session';
+        if (confirm(`An autosave from ${savedLabel} was found. Restore it?`)) {
+            const restored = restoreState(autoSaved.appState, {
+                projectName: autoSaved.projectName,
+                skipAutoSave: true
+            });
+            if (restored) {
+                showNotification('Autosave restored', 4000);
+                return;
+            }
+        }
+    }
+    generateBoard(appState.boardConfig, { skipDirtyFlag: true });
 });
 
 // ============================================================================
@@ -88,9 +117,13 @@ function cacheUIReferences() {
     ui.undoButton = document.querySelector('[data-action="undo"]');
     ui.redoButton = document.querySelector('[data-action="redo"]');
     ui.clearButton = document.querySelector('[data-action="clear-board"]');
-    ui.saveButton = document.querySelector('[data-action="save-project"]');
+    ui.saveButton = document.getElementById('saveProjectBtn');
+    ui.loadButton = document.getElementById('loadProjectBtn');
     ui.loadInput = document.getElementById('loadProject');
-    ui.exportSelect = document.querySelector('select[name="exportType"]');
+    ui.exportPNGBtn = document.getElementById('exportPNGBtn');
+    ui.exportPDFBtn = document.getElementById('exportPDFBtn');
+    ui.exportSVGBtn = document.getElementById('exportSVGBtn');
+    ui.notificationBar = document.getElementById('notificationBar');
 }
 
 /**
@@ -124,7 +157,11 @@ function setupEventListeners() {
         const previousConfig = { ...appState.boardConfig };
         initializeCanvas();
         if (appState.polygons.length) {
-            generateBoard(previousConfig, { preserveColors: true, preserveHistory: true });
+            generateBoard(previousConfig, {
+                preserveColors: true,
+                preserveHistory: true,
+                skipDirtyFlag: true
+            });
         } else {
             renderBoard();
         }
@@ -154,18 +191,6 @@ function setupEventListeners() {
 
     if (ui.clearButton) {
         ui.clearButton.addEventListener('click', clearBoardColors);
-    }
-
-    if (ui.saveButton) {
-        ui.saveButton.addEventListener('click', exportProjectFile);
-    }
-
-    if (ui.loadInput) {
-        ui.loadInput.addEventListener('change', handleProjectLoad);
-    }
-
-    if (ui.exportSelect) {
-        ui.exportSelect.addEventListener('change', handleExportSelection);
     }
 
     if (ui.canvas) {
@@ -490,7 +515,11 @@ function createTriangleVertices(origin, size, pointingUp) {
  * @param {boolean} [options.preserveHistory=false] - Avoid clearing undo.
  */
 function generateBoard(config, options = {}) {
-    const { preserveColors = false, preserveHistory = false } = options;
+    const {
+        preserveColors = false,
+        preserveHistory = false,
+        skipDirtyFlag = false
+    } = options;
     const builder = {
         hexagon: buildHexGrid,
         square: buildSquareGrid,
@@ -516,6 +545,9 @@ function generateBoard(config, options = {}) {
     } else if (appState.history.length) {
         const snapshot = appState.history[appState.historyIndex];
         restoreSnapshot(snapshot);
+    }
+    if (!skipDirtyFlag) {
+        markStateDirty();
     }
 }
 
@@ -954,6 +986,7 @@ function applyColorToPolygon(polygon, color) {
     polygon.color = color;
     renderBoard();
     recordHistory();
+    markStateDirty();
 }
 
 /**
@@ -967,6 +1000,7 @@ function clearBoardColors() {
     });
     renderBoard();
     recordHistory();
+    markStateDirty();
 }
 
 /**
@@ -992,6 +1026,19 @@ function setCurrentColor(color, button, options = {}) {
 // ============================================================================
 // 7) HISTORY + PROJECT PERSISTENCE
 // ============================================================================
+
+/**
+ * Marks the global state as needing persistence and performs an immediate
+ * auto-save so the user's latest changes are captured.
+ *
+ * @param {boolean} [skipImmediate=false] - When true, waits for interval save.
+ */
+function markStateDirty(skipImmediate = false) {
+    appState.isDirty = true;
+    if (!skipImmediate) {
+        autoSaveToLocalStorage(true);
+    }
+}
 
 /**
  * Takes a lightweight snapshot of polygon colors so the user can undo.
@@ -1038,6 +1085,7 @@ function undo() {
     appState.historyIndex -= 1;
     const snapshot = appState.history[appState.historyIndex];
     restoreSnapshot(snapshot);
+    markStateDirty();
 }
 
 /**
@@ -1048,55 +1096,225 @@ function redo() {
     appState.historyIndex += 1;
     const snapshot = appState.history[appState.historyIndex];
     restoreSnapshot(snapshot);
+    markStateDirty();
 }
 
 /**
- * Exports the current board configuration and colors to a JSON file
- * that can later be reloaded.
+ * Persists the current app state into localStorage so the browser can
+ * restore it later. Automatically throttled when there are no changes.
+ *
+ * @param {boolean} [force=false] - When true, saves even if not marked dirty.
  */
-function exportProjectFile() {
+function autoSaveToLocalStorage(force = false) {
+    if (!appState.polygons.length) return;
+    if (!force && !appState.isDirty) return;
+    if (!window.localStorage) return;
+
+    try {
+        const payload = {
+            version: '1.0',
+            timestamp: Date.now(),
+            projectName: appState.currentProjectName || DEFAULT_PROJECT_NAME,
+            appState: serializeAppState()
+        };
+        localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify(payload));
+        appState.lastSaveTime = payload.timestamp;
+        appState.isDirty = false;
+    } catch (error) {
+        if (error.name === 'QuotaExceededError') {
+            alert('Auto-save failed: browser storage quota exceeded.');
+        }
+        console.error('Auto-save error:', error);
+    }
+}
+
+/**
+ * Retrieves any previously saved autosave payload from localStorage.
+ *
+ * @returns {{timestamp:number,projectName:string,appState:Object}|null}
+ */
+function loadAutoSave() {
+    if (!window.localStorage) return null;
+    try {
+        const raw = localStorage.getItem(AUTO_SAVE_KEY);
+        if (!raw) return null;
+        return JSON.parse(raw);
+    } catch (error) {
+        console.error('Failed to parse autosave payload.', error);
+        return null;
+    }
+}
+
+/**
+ * Starts an interval to periodically persist the board even if the user
+ * forgets to interact for a while.
+ */
+function setupAutoSave() {
+    if (autoSaveIntervalId) {
+        clearInterval(autoSaveIntervalId);
+    }
+    autoSaveIntervalId = window.setInterval(() => {
+        autoSaveToLocalStorage();
+    }, AUTO_SAVE_INTERVAL);
+}
+
+/**
+ * Produces a JSON-safe snapshot of the current state.
+ *
+ * @returns {Object} Serializable state payload.
+ */
+function serializeAppState() {
+    return {
+        boardConfig: { ...appState.boardConfig },
+        currentColor: appState.currentColor,
+        polygons: clonePolygons(appState.polygons)
+    };
+}
+
+/**
+ * Deep clones the polygon collection so it can be stored or restored
+ * without keeping references to mutable objects.
+ *
+ * @param {Array<Object>} polygons - Polygon list.
+ * @returns {Array<Object>} Cloned polygons.
+ */
+function clonePolygons(polygons = []) {
+    return polygons.map((polygon) => JSON.parse(JSON.stringify(polygon)));
+}
+
+/**
+ * Applies a serialized state back into the application, updating the
+ * board, UI controls, and palette selection.
+ *
+ * @param {Object} savedState - Serializable app state.
+ * @param {Object} [options]
+ * @param {string} [options.projectName] - Name to associate with state.
+ * @param {boolean} [options.skipAutoSave=false] - Prevent immediate autosave.
+ * @returns {boolean} True if restoration succeeded.
+ */
+function restoreState(savedState, options = {}) {
+    const { projectName, skipAutoSave = false } = options;
+    if (!savedState || !savedState.boardConfig) {
+        return false;
+    }
+
+    appState.boardConfig = { ...savedState.boardConfig };
+    appState.currentColor = savedState.currentColor || appState.currentColor;
+    appState.polygons = clonePolygons(savedState.polygons || []);
+    appState.hoverPolygonId = null;
+    appState.history = [];
+    appState.historyIndex = -1;
+    updateUIFromState();
+    renderBoard();
+    recordHistory();
+    appState.isDirty = false;
+    if (projectName) {
+        appState.currentProjectName = projectName;
+    }
+    if (!skipAutoSave) {
+        autoSaveToLocalStorage(true);
+    }
+    return true;
+}
+
+/**
+ * Syncs dropdowns, number fields, and palette selection with the
+ * current in-memory state.
+ */
+function updateUIFromState() {
+    if (ui.gridTypeSelect) ui.gridTypeSelect.value = appState.boardConfig.gridType;
+    if (ui.orientationSelect) ui.orientationSelect.value = appState.boardConfig.orientation;
+    if (ui.boardShapeSelect) ui.boardShapeSelect.value = appState.boardConfig.boardShape;
+    if (ui.widthInput) ui.widthInput.value = appState.boardConfig.width;
+    if (ui.heightInput) ui.heightInput.value = appState.boardConfig.height;
+
+    if (ui.paletteButtons?.length) {
+        const normalized = appState.currentColor?.toLowerCase();
+        const match =
+            ui.paletteButtons.find((btn) => {
+                const btnColor = (btn.dataset.color || getComputedStyle(btn).getPropertyValue('--swatch-color')).trim().toLowerCase();
+                return btnColor === normalized;
+            }) || ui.paletteButtons[0];
+        if (match) {
+            setCurrentColor(appState.currentColor, match, { skipRender: true });
+        }
+    }
+}
+
+/**
+ * Displays a temporary status message near the bottom of the screen.
+ *
+ * @param {string} message - Copy to show.
+ * @param {number} [duration=3000] - Fade-out delay in milliseconds.
+ */
+function showNotification(message, duration = 3000) {
+    if (!ui.notificationBar) return;
+    ui.notificationBar.textContent = message;
+    ui.notificationBar.classList.add('show');
+    if (notificationTimerId) {
+        clearTimeout(notificationTimerId);
+    }
+    notificationTimerId = window.setTimeout(() => {
+        ui.notificationBar.classList.remove('show');
+    }, duration);
+}
+
+/**
+ * Prompts the user for a project name and downloads a JSON file
+ * containing the entire board definition.
+ */
+function saveProjectFile() {
     if (!appState.polygons.length) {
         alert('Generate a board before saving a project.');
         return;
     }
+    const defaultName = appState.currentProjectName || DEFAULT_PROJECT_NAME;
+    const input = prompt('Enter a project name', defaultName);
+    if (!input) return;
+    const trimmedName = input.trim();
+    appState.currentProjectName = trimmedName || DEFAULT_PROJECT_NAME;
     const payload = {
         version: '1.0',
-        boardConfig: appState.boardConfig,
-        colors: appState.polygons.map((polygon) => ({
-            id: polygon.id,
-            color: polygon.color
-        }))
+        projectName: appState.currentProjectName,
+        created: new Date().toISOString(),
+        appState: serializeAppState()
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = 'protogames-project.json';
-    document.body.appendChild(anchor);
-    anchor.click();
-    document.body.removeChild(anchor);
-    URL.revokeObjectURL(url);
+    const filename = `${sanitizeFileName(appState.currentProjectName)}.protogames.json`;
+    triggerBlobDownload(blob, filename);
+    appState.lastSaveTime = Date.now();
+    appState.isDirty = false;
+    showNotification('Project saved', 3500);
+    autoSaveToLocalStorage(true);
 }
 
 /**
- * Reads a previously exported project JSON file and loads its content.
+ * Reads a user-selected project file, validates it, and restores the
+ * contained board state after prompting to confirm.
  *
- * @param {Event} event - Change event from the hidden file input.
+ * @param {Event} event - Change event fired by the hidden file input.
  */
-function handleProjectLoad(event) {
+function handleFileUpload(event) {
     const file = event.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = (loadEvent) => {
         try {
             const payload = JSON.parse(loadEvent.target.result);
-            if (!payload.boardConfig || !Array.isArray(payload.colors)) {
-                throw new Error('Invalid project file.');
+            if (!validateProjectFile(payload)) {
+                throw new Error('This file does not look like a Protogames project.');
             }
-            applyLoadedProject(payload);
+            if (
+                appState.polygons.length &&
+                !confirm('Loading a project will replace your current board. Continue?')
+            ) {
+                return;
+            }
+            restoreState(payload.appState, { projectName: payload.projectName });
+            showNotification('Project loaded', 3500);
         } catch (error) {
-            console.error(error);
-            alert('Unable to load project file.');
+            console.error('Load error:', error);
+            alert(error.message || 'Unable to load project file.');
         } finally {
             event.target.value = '';
         }
@@ -1105,42 +1323,166 @@ function handleProjectLoad(event) {
 }
 
 /**
- * Applies the configuration and colors from a parsed project payload.
+ * Ensures the project file adheres to the expected schema before loading.
  *
- * @param {Object} payload - Parsed JSON with boardConfig + colors.
+ * @param {Object} data - Parsed JSON file.
+ * @returns {boolean} True when the structure matches expectations.
  */
-function applyLoadedProject(payload) {
-    const config = {
-        ...payload.boardConfig,
-        gridType: payload.boardConfig.gridType || 'hexagon',
-        orientation: payload.boardConfig.orientation || 'pointy-top',
-        boardShape: payload.boardConfig.boardShape || 'rectangle'
-    };
-
-    // Reflect config in UI
-    if (ui.gridTypeSelect) ui.gridTypeSelect.value = config.gridType;
-    if (ui.orientationSelect) ui.orientationSelect.value = config.orientation;
-    if (ui.boardShapeSelect) ui.boardShapeSelect.value = config.boardShape;
-    if (ui.widthInput) ui.widthInput.value = config.width;
-    if (ui.heightInput) ui.heightInput.value = config.height;
-
-    generateBoard(config);
-    const snapshot = payload.colors.map((entry) => ({
-        id: entry.id,
-        color: entry.color
-    }));
-    restoreSnapshot(snapshot);
-    recordHistory();
+function validateProjectFile(data) {
+    if (!data || typeof data !== 'object') return false;
+    if (data.version !== '1.0') return false;
+    if (!data.appState || typeof data.appState !== 'object') return false;
+    if (!Array.isArray(data.appState.polygons)) return false;
+    if (!data.appState.boardConfig) return false;
+    return true;
 }
 
 /**
- * Placeholder handler for export dropdown selections. Provides user
- * feedback until real export targets are implemented.
- *
- * @param {Event} event - Change event on the export dropdown.
+ * Hooks the visible save/load buttons to their underlying behaviors.
  */
-function handleExportSelection(event) {
-    const format = event.target.value;
-    alert(`Export to ${format} will be available in the next phase.`);
-    event.target.selectedIndex = 0;
+function setupFileUpload() {
+    if (ui.saveButton) {
+        ui.saveButton.addEventListener('click', saveProjectFile);
+    }
+    if (ui.loadButton && ui.loadInput) {
+        ui.loadButton.addEventListener('click', () => ui.loadInput.click());
+    }
+    if (ui.loadInput) {
+        ui.loadInput.addEventListener('change', handleFileUpload);
+    }
+}
+
+/**
+ * Exports the board as a PNG image by using the canvas bitmap.
+ *
+ * @param {string} [filenameBase] - Optional base filename sans extension.
+ */
+function exportToPNG(filenameBase) {
+    if (!appState.canvas || !appState.polygons.length) {
+        alert('Generate a board before exporting.');
+        return;
+    }
+    renderBoard();
+    const dataUrl = appState.canvas.toDataURL('image/png');
+    const base = filenameBase || appState.currentProjectName || DEFAULT_PROJECT_NAME;
+    triggerDataUrlDownload(dataUrl, `${sanitizeFileName(base)}.png`);
+    showNotification('PNG exported', 3000);
+}
+
+/**
+ * Converts every polygon into an SVG path string and downloads the result.
+ *
+ * @param {string} [filenameBase] - Base file name.
+ */
+function exportToSVG(filenameBase) {
+    if (!appState.canvas || !appState.polygons.length) {
+        alert('Generate a board before exporting.');
+        return;
+    }
+    const { width, height } = appState.canvas;
+    const paths = appState.polygons
+        .map((polygon) => {
+            const vertexCommands = (polygon.vertices || [])
+                .map((vertex, index) => `${index === 0 ? 'M' : 'L'} ${vertex.x.toFixed(2)} ${vertex.y.toFixed(2)}`)
+                .join(' ');
+            const fill = polygon.color || DEFAULT_FILL;
+            return `<path d="${vertexCommands} Z" fill="${fill}" stroke="${GRID_STROKE}" stroke-width="1" />`;
+        })
+        .join('');
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">${paths}</svg>`;
+    const blob = new Blob([svg], { type: 'image/svg+xml' });
+    const base = filenameBase || appState.currentProjectName || DEFAULT_PROJECT_NAME;
+    triggerBlobDownload(blob, `${sanitizeFileName(base)}.svg`);
+    showNotification('SVG exported', 3000);
+}
+
+/**
+ * Opens the canvas bitmap in a separate tab so the user can print or
+ * use the browser's "Save as PDF" feature.
+ *
+ * @param {string} [filenameBase] - Optional name for the print window.
+ */
+function exportToPDF(filenameBase) {
+    if (!appState.canvas || !appState.polygons.length) {
+        alert('Generate a board before exporting.');
+        return;
+    }
+    renderBoard();
+    const dataUrl = appState.canvas.toDataURL('image/png');
+    const base = filenameBase || appState.currentProjectName || DEFAULT_PROJECT_NAME;
+    const win = window.open('', '_blank');
+    if (!win) {
+        alert('Please allow pop-ups to export to PDF.');
+        return;
+    }
+    win.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head><title>${base}</title></head>
+        <body style="margin:0;display:flex;align-items:center;justify-content:center;background:#f5f5f5;">
+            <img src="${dataUrl}" style="max-width:100%;height:auto;" alt="Protogames board snapshot">
+        </body>
+        </html>
+    `);
+    win.document.close();
+    win.focus();
+    win.onload = () => win.print();
+    showNotification('PDF export ready (use browser print dialog)', 4000);
+}
+
+/**
+ * Wires export buttons to the appropriate handlers.
+ */
+function setupExportButtons() {
+    if (ui.exportPNGBtn) {
+        ui.exportPNGBtn.addEventListener('click', () => exportToPNG());
+    }
+    if (ui.exportSVGBtn) {
+        ui.exportSVGBtn.addEventListener('click', () => exportToSVG());
+    }
+    if (ui.exportPDFBtn) {
+        ui.exportPDFBtn.addEventListener('click', () => exportToPDF());
+    }
+}
+
+/**
+ * Normalizes user-provided file names to avoid invalid characters.
+ *
+ * @param {string} name - Raw user input.
+ * @returns {string} Safe filename.
+ */
+function sanitizeFileName(name = DEFAULT_PROJECT_NAME) {
+    return name.replace(/[<>:"/\\|?*]+/g, '').trim() || DEFAULT_PROJECT_NAME;
+}
+
+/**
+ * Downloads a Blob as a file via a temporary anchor tag.
+ *
+ * @param {Blob} blob - File contents.
+ * @param {string} filename - Desired file name.
+ */
+function triggerBlobDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+}
+
+/**
+ * Downloads a data URL by simulating an anchor click.
+ *
+ * @param {string} dataUrl - Encoded file data.
+ * @param {string} filename - File name.
+ */
+function triggerDataUrlDownload(dataUrl, filename) {
+    const anchor = document.createElement('a');
+    anchor.href = dataUrl;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
 }

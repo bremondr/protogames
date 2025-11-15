@@ -338,6 +338,16 @@ button:focus-visible {
     text-align: center;
 }
 
+.export-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.export-buttons .secondary-button {
+    flex: 1 1 90px;
+}
+
 .visually-hidden {
     position: absolute;
     width: 1px;
@@ -450,4 +460,32 @@ button:focus-visible {
     input[type="number"]:hover {
         border-color: rgba(255, 255, 255, 0.45);
     }
+}
+
+/* ==============================================================
+   NOTIFICATION BANNER
+   --------------------------------------------------------------
+   Lightweight toast message anchored at the bottom center of the
+   viewport. Automatically fades away after a short delay.
+   ============================================================== */
+.notification {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    background: #101828;
+    color: #ffffff;
+    padding: 0.65rem 1.5rem;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-soft);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+    z-index: 20;
+    min-width: 220px;
+    text-align: center;
+}
+
+.notification.show {
+    opacity: 0.95;
 }

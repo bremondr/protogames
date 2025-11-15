@@ -173,17 +173,17 @@
             <section class="panel" aria-labelledby="files-title">
                 <h2 id="files-title">File Management</h2>
                 <div class="stacked-buttons">
-                    <button type="button" class="secondary-button" data-action="save-project">Save Project</button>
-                    <label for="loadProject" class="secondary-button file-button">Load Project</label>
+                    <button type="button" id="saveProjectBtn" class="secondary-button">Save Project</button>
+                    <button type="button" id="loadProjectBtn" class="secondary-button file-button">Load Project</button>
                     <input type="file" id="loadProject" class="visually-hidden" aria-label="Load project file" accept=".json">
-                    <label class="field">
+                    <div class="field">
                         <span class="field-label">Export</span>
-                        <select name="exportType" aria-label="Select export format">
-                            <option value="PNG">PNG</option>
-                            <option value="PDF">PDF</option>
-                            <option value="SVG">SVG</option>
-                        </select>
-                    </label>
+                        <div class="export-buttons">
+                            <button type="button" id="exportPNGBtn" class="secondary-button">PNG</button>
+                            <button type="button" id="exportPDFBtn" class="secondary-button">PDF</button>
+                            <button type="button" id="exportSVGBtn" class="secondary-button">SVG</button>
+                        </div>
+                    </div>
                 </div>
             </section>
         </aside>
@@ -202,6 +202,9 @@
             </div>
         </main>
     </div>
+
+    <!-- Notification banner for lightweight status updates -->
+    <div id="notificationBar" class="notification" role="status" aria-live="polite"></div>
     <script src="app.js" type="module"></script>
 </body>
 </html>
