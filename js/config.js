@@ -19,10 +19,12 @@ const Config = (() => {
     const DEFAULT_BOARD_CONFIG = {
         gridType: 'hexagon',
         orientation: 'pointy-top',
-        boardShape: 'rectangle',
-        width: 12,
-        height: 12,
-        radius: 5
+        boardShape: 'hexagon',
+        width: 11,
+        height: 11,
+        radius: 5,
+        size: 10,
+        triangleOrientation: 'point-up'
     };
 
     return {

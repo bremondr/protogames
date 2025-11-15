@@ -15,11 +15,20 @@ const UI = (() => {
         elements.paletteButtons = Array.from(document.querySelectorAll('.palette-swatch'));
         elements.gridTypeSelect = document.querySelector('select[name="gridType"]');
         elements.orientationSelect = document.querySelector('select[name="gridOrientation"]');
+        elements.orientationField = document.getElementById('orientationField');
         elements.boardShapeSelect = document.querySelector('select[name="boardOutline"]');
         elements.widthInput = document.querySelector('input[name="boardWidth"]');
         elements.heightInput = document.querySelector('input[name="boardHeight"]');
+        elements.widthLabel = document.getElementById('widthLabel');
+        elements.heightLabel = document.getElementById('heightLabel');
         elements.radiusInput = document.querySelector('input[name="boardRadius"]');
         elements.radiusField = document.getElementById('radiusField');
+        elements.radiusLabel = document.getElementById('radiusLabel');
+        elements.sizeInput = document.querySelector('input[name="boardSize"]');
+        elements.sizeField = document.getElementById('sizeField');
+        elements.sizeLabel = document.getElementById('sizeLabel');
+        elements.triangleOrientationSelect = document.querySelector('select[name="triangleOrientation"]');
+        elements.triangleOrientationField = document.getElementById('triangleOrientationField');
         elements.rectangularFields = document.getElementById('rectangularFields');
         elements.generateButton = document.querySelector('[data-action="generate-board"]');
         elements.undoButton = document.querySelector('[data-action="undo"]');
@@ -32,8 +41,16 @@ const UI = (() => {
         elements.exportPDFBtn = document.getElementById('exportPDFBtn');
         elements.exportSVGBtn = document.getElementById('exportSVGBtn');
         elements.notificationBar = document.getElementById('notificationBar');
-        elements.boardShapeSelect?.addEventListener('change', applyBoardShapeVisibility);
+
+        elements.boardShapeSelect?.addEventListener('change', () => {
+            applyBoardShapeVisibility();
+            applyGridTypeRestrictions();
+        });
+        elements.gridTypeSelect?.addEventListener('change', applyGridTypeVisibility);
+
         applyBoardShapeVisibility();
+        applyGridTypeRestrictions();
+        applyGridTypeVisibility();
     }
 
     function getElements() {
@@ -61,13 +78,40 @@ const UI = (() => {
 
     function getBoardConfig() {
         const boardShape = elements.boardShapeSelect?.value || Config.DEFAULT_BOARD_CONFIG.boardShape;
+        const gridType = elements.gridTypeSelect?.value || Config.DEFAULT_BOARD_CONFIG.gridType;
+        const orientation = elements.orientationSelect?.value || Config.DEFAULT_BOARD_CONFIG.orientation;
+        const radius = parseInt(elements.radiusInput?.value, 10) || Config.DEFAULT_BOARD_CONFIG.radius;
+        const size = parseInt(elements.sizeInput?.value, 10) || Config.DEFAULT_BOARD_CONFIG.size;
+        let width = parseInt(elements.widthInput?.value, 10) || Config.DEFAULT_BOARD_CONFIG.width;
+        let height = parseInt(elements.heightInput?.value, 10) || Config.DEFAULT_BOARD_CONFIG.height;
+
+        switch (boardShape) {
+            case 'square':
+                width = size;
+                height = size;
+                break;
+            case 'triangle':
+                width = size;
+                height = size;
+                break;
+            case 'hexagon':
+            case 'circle':
+                width = radius * 2 + 1;
+                height = radius * 2 + 1;
+                break;
+            default:
+                break;
+        }
+
         return {
-            gridType: elements.gridTypeSelect?.value || Config.DEFAULT_BOARD_CONFIG.gridType,
-            orientation: elements.orientationSelect?.value || Config.DEFAULT_BOARD_CONFIG.orientation,
+            gridType,
+            orientation,
             boardShape,
-            width: parseInt(elements.widthInput?.value, 10) || Config.DEFAULT_BOARD_CONFIG.width,
-            height: parseInt(elements.heightInput?.value, 10) || Config.DEFAULT_BOARD_CONFIG.height,
-            radius: parseInt(elements.radiusInput?.value, 10) || Config.DEFAULT_BOARD_CONFIG.radius
+            width,
+            height,
+            radius,
+            size,
+            triangleOrientation: elements.triangleOrientationSelect?.value || Config.DEFAULT_BOARD_CONFIG.triangleOrientation
         };
     }
 
@@ -78,7 +122,13 @@ const UI = (() => {
         if (elements.widthInput) elements.widthInput.value = config.width;
         if (elements.heightInput) elements.heightInput.value = config.height;
         if (elements.radiusInput) elements.radiusInput.value = config.radius ?? Config.DEFAULT_BOARD_CONFIG.radius;
+        if (elements.sizeInput) elements.sizeInput.value = config.size ?? Config.DEFAULT_BOARD_CONFIG.size;
+        if (elements.triangleOrientationSelect) {
+            elements.triangleOrientationSelect.value = config.triangleOrientation || Config.DEFAULT_BOARD_CONFIG.triangleOrientation;
+        }
         applyBoardShapeVisibility();
+        applyGridTypeRestrictions();
+        applyGridTypeVisibility();
     }
 
     function setPaletteSelection(button) {
@@ -103,17 +153,73 @@ const UI = (() => {
     }
 
     /**
-     * Shows or hides the radius and width/height inputs depending on the selected board shape.
+     * Toggles visibility of board-parameter inputs (radius, size, rectangle dimensions, etc.)
+     * whenever the board outline changes, updating labels so the user always knows
+     * what each control represents.
      */
     function applyBoardShapeVisibility() {
         const boardShape = elements.boardShapeSelect?.value || Config.DEFAULT_BOARD_CONFIG.boardShape;
-        const showRadius = boardShape === 'hexagon';
-        if (elements.radiusField) {
-            elements.radiusField.classList.toggle('hidden', !showRadius);
+        const showRadius = boardShape === 'hexagon' || boardShape === 'circle';
+        const showSize = boardShape === 'square' || boardShape === 'triangle';
+        const showTriangleOrientation = boardShape === 'triangle';
+
+        elements.radiusField?.classList.toggle('hidden', !showRadius);
+        elements.sizeField?.classList.toggle('hidden', !showSize);
+        elements.rectangularFields?.classList.toggle('hidden', showRadius || showSize || boardShape === 'square');
+        elements.triangleOrientationField?.classList.toggle('hidden', !showTriangleOrientation);
+
+        if (elements.radiusLabel) {
+            elements.radiusLabel.textContent = 'Radius (tiles from center to edge)';
         }
-        if (elements.rectangularFields) {
-            elements.rectangularFields.classList.toggle('hidden', showRadius);
+        if (elements.sizeLabel) {
+            elements.sizeLabel.textContent =
+                boardShape === 'triangle' ? 'Base Size (tiles along bottom edge)' : 'Size (tiles per side)';
         }
+        if (elements.widthLabel) {
+            elements.widthLabel.textContent = 'Width (columns)';
+        }
+        if (elements.heightLabel) {
+            elements.heightLabel.textContent = 'Height (rows)';
+        }
+    }
+
+    /**
+     * Shows the grid-orientation dropdown only for hexagon grids, keeping the
+     * controls minimal for other grid types.
+     */
+    function applyGridTypeVisibility() {
+        const gridType = elements.gridTypeSelect?.value || Config.DEFAULT_BOARD_CONFIG.gridType;
+        const showOrientation = gridType === 'hexagon';
+        elements.orientationField?.classList.toggle('hidden', !showOrientation);
+    }
+
+    /**
+     * Restricts grid type choices for specific board shapes (e.g., hex outline)
+     * to prevent unsupported combinations and automatically switches to an
+     * allowed option if the current value becomes invalid.
+     */
+    function applyGridTypeRestrictions() {
+        const boardShape = elements.boardShapeSelect?.value || Config.DEFAULT_BOARD_CONFIG.boardShape;
+        const allowedForHexOutline = ['hexagon', 'triangle'];
+        const options = Array.from(elements.gridTypeSelect?.options || []);
+        let selectionChanged = false;
+
+        options.forEach((option) => {
+            if (boardShape === 'hexagon') {
+                const disabled = !allowedForHexOutline.includes(option.value);
+                option.disabled = disabled;
+                if (disabled && option.selected) {
+                    selectionChanged = true;
+                }
+            } else {
+                option.disabled = false;
+            }
+        });
+
+        if (selectionChanged) {
+            elements.gridTypeSelect.value = allowedForHexOutline[0];
+        }
+        applyGridTypeVisibility();
     }
 
     return {
@@ -125,6 +231,8 @@ const UI = (() => {
         updateBoardControls,
         setPaletteSelection,
         setPaletteByColor,
-        applyBoardShapeVisibility
+        applyBoardShapeVisibility,
+        applyGridTypeVisibility,
+        applyGridTypeRestrictions
     };
 })();

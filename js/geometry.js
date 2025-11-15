@@ -92,7 +92,7 @@ const Geometry = (() => {
                 }
 
                 const center = { x: centerX, y: centerY };
-                if (!shouldIncludePolygon(center, boardMetrics, config)) continue;
+                if (!shouldIncludePolygon(center, boardMetrics)) continue;
 
                 const id = `hex_${row}_${col}`;
                 const vertices = createHexVertices(center, size, orientation);
@@ -234,7 +234,7 @@ const Geometry = (() => {
                     x: offsetX + size / 2 + col * size,
                     y: offsetY + size / 2 + row * size
                 };
-                if (!shouldIncludePolygon(center, boardMetrics, config)) continue;
+                if (!shouldIncludePolygon(center, boardMetrics)) continue;
                 const id = `square_${row}_${col}`;
                 const vertices = createSquareVertices(center, size);
                 polygons.push(
@@ -281,7 +281,7 @@ const Geometry = (() => {
                     x: (vertices[0].x + vertices[1].x + vertices[2].x) / 3,
                     y: (vertices[0].y + vertices[1].y + vertices[2].y) / 3
                 };
-                if (!shouldIncludePolygon(center, boardMetrics, config)) continue;
+                if (!shouldIncludePolygon(center, boardMetrics)) continue;
                 const id = `triangle_${row}_${col}`;
                 polygons.push(
                     createPolygon({
@@ -319,7 +319,7 @@ const Geometry = (() => {
                     x: offsetX + size / 2 + col * size,
                     y: offsetY + size / 2 + row * size
                 };
-                if (!shouldIncludePolygon(center, boardMetrics, config)) continue;
+                if (!shouldIncludePolygon(center, boardMetrics)) continue;
                 const id = `diamond_${row}_${col}`;
                 polygons.push(
                     createPolygon({
@@ -357,22 +357,62 @@ const Geometry = (() => {
         };
     }
 
-    function shouldIncludePolygon(center, boardMetrics, config) {
+    /**
+     * Checks whether a polygon center lies inside the currently selected board
+     * outline (hexagon, triangle, circle). Rectangular outlines simply allow all.
+     *
+     * @param {{x:number,y:number}} center - Polygon center in canvas space.
+     * @param {Object|null} boardMetrics - Precomputed outline metadata.
+     * @returns {boolean} True when the polygon should be included.
+     */
+    function shouldIncludePolygon(center, boardMetrics) {
         if (!boardMetrics) return true;
-        if (config.boardShape === 'hexagon' && boardMetrics.outline) {
+        if (boardMetrics.circle) {
+            return isPointInCircle(center, boardMetrics.circle);
+        }
+        if (boardMetrics.outline) {
             return isPointInPolygon(center, boardMetrics.outline);
         }
         return true;
     }
 
+    /**
+     * Builds metadata describing the board outline (hex, triangle, circle, etc.)
+     * so that rectangular grids can be clipped to the desired silhouette.
+     *
+     * @param {number} offsetX - Canvas X offset where the board starts.
+     * @param {number} offsetY - Canvas Y offset where the board starts.
+     * @param {number} width - Board width in pixels.
+     * @param {number} height - Board height in pixels.
+     * @param {Object} config - Board configuration indicating shape/orientation.
+     * @param {string} [orientationHint] - Current grid orientation, if relevant.
+     * @returns {{bounds:Object,outline:Array|null,circle:Object|null}} Shape metadata.
+     */
     function createBoardMetrics(offsetX, offsetY, width, height, config, orientationHint) {
         const bounds = { x: offsetX, y: offsetY, width, height };
         let outline = null;
-        if (config.boardShape === 'hexagon') {
-            const orientation = orientationHint && orientationHint.includes('pointy') ? 'pointy-top' : 'flat-top';
-            outline = createBoardHexOutline(bounds, orientation);
+        let circle = null;
+
+        switch (config.boardShape) {
+            case 'hexagon': {
+                const orientation = orientationHint && orientationHint.includes('pointy') ? 'pointy-top' : 'flat-top';
+                outline = createBoardHexOutline(bounds, orientation);
+                break;
+            }
+            case 'triangle':
+                outline = createBoardTriangleOutline(bounds, config.triangleOrientation || 'point-up');
+                break;
+            case 'circle':
+                circle = {
+                    cx: offsetX + width / 2,
+                    cy: offsetY + height / 2,
+                    radius: Math.min(width, height) / 2
+                };
+                break;
+            default:
+                break;
         }
-        return { bounds, outline };
+        return { bounds, outline, circle };
     }
 
     function createBoardHexOutline(bounds, orientation) {
@@ -397,14 +437,61 @@ const Geometry = (() => {
         ];
     }
 
+    /**
+     * Creates a triangular polygon outline used to clip triangle board shapes.
+     *
+     * @param {{x:number,y:number,width:number,height:number}} bounds - Canvas bounds of the board area.
+     * @param {string} orientation - 'point-up' or 'point-down'.
+     * @returns {Array<{x:number,y:number}>} Triangle outline vertices.
+     */
+    function createBoardTriangleOutline(bounds, orientation) {
+        const { x, y, width, height } = bounds;
+        if (orientation === 'point-down') {
+            return [
+                { x: x, y },
+                { x: x + width, y },
+                { x: x + width / 2, y: y + height }
+            ];
+        }
+        return [
+            { x: x + width / 2, y },
+            { x: x + width, y: y + height },
+            { x: x, y: y + height }
+        ];
+    }
+
+    /**
+     * Determines whether a point lies inside a circle.
+     *
+     * @param {{x:number,y:number}} point - Point to test.
+     * @param {{cx:number,cy:number,radius:number}} circle - Circle descriptor.
+     * @returns {boolean} True when inside or on the boundary.
+     */
+    function isPointInCircle(point, circle) {
+        const dx = point.x - circle.cx;
+        const dy = point.y - circle.cy;
+        return dx * dx + dy * dy <= circle.radius * circle.radius;
+    }
+
     function normalizeBoardDimensions(config) {
         const width = Math.max(1, Math.round(config.width));
         const height = Math.max(1, Math.round(config.height));
-        if (config.boardShape === 'square') {
-            const size = Math.min(width, height);
-            return { cols: size, rows: size };
+        const size = Math.max(1, Math.round(config.size || width));
+        const radius = Math.max(0, Math.round(config.radius ?? 0));
+
+        switch (config.boardShape) {
+            case 'square':
+                return { cols: size, rows: size };
+            case 'triangle':
+                return { cols: size, rows: size };
+            case 'hexagon':
+            case 'circle': {
+                const diameter = radius * 2 + 1;
+                return { cols: diameter, rows: diameter };
+            }
+            default:
+                return { cols: width, rows: height };
         }
-        return { cols: width, rows: height };
     }
 
     function createHexVertices(center, size, orientation) {

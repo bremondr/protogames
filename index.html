@@ -47,16 +47,16 @@
                     <label class="field">
                         <span class="field-label">Grid Type</span>
                         <select name="gridType" aria-label="Select grid type">
-                            <option value="hexagon">Hexagon</option>
+                            <option value="hexagon" selected>Hexagon</option>
                             <option value="square">Square</option>
                             <option value="triangle">Triangle</option>
                             <option value="orthogonal-square">Orthogonal Square</option>
                         </select>
                     </label>
-                    <label class="field">
+                    <label class="field" id="orientationField">
                         <span class="field-label">Grid Orientation</span>
                         <select name="gridOrientation" aria-label="Select grid orientation">
-                            <option value="pointy-top">Pointy-top</option>
+                            <option value="pointy-top" selected>Pointy-top</option>
                             <option value="flat-top">Flat-top</option>
                             <option value="orthogonal">Orthogonal</option>
                             <option value="diagonal">Diagonal</option>
@@ -65,23 +65,36 @@
                     <label class="field">
                         <span class="field-label">Board Outline</span>
                         <select name="boardOutline" aria-label="Select board outline">
+                            <option value="hexagon" selected>Hexagon</option>
                             <option value="square">Square</option>
                             <option value="rectangle">Rectangle</option>
-                            <option value="hexagon">Hexagon</option>
+                            <option value="triangle">Triangle</option>
+                            <option value="circle">Circle</option>
                         </select>
                     </label>
                     <div class="field hidden" id="radiusField">
-                        <span class="field-label">Radius</span>
-                        <input type="number" name="boardRadius" min="1" step="1" value="5" aria-label="Hexagon radius">
-                        <p class="field-hint">Number of hexes from center to edge</p>
+                        <span class="field-label" id="radiusLabel">Radius (tiles from center to edge)</span>
+                        <input type="number" name="boardRadius" min="1" step="1" value="5" aria-label="Board radius">
+                        <p class="field-hint">Number of tiles from center to edge</p>
+                    </div>
+                    <div class="field hidden" id="sizeField">
+                        <span class="field-label" id="sizeLabel">Size (tiles per side)</span>
+                        <input type="number" name="boardSize" min="1" step="1" value="10" aria-label="Board size">
+                    </div>
+                    <div class="field hidden" id="triangleOrientationField">
+                        <span class="field-label">Triangle Orientation</span>
+                        <select name="triangleOrientation" aria-label="Select triangle orientation">
+                            <option value="point-up" selected>Point Up</option>
+                            <option value="point-down">Point Down</option>
+                        </select>
                     </div>
                     <div class="field dimension-fields" id="rectangularFields">
                         <label>
-                            <span class="field-label">Width</span>
+                            <span class="field-label" id="widthLabel">Width (columns)</span>
                             <input type="number" name="boardWidth" min="1" step="1" value="20" aria-label="Board width">
                         </label>
                         <label>
-                            <span class="field-label">Height</span>
+                            <span class="field-label" id="heightLabel">Height (rows)</span>
                             <input type="number" name="boardHeight" min="1" step="1" value="20" aria-label="Board height">
                         </label>
                     </div>
