@@ -31,28 +31,14 @@ function clearCanvas() {
     shapeGrid = []; // Clear the hex grid data
 }
 
-function drawHexagon(x, y, color, rotation = 0, strColor = 'rgba(128, 128, 128, 0.1)') {
+function drawHexagon(x, y, color, rotation = 0, strColor = 'rgba(128, 128, 128, 0.1)', pathOverride = null) {
+    const path = pathOverride || createHexPath(x, y, rotation);
     ctx.save(); // Save the current drawing state
-    ctx.translate(x, y); // Move the origin to the hexagon's center
-    ctx.rotate(rotation); // Rotate by the specified angle
-
-    ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-        const angle = (Math.PI / 3) * i;
-        const xOffset = hexRadius * Math.cos(angle);
-        const yOffset = hexRadius * Math.sin(angle);
-        if (i === 0) {
-            ctx.moveTo(xOffset, yOffset);
-        } else {
-            ctx.lineTo(xOffset, yOffset);
-        }
-    }
-    ctx.closePath();
     ctx.strokeStyle = strColor;
-    ctx.stroke();
+    ctx.lineWidth = 1;
     ctx.fillStyle = color;
-    ctx.fill();
-
+    ctx.stroke(path);
+    ctx.fill(path);
     ctx.restore(); // Restore the previous drawing state
 }
 
@@ -60,42 +46,57 @@ function redrawHexagon(hexagon) {
     clearCanvas(); // Clear the entire canvas
     for (const row of shapeGrid) {
         for (const hex of row) {
-            drawHexagon(hex.x, hex.y, hex.color, hex.rotation); // Redraw all hexagons
+            drawHexagon(hex.x, hex.y, hex.color, hex.rotation, 'rgba(128, 128, 128, 0.1)', hex.path); // Redraw all hexagons
         }
     }
 }
 
-function drawTriangle(x, y, size, flipped, color, strColor = 'rgba(128, 128, 128, 0.1)') {
-    const height = (Math.sqrt(3) / 2) * size; // Height of the equilateral triangle
+function drawTriangle(x, y, size, flipped, color, strColor = 'rgba(128, 128, 128, 0.1)', pathOverride = null) {
+    const path = pathOverride || createTrianglePath(x, y, size, flipped);
 
     ctx.save(); // Save the current state of the canvas
     ctx.lineWidth = 1;
+    ctx.strokeStyle = strColor;
+    ctx.fillStyle = color || defaultColor; // Use passed color or default to white
+    ctx.stroke(path);
+    ctx.fill(path);
+    ctx.restore(); // Restore the previous canvas state
+}
 
-    if (flipped) {
-        // When flipped, rotate 180 degrees around the top point (x, y)
-        ctx.translate(x, y);
-        ctx.rotate(Math.PI); // Rotate 180 degrees
-        ctx.translate(-x, -y); // Translate back
-        y -= height; // Adjust position to align properly with the top vertex of the original triangle
+function createHexPath(x, y, rotation = 0) {
+    const path = new Path2D();
+
+    for (let i = 0; i < 6; i++) {
+        const angle = rotation + (Math.PI / 3) * i;
+        const xOffset = hexRadius * Math.cos(angle);
+        const yOffset = hexRadius * Math.sin(angle);
+        if (i === 0) {
+            path.moveTo(x + xOffset, y + yOffset);
+        } else {
+            path.lineTo(x + xOffset, y + yOffset);
+        }
     }
 
-    // Start drawing the triangle assuming it's upright
-    ctx.beginPath();
+    path.closePath();
+    return path;
+}
 
-    // Draw the triangle
-    ctx.moveTo(x, y); // Top vertex (or bottom after rotation)
-    ctx.lineTo(x - size / 2, y + height); // Bottom left
-    ctx.lineTo(x + size / 2, y + height); // Bottom right
+function createTrianglePath(x, y, size, flipped) {
+    const path = new Path2D();
+    const height = (Math.sqrt(3) / 2) * size;
 
-    ctx.closePath();
+    if (flipped) {
+        path.moveTo(x, y + height); // Bottom vertex
+        path.lineTo(x + size / 2, y); // Top-right
+        path.lineTo(x - size / 2, y); // Top-left
+    } else {
+        path.moveTo(x, y); // Top vertex
+        path.lineTo(x - size / 2, y + height); // Bottom-left
+        path.lineTo(x + size / 2, y + height); // Bottom-right
+    }
 
-    // Draw the stroke and fill
-    ctx.strokeStyle = strColor;
-    ctx.stroke();
-    ctx.fillStyle = color || defaultColor; // Use passed color or default to white
-    ctx.fill();
-
-    ctx.restore(); // Restore the previous canvas state
+    path.closePath();
+    return path;
 }
 
 function generateFlatTopGrid() {
@@ -121,8 +122,10 @@ function generateFlatTopGrid() {
             }
 
             if (x + hexRadius <= canvas.width - margin && y + hexHeight / 2 <= canvas.height - margin) {
-                shapeGrid[r][q] = { x, y, color: defaultColor, rotation: 0, type: 'FlatTopHex' };
-                drawHexagon(x, y, defaultColor);
+                const rotation = 0;
+                const path = createHexPath(x, y, rotation);
+                shapeGrid[r][q] = { x, y, color: defaultColor, rotation, type: 'FlatTopHex', path };
+                drawHexagon(x, y, defaultColor, rotation, 'rgba(128, 128, 128, 0.1)', path);
             }
         }
     }
@@ -151,8 +154,10 @@ function generatePointyTopGrid() {
             }
 
             if (x + hexWidth / 2 <= canvas.width - margin && y + hexHeight / 2 <= canvas.height - margin) {
-                shapeGrid[r][q] = { x, y, color: defaultColor, rotation: Math.PI / 6, type: 'PointyTopHex' };
-                drawHexagon(x, y, defaultColor, Math.PI / 6);
+                const rotation = Math.PI / 6;
+                const path = createHexPath(x, y, rotation);
+                shapeGrid[r][q] = { x, y, color: defaultColor, rotation, type: 'PointyTopHex', path };
+                drawHexagon(x, y, defaultColor, rotation, 'rgba(128, 128, 128, 0.1)', path);
             }
         }
     }
@@ -184,7 +189,7 @@ function generateTriangleGrid() {
             if (x + hexRadius / 2 <= canvas.width - margin && y + triangleHeight / 2 <= canvas.height - margin) {
                 // Rotate every second triangle within a row
                 const flipped = (c % 2 === 1);
-                const rotation = flipped ? 180 : 0;
+                const path = createTrianglePath(x, y, hexRadius, flipped);
 
                 // Store triangle data in the 2D array
                 shapeGrid[r][c] = {
@@ -192,97 +197,53 @@ function generateTriangleGrid() {
                     y: y,
                     color: defaultColor,
                     flipped: flipped,
-                    type: 'triangle'
+                    type: 'triangle',
+                    path: path
                 };
 
                 // Draw triangle with color
-                drawTriangle(x, y, hexRadius, flipped, defaultColor);
+                drawTriangle(x, y, hexRadius, flipped, defaultColor, 'rgba(128, 128, 128, 0.1)', path);
             }
         }
     }
 }
 
 function isPointInFlatTopHexagon(px, py, hex) {
-    const x2 = hex.x;
-    const y2 = hex.y;
-
-    const deltaX = x2 - px;
-    const deltaY = y2 - py;
-
-    return (Math.sqrt(deltaX * deltaX + deltaY * deltaY) < hexHeight / 2) ? true : false;
+    return ctx.isPointInPath(hex.path, px, py);
 }
 
 function isPointInPointyTopHexagon(px, py, hex) {
-    const x2 = hex.x;
-    const y2 = hex.y;
-
-    const deltaX = x2 - px;
-    const deltaY = y2 - py;
-
-    return (Math.sqrt(deltaX * deltaX + deltaY * deltaY) < hexHeight / 2) ? true : false;
-}
-
-function sign(p1, p2, p3) {
-    return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y);
+    return ctx.isPointInPath(hex.path, px, py);
 }
 
 function isPointInTriangle(px, py, triangle) {
-    const { x, y, flipped } = triangle;
-    const height = (Math.sqrt(3) / 2) * hexRadius;
-
-    // Define triangle vertices
-    let v1, v2, v3;
-    if (flipped) {
-        // Flipped triangle (base at top)
-        v1 = { x: x - hexRadius / 2, y: y };           // Top-left
-        v2 = { x: x + hexRadius / 2, y: y };           // Top-right
-        v3 = { x: x, y: y + height };                   // Bottom
-    } else {
-        // Upright triangle (base at bottom)
-        v1 = { x: x - hexRadius / 2, y: y + height };  // Bottom-left
-        v2 = { x: x + hexRadius / 2, y: y + height };  // Bottom-right
-        v3 = { x: x, y: y };                            // Top
-    }
-
-    // Create point object
-    const pt = { x: px, y: py };
-
-    // Calculate signs
-    const d1 = sign(pt, v1, v2);
-    const d2 = sign(pt, v2, v3);
-    const d3 = sign(pt, v3, v1);
-
-    // Check if the point is inside the triangle
-    const has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
-    const has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
-
-    return !(has_neg && has_pos);
+    return ctx.isPointInPath(triangle.path, px, py);
 }
 
 function updateHexagonColor(hexagon, color) {
     if (color == 'grey-border') {
-        drawHexagon(hexagon.x, hexagon.y, hexagon.color, hexagon.rotation, 'black'); // Redraw hexagon with new border color
+        drawHexagon(hexagon.x, hexagon.y, hexagon.color, hexagon.rotation, 'black', hexagon.path); // Redraw hexagon with new border color
     } else if (color === 'eraser') {
         color = 'white'; // Eraser mode sets hexagon to white
         hexagon.color = color;
-        drawHexagon(hexagon.x, hexagon.y, color, hexagon.rotation, 'black');
+        drawHexagon(hexagon.x, hexagon.y, color, hexagon.rotation, 'black', hexagon.path);
     }
     else if (hexagon.color !== color) {
         hexagon.color = color;
-        drawHexagon(hexagon.x, hexagon.y, color, hexagon.rotation, "black"); // Redraw hexagon with new color
+        drawHexagon(hexagon.x, hexagon.y, color, hexagon.rotation, "black", hexagon.path); // Redraw hexagon with new color
     }
 }
 
 function updateTriangleColor(triangle, color) {
     console.log("triangle");
     if (color === 'grey-border') {
-        drawTriangle(triangle.x, triangle.y, hexRadius, triangle.flipped, triangle.color, 'black'); // Redraw with grey border
+        drawTriangle(triangle.x, triangle.y, hexRadius, triangle.flipped, triangle.color, 'black', triangle.path); // Redraw with grey border
     } else if (color === 'eraser') {
         triangle.color = 'white'; // Erase color
-        drawTriangle(triangle.x, triangle.y, hexRadius, triangle.flipped, 'white');
+        drawTriangle(triangle.x, triangle.y, hexRadius, triangle.flipped, 'white', undefined, triangle.path);
     } else {
         triangle.color = color;
-        drawTriangle(triangle.x, triangle.y, hexRadius, triangle.flipped, color, 'black');
+        drawTriangle(triangle.x, triangle.y, hexRadius, triangle.flipped, color, 'black', triangle.path);
     }
 }
 
