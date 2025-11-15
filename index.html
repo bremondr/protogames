@@ -7,7 +7,12 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <!-- Fixed top app header -->
+    <!-- =========================================================
+         PRIMARY APP HEADER
+         ---------------------------------------------------------
+         Displays the product name and lightweight tagline so the
+         user always knows which prototype tool they are using.
+         ========================================================= -->
     <header class="app-header">
         <div class="brand">
             <span class="brand-mark" aria-hidden="true">PG</span>
@@ -16,10 +21,26 @@
         <p class="header-tagline">Tabletop Board Designer</p>
     </header>
 
+    <!-- =========================================================
+         APP SHELL
+         ---------------------------------------------------------
+         Two-column layout where the sidebar contains tools and the
+         main region houses the canvas workspace.
+         ========================================================= -->
     <div class="app-shell">
-        <!-- Primary toolbar sidebar -->
+        <!-- ================================================
+             SIDEBAR TOOLBAR
+             ------------------------------------------------
+             Contains every control needed before interacting
+             with the board: generation settings, palette,
+             action buttons, and file utilities.
+             ================================================ -->
         <aside class="sidebar" aria-label="Protogames toolbox">
-            <!-- Board setup panel -->
+            <!-- --------------------------------------------
+                 BOARD SETUP PANEL
+                 Users configure the board grid, outline, and
+                 overall dimensions before generating tiles.
+                 -------------------------------------------- -->
             <section class="panel" aria-labelledby="board-setup-title">
                 <h2 id="board-setup-title">Board Setup</h2>
                 <form class="panel-form">
@@ -63,7 +84,11 @@
                 </form>
             </section>
 
-            <!-- Color palette panel -->
+            <!-- --------------------------------------------
+                 COLOR PALETTE
+                 Gives players a visual palette for terrain
+                 colors. JavaScript toggles selection states.
+                 -------------------------------------------- -->
             <section class="panel" aria-labelledby="color-palette-title">
                 <h2 id="color-palette-title">Color Palette</h2>
                 <div class="palette-grid" role="list">
@@ -102,7 +127,11 @@
                 </div>
             </section>
 
-            <!-- Action buttons panel -->
+            <!-- --------------------------------------------
+                 ACTION BUTTONS
+                 Undo/redo and clear board shortcuts appear
+                 here. Icons reinforce what each button does.
+                 -------------------------------------------- -->
             <section class="panel" aria-labelledby="actions-title">
                 <h2 id="actions-title">Actions</h2>
                 <div class="action-buttons">
@@ -136,7 +165,11 @@
                 </div>
             </section>
 
-            <!-- File management panel -->
+            <!-- --------------------------------------------
+                 FILE MANAGEMENT
+                 Allows saving/loading project JSON files and
+                 placeholders for exporting to other formats.
+                 -------------------------------------------- -->
             <section class="panel" aria-labelledby="files-title">
                 <h2 id="files-title">File Management</h2>
                 <div class="stacked-buttons">
@@ -155,7 +188,13 @@
             </section>
         </aside>
 
-        <!-- Workspace / canvas area -->
+        <!-- ================================================
+             WORKSPACE / CANVAS AREA
+             ------------------------------------------------
+             The large editor surface where polygons will be
+             rendered. The placeholder text is replaced with a
+             short hint once a grid exists.
+             ================================================ -->
         <main class="workspace" aria-label="Game board workspace">
             <div class="canvas-wrapper">
                 <canvas id="gameCanvas" aria-label="Board editor canvas"></canvas>

@@ -1,3 +1,17 @@
+/* 
+ * PROTOGAMES - Stylesheet
+ * --------------------------------------------------------------
+ * Centralizes every visual detail for the Protogames prototype.
+ * The file flows top-to-bottom from shared variables through
+ * layout pieces, component styles, and responsive tweaks.
+ */
+
+/* ==============================================================
+   CSS CUSTOM PROPERTIES
+   --------------------------------------------------------------
+   Shared color, spacing, and size tokens so we can keep the UI
+   consistent and tweak themes in one place.
+   ============================================================== */
 :root {
     --color-bg: #f5f6fb;
     --color-panel: #ffffff;
@@ -15,8 +29,13 @@
     --header-height: 56px;
 }
 
-/* CSS Reset / Normalize */
-*,
+/* ==============================================================
+   CSS RESET / NORMALIZE
+   --------------------------------------------------------------
+   Neutral base rules so the experience behaves the same across
+   browsers on desktop and tablets.
+   ============================================================== */
+*, 
 *::before,
 *::after {
     box-sizing: border-box;
@@ -60,7 +79,12 @@ button {
     cursor: pointer;
 }
 
-/* Layout */
+/* ==============================================================
+   TOP-LEVEL LAYOUT
+   --------------------------------------------------------------
+   Header, sidebar, and canvas workspace structure made with
+   Flexbox so panels resize smoothly.
+   ============================================================== */
 .app-header {
     position: fixed;
     top: 0;
@@ -157,6 +181,11 @@ button {
 }
 
 /* Panels */
+/* ==============================================================
+   SIDEBAR PANELS
+   --------------------------------------------------------------
+   Card-like containers that hold controls grouped by purpose.
+   ============================================================== */
 .panel {
     background: rgba(255, 255, 255, 0.05);
     border-radius: var(--radius-md);
@@ -213,6 +242,12 @@ input[type="number"]:focus-visible {
 }
 
 /* Buttons */
+/* ==============================================================
+   BUTTON COMPONENTS
+   --------------------------------------------------------------
+   Shared button styles with variants for primary, secondary,
+   icon, and destructive actions.
+   ============================================================== */
 .primary-button,
 .secondary-button,
 .icon-button {
@@ -316,6 +351,12 @@ button:focus-visible {
 }
 
 /* Palette */
+/* ==============================================================
+   COLOR PALETTE
+   --------------------------------------------------------------
+   Grid of swatches with labels. Each swatch is large enough for
+   comfortable tapping on touch devices.
+   ============================================================== */
 .palette-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
@@ -358,6 +399,12 @@ button:focus-visible {
 }
 
 /* Actions */
+/* ==============================================================
+   ACTIONS PANEL
+   --------------------------------------------------------------
+   Vertical stack for undo, redo, and clear buttons to remain
+   readable in tight spaces.
+   ============================================================== */
 .action-buttons {
     display: flex;
     flex-direction: column;
@@ -365,6 +412,12 @@ button:focus-visible {
 }
 
 /* Responsive adjustments */
+/* ==============================================================
+   RESPONSIVE ADJUSTMENTS
+   --------------------------------------------------------------
+   Media queries that collapse the sidebar into rows for tablet
+   widths and adjust hover feedback for pointer devices.
+   ============================================================== */
 @media (max-width: 1100px) {
     .palette-grid {
         grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
