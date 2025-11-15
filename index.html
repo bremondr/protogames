@@ -26,27 +26,27 @@
                     <label class="field">
                         <span class="field-label">Grid Type</span>
                         <select name="gridType" aria-label="Select grid type">
-                            <option>Hexagon</option>
-                            <option>Square</option>
-                            <option>Triangle</option>
-                            <option>Orthogonal Square</option>
+                            <option value="hexagon">Hexagon</option>
+                            <option value="square">Square</option>
+                            <option value="triangle">Triangle</option>
+                            <option value="orthogonal-square">Orthogonal Square</option>
                         </select>
                     </label>
                     <label class="field">
                         <span class="field-label">Grid Orientation</span>
                         <select name="gridOrientation" aria-label="Select grid orientation">
-                            <option>Pointy-top</option>
-                            <option>Flat-top</option>
-                            <option>Orthogonal</option>
-                            <option>Diagonal</option>
+                            <option value="pointy-top">Pointy-top</option>
+                            <option value="flat-top">Flat-top</option>
+                            <option value="orthogonal">Orthogonal</option>
+                            <option value="diagonal">Diagonal</option>
                         </select>
                     </label>
                     <label class="field">
                         <span class="field-label">Board Outline</span>
                         <select name="boardOutline" aria-label="Select board outline">
-                            <option>Square</option>
-                            <option>Rectangle</option>
-                            <option>Hexagon</option>
+                            <option value="square">Square</option>
+                            <option value="rectangle">Rectangle</option>
+                            <option value="hexagon">Hexagon</option>
                         </select>
                     </label>
                     <div class="field dimension-fields">
@@ -59,7 +59,7 @@
                             <input type="number" name="boardHeight" min="1" step="1" value="20" aria-label="Board height">
                         </label>
                     </div>
-                    <button type="button" class="primary-button">Generate Board</button>
+                    <button type="button" class="primary-button" data-action="generate-board">Generate Board</button>
                 </form>
             </section>
 
@@ -67,35 +67,35 @@
             <section class="panel" aria-labelledby="color-palette-title">
                 <h2 id="color-palette-title">Color Palette</h2>
                 <div class="palette-grid" role="list">
-                    <button type="button" class="palette-swatch selected" style="--swatch-color:#0b3d1d" aria-pressed="true">
+                    <button type="button" class="palette-swatch selected" style="--swatch-color:#0b3d1d" data-color="#0b3d1d" aria-pressed="true">
                         <span class="swatch" aria-hidden="true"></span>
                         <span class="swatch-label">Forest</span>
                     </button>
-                    <button type="button" class="palette-swatch" style="--swatch-color:#4caf50">
+                    <button type="button" class="palette-swatch" style="--swatch-color:#4caf50" data-color="#4caf50">
                         <span class="swatch" aria-hidden="true"></span>
                         <span class="swatch-label">Grassland</span>
                     </button>
-                    <button type="button" class="palette-swatch" style="--swatch-color:#1e88e5">
+                    <button type="button" class="palette-swatch" style="--swatch-color:#1e88e5" data-color="#1e88e5">
                         <span class="swatch" aria-hidden="true"></span>
                         <span class="swatch-label">Water</span>
                     </button>
-                    <button type="button" class="palette-swatch" style="--swatch-color:#cbb279">
+                    <button type="button" class="palette-swatch" style="--swatch-color:#cbb279" data-color="#cbb279">
                         <span class="swatch" aria-hidden="true"></span>
                         <span class="swatch-label">Desert</span>
                     </button>
-                    <button type="button" class="palette-swatch" style="--swatch-color:#607d8b">
+                    <button type="button" class="palette-swatch" style="--swatch-color:#607d8b" data-color="#607d8b">
                         <span class="swatch" aria-hidden="true"></span>
                         <span class="swatch-label">Mountain</span>
                     </button>
-                    <button type="button" class="palette-swatch" style="--swatch-color:#795548">
+                    <button type="button" class="palette-swatch" style="--swatch-color:#795548" data-color="#795548">
                         <span class="swatch" aria-hidden="true"></span>
                         <span class="swatch-label">Village</span>
                     </button>
-                    <button type="button" class="palette-swatch" style="--swatch-color:#ff7043">
+                    <button type="button" class="palette-swatch" style="--swatch-color:#ff7043" data-color="#ff7043">
                         <span class="swatch" aria-hidden="true"></span>
                         <span class="swatch-label">Volcanic</span>
                     </button>
-                    <button type="button" class="palette-swatch" style="--swatch-color:#9c27b0">
+                    <button type="button" class="palette-swatch" style="--swatch-color:#9c27b0" data-color="#9c27b0">
                         <span class="swatch" aria-hidden="true"></span>
                         <span class="swatch-label">Mystic</span>
                     </button>
@@ -106,7 +106,7 @@
             <section class="panel" aria-labelledby="actions-title">
                 <h2 id="actions-title">Actions</h2>
                 <div class="action-buttons">
-                    <button type="button" class="icon-button" aria-label="Undo action">
+                    <button type="button" class="icon-button" data-action="undo" aria-label="Undo action">
                         <span class="icon" aria-hidden="true">
                             <svg viewBox="0 0 24 24" focusable="false">
                                 <path d="M9 7H4v5" />
@@ -115,7 +115,7 @@
                         </span>
                         <span>Undo</span>
                     </button>
-                    <button type="button" class="icon-button" aria-label="Redo action">
+                    <button type="button" class="icon-button" data-action="redo" aria-label="Redo action">
                         <span class="icon" aria-hidden="true">
                             <svg viewBox="0 0 24 24" focusable="false">
                                 <path d="M15 7h5v5" />
@@ -124,7 +124,7 @@
                         </span>
                         <span>Redo</span>
                     </button>
-                    <button type="button" class="icon-button destructive" aria-label="Clear board">
+                    <button type="button" class="icon-button destructive" data-action="clear-board" aria-label="Clear board">
                         <span class="icon" aria-hidden="true">
                             <svg viewBox="0 0 24 24" focusable="false">
                                 <line x1="6" y1="6" x2="18" y2="18" />
@@ -140,15 +140,15 @@
             <section class="panel" aria-labelledby="files-title">
                 <h2 id="files-title">File Management</h2>
                 <div class="stacked-buttons">
-                    <button type="button" class="secondary-button">Save Project</button>
+                    <button type="button" class="secondary-button" data-action="save-project">Save Project</button>
                     <label for="loadProject" class="secondary-button file-button">Load Project</label>
                     <input type="file" id="loadProject" class="visually-hidden" aria-label="Load project file" accept=".json">
                     <label class="field">
                         <span class="field-label">Export</span>
                         <select name="exportType" aria-label="Select export format">
-                            <option>PNG</option>
-                            <option>PDF</option>
-                            <option>SVG</option>
+                            <option value="PNG">PNG</option>
+                            <option value="PDF">PDF</option>
+                            <option value="SVG">SVG</option>
                         </select>
                     </label>
                 </div>
@@ -163,5 +163,6 @@
             </div>
         </main>
     </div>
+    <script src="app.js" type="module"></script>
 </body>
 </html>
