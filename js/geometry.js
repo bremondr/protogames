@@ -23,8 +23,10 @@ const Geometry = (() => {
     /**
      * Generates hexagon tiles arranged either in a rectangular footprint or a
      * true hexagon outline depending on the user's board shape selection.
+     * When the user selects the hexagon outline the grid is sized by radius
+     * (number of tiles from center to vertex) rather than width/height.
      *
-     * @param {Object} config - Board configuration.
+     * @param {Object} config - Board configuration including orientation, outline and radius.
      * @param {HTMLCanvasElement} canvas - Canvas used to determine sizing.
      * @param {Map} colorMap - Map of previous polygon colors keyed by id.
      * @returns {Array<Object>} Collection of hexagon polygons.
@@ -111,25 +113,84 @@ const Geometry = (() => {
     }
 
     /**
-     * Builds a perfect hexagon footprint where each ring of axial coordinates
-     * forms a symmetrical outline with single-hex tips.
+     * Builds a perfect hexagon footprint from a radius-driven row plan so the
+     * outline always has single-hex tips and a widest center row.
      *
-     * @param {Object} config - Board configuration including radius.
+     * @param {Object} config - Board configuration including the radius parameter.
      * @param {HTMLCanvasElement} canvas - Canvas reference for sizing.
      * @param {Map} colorMap - Previous colors keyed by polygon id.
      * @returns {Array<Object>} Hexagon-shaped polygon list.
      */
     function buildHexagonShapedGrid(config, canvas, colorMap) {
+        if (!canvas) return [];
         const radius = Math.max(0, Number.isFinite(config.radius) ? Math.floor(config.radius) : Config.DEFAULT_BOARD_CONFIG.radius);
         const orientation = config.orientation === 'flat-top' ? 'flat-top' : 'pointy-top';
-        const layout = computeHexagonAxialLayout(radius, orientation);
-        const availableWidth = canvas.width - Config.CANVAS_PADDING * 2;
-        const availableHeight = canvas.height - Config.CANVAS_PADDING * 2;
+        const rowPlan = createHexagonRowPlan(radius);
+        const layout = computeHexagonAxialLayout(rowPlan.rows, orientation);
+        const placement = calculateHexagonCentering(layout, orientation, canvas);
 
+        return layout.coords.map((coord) => {
+            const polygonId = `hex_${coord.q}_${coord.r}`;
+            const center = {
+                x: (coord.x - layout.minX + placement.hexWidthUnit / 2) * placement.size + placement.offsetX,
+                y: (coord.y - layout.minY + placement.hexHeightUnit / 2) * placement.size + placement.offsetY
+            };
+            return createPolygon({
+                id: polygonId,
+                type: 'hexagon',
+                center,
+                vertices: createHexVertices(center, placement.size, orientation),
+                color: colorMap?.get(polygonId)
+            });
+        });
+    }
+
+    /**
+     * Builds row descriptors for a radius-based hexagon where the first and
+     * last rows contain a single tile and each intermediate row grows/shrinks
+     * by one tile until reaching the center row (radius + 1 tiles).
+     *
+     * @param {number} radius - Number of hexes from the center to any vertex.
+     * @returns {{rows:Array<{index:number,axialR:number,count:number,qStart:number,qEnd:number}>,totalRows:number}}
+     */
+    function createHexagonRowPlan(radius) {
+        const safeRadius = Math.max(0, radius);
+        const totalRows = safeRadius * 2 + 1;
+        const rows = [];
+
+        for (let index = 0; index < totalRows; index++) {
+            const axialR = index - safeRadius;
+            const count = index <= safeRadius ? index + 1 : totalRows - index;
+            const qStart = Math.max(-safeRadius, -axialR - safeRadius);
+            const qEnd = Math.min(safeRadius, -axialR + safeRadius);
+            rows.push({
+                index,
+                axialR,
+                count,
+                qStart,
+                qEnd
+            });
+        }
+
+        return { rows, totalRows };
+    }
+
+    /**
+     * Calculates how large each hex can be drawn and the offsets required to
+     * keep the full footprint centered on the canvas while respecting padding.
+     *
+     * @param {{minX:number,maxX:number,minY:number,maxY:number}} layout - Bounding box in axial space.
+     * @param {string} orientation - 'pointy-top' or 'flat-top'.
+     * @param {HTMLCanvasElement} canvas - Canvas reference for sizing.
+     * @returns {{size:number,offsetX:number,offsetY:number,hexWidthUnit:number,hexHeightUnit:number}}
+     */
+    function calculateHexagonCentering(layout, orientation, canvas) {
         const hexWidthUnit = orientation === 'pointy-top' ? Math.sqrt(3) : 2;
         const hexHeightUnit = orientation === 'pointy-top' ? 2 : Math.sqrt(3);
         const widthCenters = layout.maxX - layout.minX;
         const heightCenters = layout.maxY - layout.minY;
+        const availableWidth = canvas.width - Config.CANVAS_PADDING * 2;
+        const availableHeight = canvas.height - Config.CANVAS_PADDING * 2;
 
         const size = Math.max(
             8,
@@ -144,44 +205,28 @@ const Geometry = (() => {
         const offsetX = (canvas.width - (widthCenters + hexWidthUnit) * size) / 2;
         const offsetY = (canvas.height - (heightCenters + hexHeightUnit) * size) / 2;
 
-        return layout.coords.map((coord) => {
-            const polygonId = `hex_${coord.q}_${coord.r}`;
-            const center = {
-                x: (coord.x - layout.minX + hexWidthUnit / 2) * size + offsetX,
-                y: (coord.y - layout.minY + hexHeightUnit / 2) * size + offsetY
-            };
-            return createPolygon({
-                id: polygonId,
-                type: 'hexagon',
-                center,
-                vertices: createHexVertices(center, size, orientation),
-                color: colorMap?.get(polygonId)
-            });
-        });
+        return { size, offsetX, offsetY, hexWidthUnit, hexHeightUnit };
     }
 
     /**
-     * Generates axial coordinates for a hexagon of the given radius and
-     * returns center positions for a unit hex. The resulting layout is
-     * later scaled to fit within the canvas bounds.
+     * Generates axial coordinates for every tile described in the row plan
+     * so the grid can later be scaled and centered on the canvas.
      *
-     * @param {number} radius - Number of hexes from center to each vertex.
+     * @param {Array<Object>} rowPlan - Output from createHexagonRowPlan.
      * @param {string} orientation - 'pointy-top' or 'flat-top'.
      * @returns {{coords:Array,minX:number,maxX:number,minY:number,maxY:number}}
      */
-    function computeHexagonAxialLayout(radius, orientation) {
+    function computeHexagonAxialLayout(rowPlan, orientation) {
         const coords = [];
         let minX = Infinity;
         let maxX = -Infinity;
         let minY = Infinity;
         let maxY = -Infinity;
 
-        for (let q = -radius; q <= radius; q++) {
-            const rMin = Math.max(-radius, -q - radius);
-            const rMax = Math.min(radius, -q + radius);
-            for (let r = rMin; r <= rMax; r++) {
-                const { x, y } = axialToPixel(q, r, orientation, 1);
-                coords.push({ q, r, x, y });
+        for (const row of rowPlan) {
+            for (let q = row.qStart; q <= row.qEnd; q++) {
+                const { x, y } = axialToPixel(q, row.axialR, orientation, 1);
+                coords.push({ q, r: row.axialR, x, y });
                 minX = Math.min(minX, x);
                 maxX = Math.max(maxX, x);
                 minY = Math.min(minY, y);

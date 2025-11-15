@@ -169,7 +169,17 @@ const UI = (() => {
         elements.triangleOrientationField?.classList.toggle('hidden', !showTriangleOrientation);
 
         if (elements.radiusLabel) {
-            elements.radiusLabel.textContent = 'Radius (tiles from center to edge)';
+            elements.radiusLabel.textContent =
+                boardShape === 'hexagon'
+                    ? 'Radius (number of hexagons from center to edge, try 3-10)'
+                    : 'Radius (tiles from center to edge)';
+        }
+        if (elements.radiusInput) {
+            if (boardShape === 'hexagon') {
+                elements.radiusInput.placeholder = 'e.g., 3-10';
+            } else {
+                elements.radiusInput.removeAttribute('placeholder');
+            }
         }
         if (elements.sizeLabel) {
             elements.sizeLabel.textContent =
