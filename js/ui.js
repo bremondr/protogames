@@ -18,6 +18,9 @@ const UI = (() => {
         elements.boardShapeSelect = document.querySelector('select[name="boardOutline"]');
         elements.widthInput = document.querySelector('input[name="boardWidth"]');
         elements.heightInput = document.querySelector('input[name="boardHeight"]');
+        elements.radiusInput = document.querySelector('input[name="boardRadius"]');
+        elements.radiusField = document.getElementById('radiusField');
+        elements.rectangularFields = document.getElementById('rectangularFields');
         elements.generateButton = document.querySelector('[data-action="generate-board"]');
         elements.undoButton = document.querySelector('[data-action="undo"]');
         elements.redoButton = document.querySelector('[data-action="redo"]');
@@ -29,6 +32,8 @@ const UI = (() => {
         elements.exportPDFBtn = document.getElementById('exportPDFBtn');
         elements.exportSVGBtn = document.getElementById('exportSVGBtn');
         elements.notificationBar = document.getElementById('notificationBar');
+        elements.boardShapeSelect?.addEventListener('change', applyBoardShapeVisibility);
+        applyBoardShapeVisibility();
     }
 
     function getElements() {
@@ -55,12 +60,14 @@ const UI = (() => {
     }
 
     function getBoardConfig() {
+        const boardShape = elements.boardShapeSelect?.value || Config.DEFAULT_BOARD_CONFIG.boardShape;
         return {
             gridType: elements.gridTypeSelect?.value || Config.DEFAULT_BOARD_CONFIG.gridType,
             orientation: elements.orientationSelect?.value || Config.DEFAULT_BOARD_CONFIG.orientation,
-            boardShape: elements.boardShapeSelect?.value || Config.DEFAULT_BOARD_CONFIG.boardShape,
+            boardShape,
             width: parseInt(elements.widthInput?.value, 10) || Config.DEFAULT_BOARD_CONFIG.width,
-            height: parseInt(elements.heightInput?.value, 10) || Config.DEFAULT_BOARD_CONFIG.height
+            height: parseInt(elements.heightInput?.value, 10) || Config.DEFAULT_BOARD_CONFIG.height,
+            radius: parseInt(elements.radiusInput?.value, 10) || Config.DEFAULT_BOARD_CONFIG.radius
         };
     }
 
@@ -70,6 +77,8 @@ const UI = (() => {
         if (elements.boardShapeSelect) elements.boardShapeSelect.value = config.boardShape;
         if (elements.widthInput) elements.widthInput.value = config.width;
         if (elements.heightInput) elements.heightInput.value = config.height;
+        if (elements.radiusInput) elements.radiusInput.value = config.radius ?? Config.DEFAULT_BOARD_CONFIG.radius;
+        applyBoardShapeVisibility();
     }
 
     function setPaletteSelection(button) {
@@ -93,6 +102,20 @@ const UI = (() => {
         }
     }
 
+    /**
+     * Shows or hides the radius and width/height inputs depending on the selected board shape.
+     */
+    function applyBoardShapeVisibility() {
+        const boardShape = elements.boardShapeSelect?.value || Config.DEFAULT_BOARD_CONFIG.boardShape;
+        const showRadius = boardShape === 'hexagon';
+        if (elements.radiusField) {
+            elements.radiusField.classList.toggle('hidden', !showRadius);
+        }
+        if (elements.rectangularFields) {
+            elements.rectangularFields.classList.toggle('hidden', showRadius);
+        }
+    }
+
     return {
         init,
         getElements,
@@ -101,6 +124,7 @@ const UI = (() => {
         getBoardConfig,
         updateBoardControls,
         setPaletteSelection,
-        setPaletteByColor
+        setPaletteByColor,
+        applyBoardShapeVisibility
     };
 })();

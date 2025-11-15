@@ -70,7 +70,12 @@
                             <option value="hexagon">Hexagon</option>
                         </select>
                     </label>
-                    <div class="field dimension-fields">
+                    <div class="field hidden" id="radiusField">
+                        <span class="field-label">Radius</span>
+                        <input type="number" name="boardRadius" min="1" step="1" value="5" aria-label="Hexagon radius">
+                        <p class="field-hint">Number of hexes from center to edge</p>
+                    </div>
+                    <div class="field dimension-fields" id="rectangularFields">
                         <label>
                             <span class="field-label">Width</span>
                             <input type="number" name="boardWidth" min="1" step="1" value="20" aria-label="Board width">

@@ -20,8 +20,21 @@ const Geometry = (() => {
         }
     }
 
+    /**
+     * Generates hexagon tiles arranged either in a rectangular footprint or a
+     * true hexagon outline depending on the user's board shape selection.
+     *
+     * @param {Object} config - Board configuration.
+     * @param {HTMLCanvasElement} canvas - Canvas used to determine sizing.
+     * @param {Map} colorMap - Map of previous polygon colors keyed by id.
+     * @returns {Array<Object>} Collection of hexagon polygons.
+     */
     function buildHexGrid(config, canvas, colorMap) {
         if (!canvas) return [];
+        if (config.boardShape === 'hexagon') {
+            return buildHexagonShapedGrid(config, canvas, colorMap);
+        }
+
         const dims = normalizeBoardDimensions(config);
         const cols = dims.cols;
         const rows = dims.rows;
@@ -95,6 +108,108 @@ const Geometry = (() => {
             }
         }
         return polygons;
+    }
+
+    /**
+     * Builds a perfect hexagon footprint where each ring of axial coordinates
+     * forms a symmetrical outline with single-hex tips.
+     *
+     * @param {Object} config - Board configuration including radius.
+     * @param {HTMLCanvasElement} canvas - Canvas reference for sizing.
+     * @param {Map} colorMap - Previous colors keyed by polygon id.
+     * @returns {Array<Object>} Hexagon-shaped polygon list.
+     */
+    function buildHexagonShapedGrid(config, canvas, colorMap) {
+        const radius = Math.max(0, Number.isFinite(config.radius) ? Math.floor(config.radius) : Config.DEFAULT_BOARD_CONFIG.radius);
+        const orientation = config.orientation === 'flat-top' ? 'flat-top' : 'pointy-top';
+        const layout = computeHexagonAxialLayout(radius, orientation);
+        const availableWidth = canvas.width - Config.CANVAS_PADDING * 2;
+        const availableHeight = canvas.height - Config.CANVAS_PADDING * 2;
+
+        const hexWidthUnit = orientation === 'pointy-top' ? Math.sqrt(3) : 2;
+        const hexHeightUnit = orientation === 'pointy-top' ? 2 : Math.sqrt(3);
+        const widthCenters = layout.maxX - layout.minX;
+        const heightCenters = layout.maxY - layout.minY;
+
+        const size = Math.max(
+            8,
+            Math.floor(
+                Math.min(
+                    availableWidth / (widthCenters + hexWidthUnit),
+                    availableHeight / (heightCenters + hexHeightUnit)
+                )
+            )
+        );
+
+        const offsetX = (canvas.width - (widthCenters + hexWidthUnit) * size) / 2;
+        const offsetY = (canvas.height - (heightCenters + hexHeightUnit) * size) / 2;
+
+        return layout.coords.map((coord) => {
+            const polygonId = `hex_${coord.q}_${coord.r}`;
+            const center = {
+                x: (coord.x - layout.minX + hexWidthUnit / 2) * size + offsetX,
+                y: (coord.y - layout.minY + hexHeightUnit / 2) * size + offsetY
+            };
+            return createPolygon({
+                id: polygonId,
+                type: 'hexagon',
+                center,
+                vertices: createHexVertices(center, size, orientation),
+                color: colorMap?.get(polygonId)
+            });
+        });
+    }
+
+    /**
+     * Generates axial coordinates for a hexagon of the given radius and
+     * returns center positions for a unit hex. The resulting layout is
+     * later scaled to fit within the canvas bounds.
+     *
+     * @param {number} radius - Number of hexes from center to each vertex.
+     * @param {string} orientation - 'pointy-top' or 'flat-top'.
+     * @returns {{coords:Array,minX:number,maxX:number,minY:number,maxY:number}}
+     */
+    function computeHexagonAxialLayout(radius, orientation) {
+        const coords = [];
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let minY = Infinity;
+        let maxY = -Infinity;
+
+        for (let q = -radius; q <= radius; q++) {
+            const rMin = Math.max(-radius, -q - radius);
+            const rMax = Math.min(radius, -q + radius);
+            for (let r = rMin; r <= rMax; r++) {
+                const { x, y } = axialToPixel(q, r, orientation, 1);
+                coords.push({ q, r, x, y });
+                minX = Math.min(minX, x);
+                maxX = Math.max(maxX, x);
+                minY = Math.min(minY, y);
+                maxY = Math.max(maxY, y);
+            }
+        }
+
+        return { coords, minX, maxX, minY, maxY };
+    }
+
+    /**
+     * Converts axial coordinates (q,r) to pixel space for the requested orientation.
+     *
+     * @param {number} q - Axial q coordinate.
+     * @param {number} r - Axial r coordinate.
+     * @param {string} orientation - 'pointy-top' or 'flat-top'.
+     * @param {number} size - Hex radius in pixels.
+     * @returns {{x:number,y:number}} Pixel location for the hex center.
+     */
+    function axialToPixel(q, r, orientation, size) {
+        if (orientation === 'flat-top') {
+            const x = size * (3 / 2) * q;
+            const y = size * Math.sqrt(3) * (r + q / 2);
+            return { x, y };
+        }
+        const x = size * Math.sqrt(3) * (q + r / 2);
+        const y = size * (3 / 2) * r;
+        return { x, y };
     }
 
     function buildSquareGrid(config, canvas, colorMap) {

@@ -21,7 +21,8 @@ const Config = (() => {
         orientation: 'pointy-top',
         boardShape: 'rectangle',
         width: 12,
-        height: 12
+        height: 12,
+        radius: 5
     };
 
     return {
