@@ -7,6 +7,9 @@
  */
 const Interactions = (() => {
     let ui = null;
+    // Ensures move events are processed at most ~60fps for smooth brushing.
+    const MOVE_THROTTLE_MS = 16;
+    let lastMoveTimestamp = 0;
 
     function init(uiRefs) {
         ui = uiRefs;
@@ -22,7 +25,8 @@ const Interactions = (() => {
         canvas.addEventListener('pointerdown', handlePointerDown);
         canvas.addEventListener('pointermove', handlePointerMove);
         canvas.addEventListener('pointerup', handlePointerUp);
-        canvas.addEventListener('pointerleave', handlePointerLeave);
+        canvas.addEventListener('pointerleave', handlePointerCancel);
+        canvas.addEventListener('pointercancel', handlePointerCancel);
     }
 
     function bindPaletteEvents() {
@@ -82,34 +86,91 @@ const Interactions = (() => {
         FileManager.autoSaveToLocalStorage(true);
     }
 
+    /**
+     * Handles pointer presses by entering drawing mode and coloring
+     * the polygon immediately under the cursor/touch.
+     *
+     * @param {PointerEvent} event - Pointer down event.
+     */
     function handlePointerDown(event) {
         event.preventDefault();
         const point = getCanvasCoordinates(event);
-        const polygon = Geometry.findPolygonAtPoint(point, AppState.getState().polygons);
+        const state = AppState.getState();
+        const polygon = Geometry.findPolygonAtPoint(point, state.polygons);
+        AppState.setDrawingActive(true, polygon?.id || null);
         if (polygon) {
-            applyColorToPolygon(polygon, AppState.getState().currentColor);
+            applyColorToPolygon(polygon, state.currentColor, { recordHistory: false, markDirty: false });
+            Renderer.renderBoard();
         }
     }
 
+    /**
+     * Handles pointer movement for both hover feedback and brush coloring.
+     * Movement events are throttled so dragging feels smooth even on tablets.
+     *
+     * @param {PointerEvent} event - Pointer move event.
+     */
     function handlePointerMove(event) {
+        const state = AppState.getState();
         const point = getCanvasCoordinates(event);
-        const polygon = Geometry.findPolygonAtPoint(point, AppState.getState().polygons);
+
+        if (state.isDrawing) {
+            const now = performance.now();
+            if (now - lastMoveTimestamp < MOVE_THROTTLE_MS) {
+                return;
+            }
+            lastMoveTimestamp = now;
+            const polygon = Geometry.findPolygonAtPoint(point, state.polygons);
+            if (polygon && polygon.id !== state.lastColoredPolygonId) {
+                applyColorToPolygon(polygon, state.currentColor, { recordHistory: false, markDirty: false });
+                AppState.setLastColoredPolygonId(polygon.id);
+                Renderer.renderBoard();
+            }
+            return;
+        }
+
+        const polygon = Geometry.findPolygonAtPoint(point, state.polygons);
         const polygonId = polygon?.id || null;
-        if (polygonId !== AppState.getState().hoverPolygonId) {
+        if (polygonId !== state.hoverPolygonId) {
             AppState.setHoverPolygonId(polygonId);
             Renderer.renderBoard();
         }
     }
 
+    /**
+     * Finalizes a brush stroke by recording history and resetting drawing flags.
+     */
     function handlePointerUp() {
-        // Reserved for future drag interactions.
+        const state = AppState.getState();
+        if (!state.isDrawing) return;
+        const didColor = Boolean(state.lastColoredPolygonId);
+        AppState.setDrawingActive(false);
+        if (didColor) {
+            AppState.recordHistory();
+            AppState.markDirty();
+            FileManager.autoSaveToLocalStorage(true);
+        }
+        Renderer.renderBoard();
     }
 
-    function handlePointerLeave() {
-        if (AppState.getState().hoverPolygonId) {
-            AppState.setHoverPolygonId(null);
-            Renderer.renderBoard();
+    /**
+     * Cancels drawing when the pointer leaves the canvas or touch is interrupted.
+     */
+    function handlePointerCancel() {
+        const state = AppState.getState();
+        if (state.isDrawing) {
+            const didColor = Boolean(state.lastColoredPolygonId);
+            AppState.setDrawingActive(false);
+            if (didColor) {
+                AppState.recordHistory();
+                AppState.markDirty();
+                FileManager.autoSaveToLocalStorage(true);
+            }
         }
+        if (state.hoverPolygonId) {
+            AppState.setHoverPolygonId(null);
+        }
+        Renderer.renderBoard();
     }
 
     /**
@@ -131,13 +192,26 @@ const Interactions = (() => {
         };
     }
 
-    function applyColorToPolygon(polygon, color) {
+    /**
+     * Applies a color to a polygon with optional history/dirty tracking.
+     *
+     * @param {Object} polygon - Polygon to update.
+     * @param {string} color - Hex color string.
+     * @param {Object} [options] - Behavior flags.
+     * @param {boolean} [options.recordHistory=true] - Whether to snapshot history.
+     * @param {boolean} [options.markDirty=true] - Whether to mark state dirty/autosave.
+     */
+    function applyColorToPolygon(polygon, color, options = {}) {
+        const { recordHistory = true, markDirty = true } = options;
         if (!polygon || polygon.color === color) return;
         polygon.color = color;
-        Renderer.renderBoard();
-        AppState.recordHistory();
-        AppState.markDirty();
-        FileManager.autoSaveToLocalStorage(true);
+        if (recordHistory) {
+            AppState.recordHistory();
+        }
+        if (markDirty) {
+            AppState.markDirty();
+            FileManager.autoSaveToLocalStorage(true);
+        }
     }
 
     /**

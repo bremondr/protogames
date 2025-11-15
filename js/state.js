@@ -17,7 +17,17 @@ const AppState = (() => {
         historyIndex: -1,
         currentProjectName: null,
         lastSaveTime: null,
-        isDirty: false
+        isDirty: false,
+        /**
+         * Indicates whether the user currently has a pointer pressed down
+         * and is brushing across the board.
+         */
+        isDrawing: false,
+        /**
+         * Stores the last polygon id colored during a single drag action
+         * to avoid repainting the same cell repeatedly.
+         */
+        lastColoredPolygonId: null
     };
 
     /**
@@ -84,6 +94,27 @@ const AppState = (() => {
      */
     function setProjectName(name) {
         state.currentProjectName = name;
+    }
+
+    /**
+     * Toggles drawing mode when the user is actively brushing.
+     *
+     * @param {boolean} active - Whether drawing is active.
+     * @param {string|null} [polygonId=null] - Polygon already colored when drawing starts.
+     */
+    function setDrawingActive(active, polygonId = null) {
+        state.isDrawing = active;
+        state.lastColoredPolygonId = active ? polygonId : null;
+    }
+
+    /**
+     * Persists the last polygon colored while dragging so we do not repaint
+     * the same shape multiple times during a single brush stroke.
+     *
+     * @param {string|null} id - Polygon identifier or null to clear.
+     */
+    function setLastColoredPolygonId(id) {
+        state.lastColoredPolygonId = id;
     }
 
     function markDirty() {
@@ -158,6 +189,8 @@ const AppState = (() => {
         setCurrentColor,
         setHoverPolygonId,
         setProjectName,
+        setDrawingActive,
+        setLastColoredPolygonId,
         markDirty,
         clearDirty,
         recordHistory,
