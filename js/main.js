@@ -5,6 +5,15 @@
  * once the DOM is ready.
  */
 const Main = (() => {
+    const debouncedResize = Utils.debounce(() => {
+        Renderer.resizeCanvas();
+        Interactions.generateBoard(AppState.getState().boardConfig, {
+            preserveColors: true,
+            preserveHistory: true,
+            skipDirtyFlag: true
+        });
+    }, 250);
+
     function initializeApp() {
         UI.init();
         const uiRefs = UI.getElements();
@@ -30,17 +39,7 @@ const Main = (() => {
         Interactions.generateBoard(AppState.getState().boardConfig, { skipDirtyFlag: true });
         UI.updateCanvasMessage(AppState.getState().polygons.length);
 
-        window.addEventListener('resize', handleResize);
-    }
-
-    function handleResize() {
-        const uiRefs = UI.getElements();
-        Renderer.initializeCanvas(uiRefs.canvas);
-        Interactions.generateBoard(AppState.getState().boardConfig, {
-            preserveColors: true,
-            preserveHistory: true,
-            skipDirtyFlag: true
-        });
+        window.addEventListener('resize', debouncedResize);
     }
 
     document.addEventListener('DOMContentLoaded', initializeApp);

@@ -14,15 +14,30 @@ const Renderer = (() => {
      */
     function initializeCanvas(canvas) {
         if (!canvas) return;
-        const parentRect = canvas.parentElement.getBoundingClientRect();
-        canvas.width = Math.floor(parentRect.width);
-        canvas.height = Math.floor(parentRect.height);
         canvas.style.touchAction = 'none';
         const ctx = canvas.getContext('2d');
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
         ctx.imageSmoothingEnabled = true;
         AppState.setCanvas(canvas, ctx);
+        resizeCanvas();
+    }
+
+    /**
+     * Resizes the canvas to match its container.
+     *
+     * @returns {{width:number,height:number, changed:boolean}|null}
+     */
+    function resizeCanvas() {
+        const { canvas } = AppState.getState();
+        if (!canvas || !canvas.parentElement) return null;
+        const parentRect = canvas.parentElement.getBoundingClientRect();
+        const newWidth = Math.floor(parentRect.width);
+        const newHeight = Math.floor(parentRect.height);
+        const changed = canvas.width !== newWidth || canvas.height !== newHeight;
+        canvas.width = newWidth;
+        canvas.height = newHeight;
+        return { width: newWidth, height: newHeight, changed };
     }
 
     /**
@@ -99,6 +114,7 @@ const Renderer = (() => {
 
     return {
         initializeCanvas,
+        resizeCanvas,
         clearCanvas,
         renderBoard,
         drawPolygon

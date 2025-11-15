@@ -7,6 +7,22 @@
  */
 const Utils = (() => {
     /**
+     * Creates a debounced version of a function that delays execution
+     * until after the specified wait time has elapsed.
+     *
+     * @param {Function} fn - Function to debounce.
+     * @param {number} [delay=250] - Delay in ms.
+     * @returns {Function} Debounced function.
+     */
+    function debounce(fn, delay = 250) {
+        let timeoutId;
+        return function (...args) {
+            clearTimeout(timeoutId);
+            timeoutId = window.setTimeout(() => fn.apply(this, args), delay);
+        };
+    }
+
+    /**
      * Removes characters that are invalid in file names.
      *
      * @param {string} [name=Config.DEFAULT_PROJECT_NAME] - Raw user input.
@@ -70,6 +86,7 @@ const Utils = (() => {
     }
 
     return {
+        debounce,
         sanitizeFileName,
         clonePolygons,
         triggerBlobDownload,
