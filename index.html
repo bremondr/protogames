@@ -45,6 +45,16 @@
                 <h2 id="board-setup-title">Board Setup</h2>
                 <form class="panel-form">
                     <label class="field">
+                        <span class="field-label">Board Shape</span>
+                        <select name="boardOutline" aria-label="Select board shape">
+                            <option value="hexagon" selected>Hexagon</option>
+                            <option value="square">Square</option>
+                            <option value="rectangle">Rectangle</option>
+                            <option value="triangle">Triangle</option>
+                            <option value="circle">Circle</option>
+                        </select>
+                    </label>                    
+                    <label class="field">
                         <span class="field-label">Tile shape</span>
                         <select name="gridType" aria-label="Select grid type">
                             <option value="hexagon" selected>Hexagon</option>
@@ -59,16 +69,6 @@
                             <option value="flat-top">Flat-top</option>
                             <!-- <option value="orthogonal">Orthogonal</option>
                             <option value="diagonal">Diagonal</option> -->
-                        </select>
-                    </label>
-                    <label class="field">
-                        <span class="field-label">Board Shape</span>
-                        <select name="boardOutline" aria-label="Select board shape">
-                            <option value="hexagon" selected>Hexagon</option>
-                            <option value="square">Square</option>
-                            <option value="rectangle">Rectangle</option>
-                            <option value="triangle">Triangle</option>
-                            <option value="circle">Circle</option>
                         </select>
                     </label>
                     <div class="field hidden" id="radiusField">
