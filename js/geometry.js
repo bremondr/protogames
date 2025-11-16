@@ -330,6 +330,15 @@ const Geometry = (() => {
             return buildTessellatedTriangle(config, canvas, colorMap, baseSize, triangleOrientation);
         }
 
+        if (config.boardShape === 'hexagon') {
+            const radius = Math.max(
+                0,
+                Number.isFinite(config.radius) ? Math.floor(config.radius) : Config.DEFAULT_BOARD_CONFIG.radius
+            );
+            const hexOrientation = config.orientation === 'flat-top' ? 'flat-top' : 'pointy-top';
+            return buildHexagonTriangleGrid(config, canvas, colorMap, radius, hexOrientation);
+        }
+
         // Fallback: retain rectangular tiling when the board outline is not triangular.
         const dims = normalizeBoardDimensions(config);
         const cols = Math.max(2, dims.cols);
@@ -359,7 +368,12 @@ const Geometry = (() => {
                     x: (vertices[0].x + vertices[1].x + vertices[2].x) / 3,
                     y: (vertices[0].y + vertices[1].y + vertices[2].y) / 3
                 };
-                if (!shouldIncludePolygon(center, boardMetrics)) continue;
+                const insideHex =
+                    boardMetrics && boardMetrics.outline
+                        ? isPointInPolygon(center, boardMetrics.outline) &&
+                          vertices.every((vertex) => isPointInPolygon(vertex, boardMetrics.outline))
+                        : shouldIncludePolygon(center, boardMetrics);
+                if (!insideHex) continue;
                 const id = `triangle_${row}_${col}`;
                 polygons.push(
                     createPolygon({
@@ -373,6 +387,72 @@ const Geometry = (() => {
                 );
             }
         }
+        return polygons;
+    }
+
+    /**
+     * Generates a triangle-tessellated hexagon outline by first sizing the hex
+     * footprint from the provided radius (tiles from center to vertex) and then
+     * filtering a full triangular grid so only triangles whose centers fall
+     * inside the hex polygon remain. Both upward and downward triangles are
+     * produced to keep the tessellation seamless across the entire outline.
+     *
+     * @param {Object} config - Board configuration.
+     * @param {HTMLCanvasElement} canvas - Canvas reference for sizing and centering.
+     * @param {Map} colorMap - Previous polygon colors keyed by id.
+     * @param {number} radius - Hex radius in tiles from center to any vertex.
+     * @param {string} orientation - 'pointy-top' or 'flat-top' hex orientation.
+     * @returns {Array<Object>} Triangle polygons clipped to the hex outline.
+     */
+    function buildHexagonTriangleGrid(config, canvas, colorMap, radius, orientation) {
+        const rowPlan = createHexagonRowPlan(radius);
+        const layout = computeHexagonAxialLayout(rowPlan.rows, orientation);
+        const placement = calculateHexagonCentering(layout, orientation, canvas);
+
+        const boardWidth = (layout.maxX - layout.minX + placement.hexWidthUnit) * placement.size;
+        const boardHeight = (layout.maxY - layout.minY + placement.hexHeightUnit) * placement.size;
+        const offsetX = placement.offsetX;
+        const offsetY = placement.offsetY;
+
+        // Match triangle side to the hex edge length so boundaries align.
+        const triangleSize = Math.max(8, Math.floor(placement.size));
+        const triangleHeight = (Math.sqrt(3) / 2) * triangleSize;
+
+        // Generate a tessellation that fully covers the bounding box with a slight bleed.
+        const rows = Math.ceil(boardHeight / triangleHeight) + 4;
+        const cols = Math.ceil(boardWidth / (triangleSize / 2)) + 8;
+
+        const hexCenter = { x: offsetX + boardWidth / 2, y: offsetY + boardHeight / 2 };
+        const hexOutline = createHexVertices(hexCenter, placement.size, orientation);
+        const polygons = [];
+
+        for (let row = 0; row < rows; row++) {
+            const originY = offsetY - 2 * triangleHeight + row * triangleHeight;
+            for (let col = 0; col < cols; col++) {
+                const originX = offsetX - 2 * triangleSize + (col * triangleSize) / 2;
+                const pointingUp = (row + col) % 2 === 0;
+                const vertices = createTriangleVertices({ x: originX, y: originY }, triangleSize, pointingUp);
+                const center = {
+                    x: (vertices[0].x + vertices[1].x + vertices[2].x) / 3,
+                    y: (vertices[0].y + vertices[1].y + vertices[2].y) / 3
+                };
+                const insideHex =
+                    isPointInPolygon(center, hexOutline) && vertices.every((vertex) => isPointInPolygon(vertex, hexOutline));
+                if (!insideHex) continue;
+                const id = `triangle_hex_${row}_${col}`;
+                polygons.push(
+                    createPolygon({
+                        id,
+                        type: 'triangle',
+                        center,
+                        vertices,
+                        color: colorMap?.get(id),
+                        metadata: { pointingUp }
+                    })
+                );
+            }
+        }
+
         return polygons;
     }
 
