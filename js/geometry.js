@@ -296,8 +296,41 @@ const Geometry = (() => {
         return polygons;
     }
 
+    /**
+     * Builds a fully tessellated triangular board where both upward and downward
+     * triangles fill the shape. The `size` parameter represents the base size
+     * (number of upward-pointing triangles along the wide edge). Each row either
+     * gains or loses one upward and one downward triangle, producing counts of
+     * (2r + 1) tiles per row in point-up mode and mirroring for point-down.
+     *
+     * Row structure (point-up):
+     * - Row 0 (top) starts with 1 upward triangle.
+     * - Row r has (r + 1) upward + r downward = 2r + 1 total triangles.
+     * - Bottom row has `baseSize` upward and `baseSize - 1` downward triangles.
+     *
+     * The pattern alternates orientations horizontally (up, down, up, ...),
+     * keeping gaps closed so the outline is a solid triangle with single-vertex
+     * tips. Point-down orientation mirrors the same plan vertically and starts
+     * each row with a downward triangle at the left edge.
+     *
+     * @param {Object} config - Board configuration including `size` and `triangleOrientation`.
+     * @param {HTMLCanvasElement} canvas - Canvas reference for sizing and centering.
+     * @param {Map} colorMap - Previous polygon colors keyed by id.
+     * @returns {Array<Object>} Triangle polygons covering the requested footprint.
+     */
     function buildTriangleGrid(config, canvas, colorMap) {
         if (!canvas) return [];
+        const baseSize = Math.max(
+            1,
+            Number.isFinite(config.size) ? Math.floor(config.size) : Config.DEFAULT_BOARD_CONFIG.size
+        );
+        const triangleOrientation = config.triangleOrientation === 'point-down' ? 'point-down' : 'point-up';
+
+        if (config.boardShape === 'triangle') {
+            return buildTessellatedTriangle(config, canvas, colorMap, baseSize, triangleOrientation);
+        }
+
+        // Fallback: retain rectangular tiling when the board outline is not triangular.
         const dims = normalizeBoardDimensions(config);
         const cols = Math.max(2, dims.cols);
         const rows = Math.max(1, dims.rows);
@@ -340,6 +373,65 @@ const Geometry = (() => {
                 );
             }
         }
+        return polygons;
+    }
+
+    /**
+     * Generates the fully filled triangular footprint (both orientations) using
+     * the base-size definition. Geometry is calculated row-by-row so that each
+     * row is centered horizontally and spaced vertically by the triangle height.
+     *
+     * @param {Object} config - Board configuration.
+     * @param {HTMLCanvasElement} canvas - Canvas for sizing and centering.
+     * @param {Map} colorMap - Previous polygon colors keyed by id.
+     * @param {number} baseSize - Number of upward triangles along the wide edge.
+     * @param {string} triangleOrientation - 'point-up' or 'point-down'.
+     * @returns {Array<Object>} Triangle polygons describing the outline.
+     */
+    function buildTessellatedTriangle(config, canvas, colorMap, baseSize, triangleOrientation) {
+        const availableWidth = canvas.width - Config.CANVAS_PADDING * 2;
+        const availableHeight = canvas.height - Config.CANVAS_PADDING * 2;
+        const sizeFromWidth = availableWidth / baseSize;
+        const sizeFromHeight = (availableHeight * 2) / (Math.sqrt(3) * baseSize);
+        const size = Math.max(12, Math.floor(Math.min(sizeFromWidth, sizeFromHeight)));
+        const triangleHeight = (Math.sqrt(3) / 2) * size;
+        const boardWidth = baseSize * size;
+        const boardHeight = baseSize * triangleHeight;
+        const offsetX = (canvas.width - boardWidth) / 2;
+        const offsetY = (canvas.height - boardHeight) / 2;
+        const polygons = [];
+
+        for (let row = 0; row < baseSize; row++) {
+            const logicalRow = triangleOrientation === 'point-up' ? row : baseSize - 1 - row;
+            const trianglesInRow = 2 * logicalRow + 1;
+            const rowWidthCenters = (trianglesInRow - 1) * (size / 2);
+            const startX = offsetX + boardWidth / 2 - rowWidthCenters / 2;
+            const originY = offsetY + row * triangleHeight;
+
+            for (let col = 0; col < trianglesInRow; col++) {
+                const centerX = startX + col * (size / 2);
+                const origin = { x: centerX - size / 2, y: originY };
+                const startWithUp = triangleOrientation === 'point-up';
+                const pointingUp = startWithUp ? col % 2 === 0 : col % 2 !== 0;
+                const vertices = createTriangleVertices(origin, size, pointingUp);
+                const center = {
+                    x: (vertices[0].x + vertices[1].x + vertices[2].x) / 3,
+                    y: (vertices[0].y + vertices[1].y + vertices[2].y) / 3
+                };
+                const id = `triangle_${row}_${col}`;
+                polygons.push(
+                    createPolygon({
+                        id,
+                        type: 'triangle',
+                        center,
+                        vertices,
+                        color: colorMap?.get(id),
+                        metadata: { pointingUp }
+                    })
+                );
+            }
+        }
+
         return polygons;
     }
 
@@ -572,6 +664,17 @@ const Geometry = (() => {
         ];
     }
 
+    /**
+     * Creates equilateral triangle vertices given a bounding-box origin. The box
+     * width equals the side length, and height is derived from the 60° angles:
+     * h = side * sqrt(3) / 2. Upward triangles place the tip at the top edge;
+     * downward triangles place the tip at the bottom edge.
+     *
+     * @param {{x:number,y:number}} origin - Top-left corner of the triangle's bounding box.
+     * @param {number} size - Side length in pixels.
+     * @param {boolean} pointingUp - True for upward orientation (tip at top), false for downward.
+     * @returns {Array<{x:number,y:number}>} Ordered triangle vertices.
+     */
     function createTriangleVertices(origin, size, pointingUp) {
         const height = (Math.sqrt(3) / 2) * size;
         if (pointingUp) {
