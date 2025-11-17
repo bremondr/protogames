@@ -391,54 +391,96 @@ const Geometry = (() => {
     }
 
     /**
-     * Generates a triangle-tessellated hexagon outline by first sizing the hex
-     * footprint from the provided radius (tiles from center to vertex) and then
-     * filtering a full triangular grid so only triangles whose centers fall
-     * inside the hex polygon remain. Both upward and downward triangles are
-     * produced to keep the tessellation seamless across the entire outline.
+     * Generates a hexagon filled with concentric rings of equilateral triangles.
+     * The radius counts rings of triangles: radius 1 places exactly 6 triangles
+     * meeting at the center to form a perfect hexagon; each additional ring k
+     * adds `6 * (2k - 1)` more triangles, keeping flat edges and 6-fold symmetry
+     * (total triangles = `6 * radius^2`). The outer edge of every ring is a
+     * straight hex facet composed of triangle bases, matching the reference
+     * pattern in the provided visualization.
+     *
+     * Generation approach:
+     * - Compute a regular hex outline whose side length equals `radius *
+     *   triangleSize` (hex circumradius matches the chosen triangle scale).
+     * - Generate a full triangle tessellation covering the outline's bounding
+     *   box (alternating up/down per standard grid).
+     * - Keep only triangles whose centers and vertices lie inside the hex
+     *   outline. Because the hex side aligns to the triangle grid, this yields
+     *   the ring-by-ring structure with flat outer edges.
      *
      * @param {Object} config - Board configuration.
      * @param {HTMLCanvasElement} canvas - Canvas reference for sizing and centering.
      * @param {Map} colorMap - Previous polygon colors keyed by id.
-     * @param {number} radius - Hex radius in tiles from center to any vertex.
+     * @param {number} radius - Number of concentric triangle rings (1 => 6 triangles).
      * @param {string} orientation - 'pointy-top' or 'flat-top' hex orientation.
-     * @returns {Array<Object>} Triangle polygons clipped to the hex outline.
+     * @returns {Array<Object>} Triangle polygons forming the filled hexagon.
      */
     function buildHexagonTriangleGrid(config, canvas, colorMap, radius, orientation) {
-        const rowPlan = createHexagonRowPlan(radius);
-        const layout = computeHexagonAxialLayout(rowPlan.rows, orientation);
-        const placement = calculateHexagonCentering(layout, orientation, canvas);
+        if (!canvas) return [];
 
-        const boardWidth = (layout.maxX - layout.minX + placement.hexWidthUnit) * placement.size;
-        const boardHeight = (layout.maxY - layout.minY + placement.hexHeightUnit) * placement.size;
-        const offsetX = placement.offsetX;
-        const offsetY = placement.offsetY;
+        const rings = Math.max(
+            1,
+            Number.isFinite(radius) ? Math.floor(radius) : Config.DEFAULT_BOARD_CONFIG.radius
+        );
+        const hexOrientation = orientation === 'flat-top' ? 'flat-top' : 'pointy-top';
 
-        // Match triangle side to the hex edge length so boundaries align.
-        const triangleSize = Math.max(8, Math.floor(placement.size));
+        const availableWidth = canvas.width - Config.CANVAS_PADDING * 2;
+        const availableHeight = canvas.height - Config.CANVAS_PADDING * 2;
+
+        // Hex width/height per unit size (circumradius) for the two orientations.
+        const hexWidthUnit = hexOrientation === 'pointy-top' ? Math.sqrt(3) : 2;
+        const hexHeightUnit = hexOrientation === 'pointy-top' ? 2 : Math.sqrt(3);
+
+        // First find the maximum hex radius that fits; then derive triangle size by dividing by rings.
+        const maxHexSize = Math.max(
+            8,
+            Math.floor(Math.min(availableWidth / hexWidthUnit, availableHeight / hexHeightUnit))
+        );
+        const triangleSize = Math.max(8, Math.floor(maxHexSize / rings));
+        const size = triangleSize * rings; // actual hex radius after snapping to triangle grid
         const triangleHeight = (Math.sqrt(3) / 2) * triangleSize;
 
-        // Generate a tessellation that fully covers the bounding box with a slight bleed.
-        const rows = Math.ceil(boardHeight / triangleHeight) + 4;
-        const cols = Math.ceil(boardWidth / (triangleSize / 2)) + 8;
+        const hexWidth = hexWidthUnit * size;
+        const hexHeight = hexHeightUnit * size;
+        const offsetX = (canvas.width - hexWidth) / 2;
+        const offsetY = (canvas.height - hexHeight) / 2;
+        const hexCenter = { x: offsetX + hexWidth / 2, y: offsetY + hexHeight / 2 };
+        const hexOutline = createHexVertices(hexCenter, size, hexOrientation);
 
-        const hexCenter = { x: offsetX + boardWidth / 2, y: offsetY + boardHeight / 2 };
-        const hexOutline = createHexVertices(hexCenter, placement.size, orientation);
+        // Anchor the triangle lattice so that the hex center is itself a lattice
+        // vertex. This guarantees radius 1 yields six triangles meeting at the
+        // center. Origins step by size/2 horizontally and full height vertically.
+        const anchorX = hexCenter.x - triangleSize / 2;
+        const anchorY = hexCenter.y;
+
+        // Bound the lattice range to cover the hex with a small bleed.
+        const minX = offsetX;
+        const maxX = offsetX + hexWidth;
+        const minY = offsetY;
+        const maxY = offsetY + hexHeight;
+        const bleed = 2;
+        const rowStart = Math.floor((minY - anchorY) / triangleHeight) - bleed;
+        const rowEnd = Math.ceil((maxY - anchorY) / triangleHeight) + bleed;
+        const colStart = Math.floor(((minX - anchorX) * 2) / triangleSize) - bleed;
+        const colEnd = Math.ceil(((maxX - anchorX) * 2) / triangleSize) + bleed;
+
         const polygons = [];
 
-        for (let row = 0; row < rows; row++) {
-            const originY = offsetY - 2 * triangleHeight + row * triangleHeight;
-            for (let col = 0; col < cols; col++) {
-                const originX = offsetX - 2 * triangleSize + (col * triangleSize) / 2;
+        for (let row = rowStart; row <= rowEnd; row++) {
+            const originY = anchorY + row * triangleHeight;
+            for (let col = colStart; col <= colEnd; col++) {
+                const originX = anchorX + (col * triangleSize) / 2;
                 const pointingUp = (row + col) % 2 === 0;
                 const vertices = createTriangleVertices({ x: originX, y: originY }, triangleSize, pointingUp);
                 const center = {
                     x: (vertices[0].x + vertices[1].x + vertices[2].x) / 3,
                     y: (vertices[0].y + vertices[1].y + vertices[2].y) / 3
                 };
+
                 const insideHex =
                     isPointInPolygon(center, hexOutline) && vertices.every((vertex) => isPointInPolygon(vertex, hexOutline));
                 if (!insideHex) continue;
+
                 const id = `triangle_hex_${row}_${col}`;
                 polygons.push(
                     createPolygon({
@@ -455,6 +497,7 @@ const Geometry = (() => {
 
         return polygons;
     }
+
 
     /**
      * Generates the fully filled triangular footprint (both orientations) using
