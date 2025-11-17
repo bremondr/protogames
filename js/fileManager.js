@@ -21,6 +21,9 @@ const FileManager = (() => {
         if (autoSaveIntervalId) {
             clearInterval(autoSaveIntervalId);
         }
+        if (!AppState.getState().autoSaveEnabled) {
+            return;
+        }
         autoSaveIntervalId = window.setInterval(() => {
             autoSaveToLocalStorage();
         }, Config.AUTO_SAVE_INTERVAL);
@@ -43,12 +46,14 @@ const FileManager = (() => {
             currentColor: state.currentColor,
             paletteId: state.currentPaletteId,
             isEraserActive: state.isEraserActive,
+            autoSaveEnabled: state.autoSaveEnabled,
             polygons: Utils.clonePolygons(state.polygons)
         };
     }
 
     function autoSaveToLocalStorage(force = false) {
         const state = AppState.getState();
+        if (!state.autoSaveEnabled) return;
         if (!state.polygons.length) return;
         if (!force && !state.isDirty) return;
         if (!window.localStorage) return;
@@ -81,6 +86,47 @@ const FileManager = (() => {
             console.error('Failed to parse autosave payload.', error);
             return null;
         }
+    }
+
+    /**
+     * Presents a clear autosave prompt with load/discard actions.
+     *
+     * @param {Object} payload - Autosave payload.
+     */
+    function promptAutosaveRestore(payload) {
+        const timestamp = payload.timestamp ? new Date(payload.timestamp).toLocaleString() : 'a previous session';
+        const modal = document.createElement('div');
+        modal.className = 'modal-backdrop';
+        modal.innerHTML = `
+            <div class="modal">
+                <h3>Auto-saved work found</h3>
+                <p>Auto-saved work found from ${timestamp}. What would you like to do?</p>
+                <div class="modal-actions">
+                    <button type="button" class="secondary-button" data-action="discard">Discard</button>
+                    <button type="button" class="primary-button" data-action="load">Load</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        const handleChoice = (action) => {
+            modal.remove();
+            if (action === 'load') {
+                restoreState(payload, { skipNotification: true });
+                UI?.showNotification('Autosave restored', 4000);
+            } else {
+                // discard
+                localStorage.removeItem(Config.AUTO_SAVE_KEY);
+                UI?.showNotification('Autosave discarded', 2500);
+            }
+        };
+
+        modal.addEventListener('click', (event) => {
+            const button = event.target.closest('button[data-action]');
+            if (!button) return;
+            const action = button.dataset.action;
+            handleChoice(action);
+        });
     }
 
     function saveProjectFile() {
@@ -151,6 +197,13 @@ const FileManager = (() => {
         AppState.setCurrentColor(resolved.color);
         AppState.setEraserActive(Boolean(statePayload.isEraserActive));
         UI.setEraserActive(statePayload.isEraserActive);
+        if (typeof statePayload.autoSaveEnabled === 'boolean') {
+            AppState.setAutoSaveEnabled(statePayload.autoSaveEnabled);
+            if (ui?.autoSaveToggle) {
+                ui.autoSaveToggle.checked = statePayload.autoSaveEnabled;
+            }
+            setupAutoSave();
+        }
         AppState.setPolygons(Utils.clonePolygons(statePayload.polygons || []));
         AppState.setProjectName(payload.projectName || Config.DEFAULT_PROJECT_NAME);
 
@@ -174,6 +227,7 @@ const FileManager = (() => {
         autoSaveToLocalStorage,
         loadAutoSave,
         restoreState,
-        saveProjectFile
+        saveProjectFile,
+        promptAutosaveRestore
     };
 })();

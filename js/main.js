@@ -34,12 +34,8 @@ const Main = (() => {
 
         const autoSaved = FileManager.loadAutoSave();
         if (autoSaved) {
-            const label = Utils.formatTimestamp(autoSaved.timestamp) || 'a previous session';
-            if (confirm(`An autosave from ${label} was found. Restore it?`)) {
-                FileManager.restoreState(autoSaved, { skipNotification: true });
-                UI.showNotification('Autosave restored', 4000);
-                return;
-            }
+            FileManager.promptAutosaveRestore(autoSaved);
+            return;
         }
 
         Interactions.generateBoard(AppState.getState().boardConfig, { skipDirtyFlag: true });
