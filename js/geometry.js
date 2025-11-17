@@ -14,8 +14,6 @@
         switch (config.gridType) {
             case 'triangle':
                 return tri.buildTriangleGrid(config, canvas, colorMap);
-            case 'orthogonal-square':
-                return square.buildDiamondGrid(config, canvas, colorMap);
             case 'square':
                 return square.buildSquareGrid(config, canvas, colorMap);
             case 'hexagon':
