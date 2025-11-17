@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Protogames Texture Test</title>
+    <link rel="stylesheet" href="css/texture-test.css" />
+</head>
+<body>
+    <div class="app-shell">
+        <aside class="sidebar">
+            <header>
+                <h1>Texture Lab</h1>
+                <p>Standalone testbed for procedural and AI textures.</p>
+            </header>
+
+            <section class="card">
+                <h2>Provider</h2>
+                <label class="field">
+                    <span>Provider</span>
+                    <select id="providerSelect"></select>
+                </label>
+                <div id="openaiSettings" class="stack hidden">
+                    <label class="field">
+                        <span>API Key</span>
+                        <input type="password" id="openaiKey" placeholder="sk-..." autocomplete="off" />
+                    </label>
+                    <label class="field">
+                        <span>Model</span>
+                        <select id="openaiModel">
+                            <option value="dall-e-3" selected>dall-e-3</option>
+                            <option value="dall-e-2">dall-e-2</option>
+                            <option value="gpt-image-1">gpt-image-1</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Quality</span>
+                        <select id="openaiQuality">
+                            <option value="standard" selected>standard</option>
+                            <option value="hd">hd</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>Style</span>
+                        <select id="openaiStyle">
+                            <option value="" selected>default</option>
+                            <option value="natural">natural</option>
+                            <option value="vivid">vivid</option>
+                        </select>
+                    </label>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>Environments</h2>
+                <div id="environmentList" class="env-grid"></div>
+            </section>
+
+            <section class="card actions">
+                <button id="generateApplyBtn" class="primary">Generate & Apply</button>
+                <button id="generateAllBtn" class="secondary">Generate All</button>
+                <button id="clearCacheBtn" class="ghost">Clear Cache</button>
+                <div class="cache-meta">
+                    <span id="cacheCount">0 cached</span>
+                    <span id="cacheQuota">/ 50 max</span>
+                </div>
+            </section>
+
+            <section class="card log">
+                <h2>Status</h2>
+                <div id="statusLog" class="log-list" aria-live="polite"></div>
+            </section>
+        </aside>
+
+        <main class="canvas-area">
+            <div class="canvas-header">
+                <div>
+                    <h2>Hex Grid Preview</h2>
+                    <p>Click a hex to select it, then generate textures.</p>
+                </div>
+                <div class="selection-meta">
+                    <span id="selectedHexLabel">No hex selected</span>
+                    <span id="selectedEnvLabel">No environment selected</span>
+                </div>
+            </div>
+            <div class="canvas-wrapper">
+                <canvas id="hexCanvas" width="800" height="800"></canvas>
+                <div id="loadingOverlay" class="loading hidden">
+                    <div class="spinner"></div>
+                    <p>Generating texture...</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/textures/config.js"></script>
+    <script src="js/textures/cache.js"></script>
+    <script src="js/textures/baseProvider.js"></script>
+    <script src="js/textures/mockProvider.js"></script>
+    <script src="js/textures/openaiProvider.js"></script>
+    <script src="js/textures/textureManager.js"></script>
+    <script src="js/textures/hexRenderer.js"></script>
+    <script src="js/textures/testInterface.js"></script>
+</body>
+</html>
