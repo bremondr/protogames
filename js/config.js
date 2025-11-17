@@ -62,7 +62,52 @@ const Config = (() => {
                 { label: 'Energy', hex: '#90E0EF' },
                 { label: 'Void', hex: '#240046' }
             ]
-        }
+        },
+        {
+        "id": "dungeon",
+        "name": "Dungeon",
+        "description": "Underground dungeon and cave environments",
+        "colors": [
+        { "hex": "#4A4A4A", "label": "Stone Floor" },
+        { "hex": "#2C2C2C", "label": "Wall" },
+        { "hex": "#5D4037", "label": "Door" },
+        { "hex": "#C62828", "label": "Trap" },
+        { "hex": "#FFD700", "label": "Treasure" },
+        { "hex": "#1565C0", "label": "Water" },
+        { "hex": "#D84315", "label": "Lava" },
+        { "hex": "#7B1FA2", "label": "Secret" }
+        ]
+        },
+        {
+        "id": "spaceship",
+        "name": "Spaceship",
+        "description": "Interior of spaceships and space stations",
+        "colors": [
+        { "hex": "#ECEFF1", "label": "Corridor" },
+        { "hex": "#455A64", "label": "Hull" },
+        { "hex": "#00BCD4", "label": "Control Room" },
+        { "hex": "#FF5722", "label": "Engine Room" },
+        { "hex": "#C62828", "label": "Danger Zone" },
+        { "hex": "#4CAF50", "label": "Life Support" },
+        { "hex": "#9E9E9E", "label": "Storage" },
+        { "hex": "#FFC107", "label": "Airlock" }
+        ]
+        },
+        {
+        "id": "arctic",
+        "name": "Arctic",
+        "description": "Frozen tundra and polar environments",
+        "colors": [
+        { "hex": "#FFFFFF", "label": "Snow" },
+        { "hex": "#B3E5FC", "label": "Ice" },
+        { "hex": "#0288D1", "label": "Deep Ice" },
+        { "hex": "#01579B", "label": "Frozen Water" },
+        { "hex": "#546E7A", "label": "Rock" },
+        { "hex": "#37474F", "label": "Cave" },
+        { "hex": "#BBDEFB", "label": "Glacier" },
+        { "hex": "#E0F7FA", "label": "Fresh Snow" }
+        ]
+        }        
     ];
     const DEFAULT_PALETTE_ID = 'landscape';
 
