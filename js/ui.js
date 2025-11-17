@@ -43,6 +43,7 @@ const UI = (() => {
         elements.exportPNGBtn = document.getElementById('exportPNGBtn');
         elements.exportPDFBtn = document.getElementById('exportPDFBtn');
         elements.exportSVGBtn = document.getElementById('exportSVGBtn');
+        elements.autoSaveToggle = document.getElementById('autoSaveToggle');
         elements.notificationBar = document.getElementById('notificationBar');
 
         elements.boardShapeSelect?.addEventListener('change', () => {
@@ -50,6 +51,16 @@ const UI = (() => {
             applyGridTypeRestrictions();
         });
         elements.gridTypeSelect?.addEventListener('change', applyGridTypeVisibility);
+        elements.autoSaveToggle?.addEventListener('change', () => {
+            const enabled = elements.autoSaveToggle.checked;
+            AppState.setAutoSaveEnabled(enabled);
+            FileManager.setupAutoSave();
+        });
+
+        // Sync toggle with state on init.
+        if (elements.autoSaveToggle) {
+            elements.autoSaveToggle.checked = AppState.getState().autoSaveEnabled;
+        }
 
         applyBoardShapeVisibility();
         applyGridTypeRestrictions();

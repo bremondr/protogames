@@ -19,6 +19,11 @@ const AppState = (() => {
          * blank color instead of applying a swatch color.
          */
         isEraserActive: false,
+        /**
+         * Controls whether auto-save is enabled. When false, auto-save timers
+         * and save attempts are skipped.
+         */
+        autoSaveEnabled: true,
         hoverPolygonId: null,
         history: [],
         historyIndex: -1,
@@ -101,6 +106,15 @@ const AppState = (() => {
      */
     function setEraserActive(active) {
         state.isEraserActive = Boolean(active);
+    }
+
+    /**
+     * Updates the auto-save enabled flag.
+     *
+     * @param {boolean} enabled - True to enable auto-save, false to disable.
+     */
+    function setAutoSaveEnabled(enabled) {
+        state.autoSaveEnabled = Boolean(enabled);
     }
 
     /**
@@ -223,6 +237,7 @@ const AppState = (() => {
         setAvailablePalettes,
         setCurrentColor,
         setEraserActive,
+        setAutoSaveEnabled,
         setCurrentPaletteId,
         setHoverPolygonId,
         setProjectName,
