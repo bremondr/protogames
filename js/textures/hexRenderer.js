@@ -2,11 +2,10 @@
  * Simple hex grid renderer for preview.
  */
 const HexRenderer = (() => {
-    const GRID_COLS = 5;
-    const GRID_ROWS = 5;
-    const HEX_SIZE = 60;
-    const HEX_GAP = 8;
-    const FLAT_TOP = true;
+    const GRID_COLS = 2;
+    const GRID_ROWS = 2;
+    const HEX_SIZE = 80;
+    const HEX_GAP = 6;
 
     function axialToPixel(q, r) {
         const size = HEX_SIZE;
@@ -38,9 +37,16 @@ const HexRenderer = (() => {
         ctx.closePath();
         if (textures[hex.id]) {
             const img = textures[hex.id];
-            // clip and draw pattern
+            ctx.save();
             ctx.clip();
-            ctx.drawImage(img, hex.center.x - HEX_SIZE, hex.center.y - HEX_SIZE, HEX_SIZE * 2, HEX_SIZE * 2);
+            const pattern = ctx.createPattern(img, 'repeat');
+            if (pattern) {
+                ctx.fillStyle = pattern;
+                ctx.fill();
+            } else {
+                ctx.drawImage(img, hex.center.x - HEX_SIZE, hex.center.y - HEX_SIZE, HEX_SIZE * 2, HEX_SIZE * 2);
+            }
+            ctx.restore();
         } else {
             ctx.fillStyle = '#f8fafc';
             ctx.fill();
@@ -79,9 +85,11 @@ const HexRenderer = (() => {
             }),
             { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
         );
-        const width = bounds.maxX - bounds.minX + HEX_SIZE * 2 + HEX_GAP * 2;
-        const height = bounds.maxY - bounds.minY + HEX_SIZE * 2 + HEX_GAP * 2;
-        return { hexes, width, height, offsetX: -bounds.minX + HEX_SIZE + HEX_GAP, offsetY: -bounds.minY + HEX_SIZE + HEX_GAP };
+        const width = bounds.maxX - bounds.minX + HEX_SIZE * 3 + HEX_GAP * 2;
+        const height = bounds.maxY - bounds.minY + HEX_SIZE * 3 + HEX_GAP * 2;
+        const offsetX = -bounds.minX + HEX_SIZE * 1.5 + HEX_GAP;
+        const offsetY = -bounds.minY + HEX_SIZE * 1.5 + HEX_GAP;
+        return { hexes, width, height, offsetX, offsetY };
     }
 
     function render(canvas, state) {
@@ -96,30 +104,8 @@ const HexRenderer = (() => {
         ctx.restore();
     }
 
-    function hitTest(canvas, state, x, y) {
-        const ctx = canvas.getContext('2d');
-        ctx.save();
-        ctx.translate(state.offsetX, state.offsetY);
-        for (const hex of state.hexes) {
-            const verts = hexVertices(hex.center);
-            ctx.beginPath();
-            verts.forEach((v, idx) => {
-                if (idx === 0) ctx.moveTo(v.x, v.y);
-                else ctx.lineTo(v.x, v.y);
-            });
-            ctx.closePath();
-            if (ctx.isPointInPath(x - state.offsetX, y - state.offsetY)) {
-                ctx.restore();
-                return hex;
-            }
-        }
-        ctx.restore();
-        return null;
-    }
-
     return {
         layoutGrid,
-        render,
-        hitTest
+        render
     };
 })();

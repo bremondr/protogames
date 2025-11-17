@@ -100,16 +100,6 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.width = layout.width;
         canvas.height = layout.height;
         HexRenderer.render(canvas, state);
-
-        canvas.addEventListener('click', (evt) => {
-            const rect = canvas.getBoundingClientRect();
-            const hex = HexRenderer.hitTest(canvas, state, evt.clientX - rect.left, evt.clientY - rect.top);
-            if (hex) {
-                state.selectedHexId = hex.id;
-                selectedHexLabel.textContent = `Hex: ${hex.id}`;
-                HexRenderer.render(canvas, state);
-            }
-        });
     }
 
     async function generateForHex(hexId) {
@@ -122,7 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const prompt = `${env.prompt}`;
         const size = '1024x1024';
         setLoading(true);
-        log(`Generating ${env.id} for ${hexId} via ${providerId}`, 'info');
+        log(`Generating ${env.id} for ${hexId || 'all hexes'} via ${providerId}`, 'info');
         const result = await TextureManager.generateTexture({
             prompt,
             width: 1024,
@@ -140,11 +130,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const img = new Image();
             img.crossOrigin = 'anonymous';
             img.onload = () => {
-                state.textures[hexId] = img;
+                if (hexId) {
+                    state.textures[hexId] = img;
+                } else {
+                    state.hexes.forEach((hex) => {
+                        state.textures[hex.id] = img;
+                    });
+                }
                 HexRenderer.render(canvas, state);
             };
             img.src = result.imageUrl;
-            log(`Applied texture to ${hexId} (${env.id})${result.metadata.cached ? ' [cache]' : ''}`, 'success');
+            log(`Applied texture (${env.id})${result.metadata.cached ? ' [cache]' : ''}`, 'success');
         } else {
             log(`Error: ${result.error || 'Unknown error'}`, 'error');
         }
@@ -152,11 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     async function generateAll() {
-        for (const hex of state.hexes) {
-            state.selectedHexId = hex.id;
-            HexRenderer.render(canvas, state);
-            await generateForHex(hex.id);
-        }
+        await generateForHex(null);
     }
 
     function clearCache() {
@@ -166,11 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     generateApplyBtn.addEventListener('click', () => {
-        if (!state.selectedHexId) {
-            log('Select a hex first', 'warning');
-            return;
-        }
-        generateForHex(state.selectedHexId);
+        generateForHex(null);
     });
 
     generateAllBtn.addEventListener('click', () => {
@@ -185,5 +173,5 @@ document.addEventListener('DOMContentLoaded', () => {
     selectEnvironment(state.selectedEnvId);
     updateCacheMeta();
     initCanvas();
-    log('Ready. Mock provider active by default.', 'info');
+    log('Ready. Mock provider active by default. Grid auto-fills on generate.', 'info');
 });

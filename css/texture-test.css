@@ -229,6 +229,8 @@ button:hover {
 #hexCanvas {
     width: 100%;
     height: auto;
+    max-height: calc(100vh - 200px);
+    object-fit: contain;
     display: block;
 }
 
