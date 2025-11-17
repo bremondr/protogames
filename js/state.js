@@ -14,6 +14,11 @@ const AppState = (() => {
         currentColor: Config.getDefaultPalette().colors[0].hex,
         currentPaletteId: Config.DEFAULT_PALETTE_ID,
         availablePalettes: [],
+        /**
+         * When true, painting uses the eraser and resets tiles to the default
+         * blank color instead of applying a swatch color.
+         */
+        isEraserActive: false,
         hoverPolygonId: null,
         history: [],
         historyIndex: -1,
@@ -87,6 +92,15 @@ const AppState = (() => {
      */
     function setCurrentColor(color) {
         state.currentColor = color;
+    }
+
+    /**
+     * Toggles the eraser mode flag.
+     *
+     * @param {boolean} active - Whether the eraser should be active.
+     */
+    function setEraserActive(active) {
+        state.isEraserActive = Boolean(active);
     }
 
     /**
@@ -208,6 +222,7 @@ const AppState = (() => {
         updateBoardConfig,
         setAvailablePalettes,
         setCurrentColor,
+        setEraserActive,
         setCurrentPaletteId,
         setHoverPolygonId,
         setProjectName,

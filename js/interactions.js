@@ -39,6 +39,9 @@ const Interactions = (() => {
 
         const paletteSelect = ui?.paletteSelect;
         paletteSelect?.addEventListener('change', () => handlePaletteChange(paletteSelect.value));
+
+        const eraserButton = ui?.eraserButton;
+        eraserButton?.addEventListener('click', handleEraserSelect);
     }
 
     function bindBoardControls() {
@@ -56,7 +59,9 @@ const Interactions = (() => {
             button.dataset.color ||
             getComputedStyle(button).getPropertyValue('--swatch-color').trim();
         AppState.setCurrentColor(color);
+        AppState.setEraserActive(false);
         UI?.setPaletteSelection(button);
+        UI?.setEraserActive(false);
     }
 
     /**
@@ -71,11 +76,21 @@ const Interactions = (() => {
         const currentColor = state.currentColor;
         const resolved = UI.renderColorPalette(palette.id, currentColor);
 
+        AppState.setEraserActive(false);
         AppState.setCurrentPaletteId(palette.id);
         AppState.setCurrentColor(resolved.color);
         UI.setPaletteByColor(resolved.color);
+        UI.setEraserActive(false);
         AppState.markDirty();
         FileManager.autoSaveToLocalStorage(true);
+    }
+
+    /**
+     * Activates the eraser tool and deselects any palette swatches.
+     */
+    function handleEraserSelect() {
+        AppState.setEraserActive(true);
+        UI?.setEraserActive(true);
     }
 
     function handleBoardGeneration() {
@@ -103,7 +118,7 @@ const Interactions = (() => {
         const state = AppState.getState();
         if (!state.polygons.length) return;
         state.polygons.forEach((polygon) => {
-            polygon.color = Config.DEFAULT_FILL;
+            polygon.color = Config.DEFAULT_TILE_COLOR;
         });
         Renderer.renderBoard();
         AppState.recordHistory();
@@ -124,7 +139,8 @@ const Interactions = (() => {
         const polygon = Geometry.findPolygonAtPoint(point, state.polygons);
         AppState.setDrawingActive(true, polygon?.id || null);
         if (polygon) {
-            applyColorToPolygon(polygon, state.currentColor, { recordHistory: false, markDirty: false });
+            const paintColor = state.isEraserActive ? Config.DEFAULT_TILE_COLOR : state.currentColor;
+            applyColorToPolygon(polygon, paintColor, { recordHistory: false, markDirty: false });
             Renderer.renderBoard();
         }
     }
@@ -147,7 +163,8 @@ const Interactions = (() => {
             lastMoveTimestamp = now;
             const polygon = Geometry.findPolygonAtPoint(point, state.polygons);
             if (polygon && polygon.id !== state.lastColoredPolygonId) {
-                applyColorToPolygon(polygon, state.currentColor, { recordHistory: false, markDirty: false });
+                const paintColor = state.isEraserActive ? Config.DEFAULT_TILE_COLOR : state.currentColor;
+                applyColorToPolygon(polygon, paintColor, { recordHistory: false, markDirty: false });
                 AppState.setLastColoredPolygonId(polygon.id);
                 Renderer.renderBoard();
             }

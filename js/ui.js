@@ -14,6 +14,7 @@ const UI = (() => {
         elements.canvasPlaceholder = document.querySelector('.canvas-placeholder');
         elements.paletteGrid = document.querySelector('.palette-grid');
         elements.paletteSelect = document.getElementById('paletteSelect');
+        elements.eraserButton = document.getElementById('eraserButton');
         elements.paletteButtons = [];
         elements.gridTypeSelect = document.querySelector('select[name="gridType"]');
         elements.orientationSelect = document.querySelector('select[name="gridOrientation"]');
@@ -206,10 +207,27 @@ const UI = (() => {
 
     function setPaletteSelection(button) {
         elements.paletteButtons?.forEach((btn) => {
-            const isSelected = btn === button;
+            const isSelected = btn === button && button !== null;
             btn.classList.toggle('selected', isSelected);
             btn.setAttribute('aria-pressed', String(isSelected));
         });
+    }
+
+    /**
+     * Toggles eraser button visual state and clears palette selection when active.
+     *
+     * @param {boolean} active - Whether eraser is active.
+     */
+    function setEraserActive(active) {
+        const isActive = Boolean(active);
+        const btn = elements.eraserButton;
+        if (btn) {
+            btn.classList.toggle('active', isActive);
+            btn.setAttribute('aria-pressed', String(isActive));
+        }
+        if (isActive) {
+            setPaletteSelection(null);
+        }
     }
 
     function setPaletteByColor(color) {
@@ -314,6 +332,7 @@ const UI = (() => {
         updateBoardControls,
         setPaletteSelection,
         setPaletteByColor,
+        setEraserActive,
         applyBoardShapeVisibility,
         applyGridTypeVisibility,
         applyGridTypeRestrictions,

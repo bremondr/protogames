@@ -9,7 +9,12 @@ const Config = (() => {
     const VERSION = '1.0';
     const CANVAS_PADDING = 48;
     const HISTORY_LIMIT = 50;
-    const DEFAULT_FILL = '#ffffff';
+    /**
+     * Baseline tile color used for blank/erased cells.
+     * Shared by the eraser tool and board resets.
+     */
+    const DEFAULT_TILE_COLOR = '#ffffff';
+    const DEFAULT_FILL = DEFAULT_TILE_COLOR;
     const GRID_STROKE = '#333741';
     const HOVER_OUTLINE = '#2f6fed';
     const AUTO_SAVE_KEY = 'protogames_autosave';

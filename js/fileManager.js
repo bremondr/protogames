@@ -42,6 +42,7 @@ const FileManager = (() => {
             boardConfig: { ...state.boardConfig },
             currentColor: state.currentColor,
             paletteId: state.currentPaletteId,
+            isEraserActive: state.isEraserActive,
             polygons: Utils.clonePolygons(state.polygons)
         };
     }
@@ -148,6 +149,8 @@ const FileManager = (() => {
         const resolved = UI.renderColorPalette(palette.id, statePayload.currentColor || AppState.getState().currentColor);
         AppState.setCurrentPaletteId(resolved.paletteId);
         AppState.setCurrentColor(resolved.color);
+        AppState.setEraserActive(Boolean(statePayload.isEraserActive));
+        UI.setEraserActive(statePayload.isEraserActive);
         AppState.setPolygons(Utils.clonePolygons(statePayload.polygons || []));
         AppState.setProjectName(payload.projectName || Config.DEFAULT_PROJECT_NAME);
 

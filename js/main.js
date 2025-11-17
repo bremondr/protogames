@@ -23,6 +23,8 @@ const Main = (() => {
         const paletteRender = UI.renderColorPalette(defaultPalette.id, defaultPalette.colors[0]?.hex);
         AppState.setCurrentPaletteId(paletteRender.paletteId);
         AppState.setCurrentColor(paletteRender.color);
+        AppState.setEraserActive(false);
+        UI.setEraserActive(false);
         Renderer.initializeCanvas(uiRefs.canvas);
 
         Interactions.init(uiRefs);

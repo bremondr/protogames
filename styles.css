@@ -434,6 +434,30 @@ button:focus-visible {
     background: rgba(255, 255, 255, 0.16);
 }
 
+.eraser-button {
+    width: 100%;
+    padding: 0.6rem 0.8rem;
+    margin-bottom: 0.75rem;
+    border: 2px solid #c62828;
+    border-radius: var(--radius-sm);
+    background: rgba(198, 40, 40, 0.08);
+    color: #c62828;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.eraser-button:hover {
+    background: rgba(198, 40, 40, 0.16);
+    transform: translateY(-1px);
+}
+
+.eraser-button.active {
+    border-color: #ef5350;
+    background: rgba(239, 83, 80, 0.24);
+    box-shadow: 0 0 0 2px rgba(239, 83, 80, 0.18);
+}
+
 /* Actions */
 /* ==============================================================
    ACTIONS PANEL
