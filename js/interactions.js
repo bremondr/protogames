@@ -30,9 +30,15 @@ const Interactions = (() => {
     }
 
     function bindPaletteEvents() {
-        ui?.paletteButtons?.forEach((button) => {
-            button.addEventListener('click', () => handleColorSelect(button));
+        const paletteGrid = ui?.paletteGrid;
+        paletteGrid?.addEventListener('click', (event) => {
+            const button = event.target.closest('.palette-swatch');
+            if (!button || !paletteGrid.contains(button)) return;
+            handleColorSelect(button);
         });
+
+        const paletteSelect = ui?.paletteSelect;
+        paletteSelect?.addEventListener('change', () => handlePaletteChange(paletteSelect.value));
     }
 
     function bindBoardControls() {
@@ -51,6 +57,25 @@ const Interactions = (() => {
             getComputedStyle(button).getPropertyValue('--swatch-color').trim();
         AppState.setCurrentColor(color);
         UI?.setPaletteSelection(button);
+    }
+
+    /**
+     * Switches to a different palette, preserving the current color when
+     * available inside the new palette; otherwise selects the first swatch.
+     *
+     * @param {string} paletteId - Requested palette id.
+     */
+    function handlePaletteChange(paletteId) {
+        const palette = Config.getPaletteById(paletteId) || Config.getDefaultPalette();
+        const state = AppState.getState();
+        const currentColor = state.currentColor;
+        const resolved = UI.renderColorPalette(palette.id, currentColor);
+
+        AppState.setCurrentPaletteId(palette.id);
+        AppState.setCurrentColor(resolved.color);
+        UI.setPaletteByColor(resolved.color);
+        AppState.markDirty();
+        FileManager.autoSaveToLocalStorage(true);
     }
 
     function handleBoardGeneration() {

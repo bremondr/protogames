@@ -11,7 +11,9 @@ const AppState = (() => {
         ctx: null,
         polygons: [],
         boardConfig: { ...Config.DEFAULT_BOARD_CONFIG },
-        currentColor: '#0b3d1d',
+        currentColor: Config.getDefaultPalette().colors[0].hex,
+        currentPaletteId: Config.DEFAULT_PALETTE_ID,
+        availablePalettes: [],
         hoverPolygonId: null,
         history: [],
         historyIndex: -1,
@@ -70,12 +72,30 @@ const AppState = (() => {
     }
 
     /**
+     * Updates the list of palettes made available to the UI.
+     *
+     * @param {Array<Object>} palettes - Palette definitions.
+     */
+    function setAvailablePalettes(palettes) {
+        state.availablePalettes = Array.isArray(palettes) ? palettes.slice() : [];
+    }
+
+    /**
      * Updates the palette color used when painting.
      *
      * @param {string} color - Hex color string.
      */
     function setCurrentColor(color) {
         state.currentColor = color;
+    }
+
+    /**
+     * Tracks the active palette id for palette switching and persistence.
+     *
+     * @param {string} paletteId - Palette identifier.
+     */
+    function setCurrentPaletteId(paletteId) {
+        state.currentPaletteId = paletteId;
     }
 
     /**
@@ -186,7 +206,9 @@ const AppState = (() => {
         getState,
         setPolygons,
         updateBoardConfig,
+        setAvailablePalettes,
         setCurrentColor,
+        setCurrentPaletteId,
         setHoverPolygonId,
         setProjectName,
         setDrawingActive,

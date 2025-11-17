@@ -12,7 +12,9 @@ const UI = (() => {
     function init() {
         elements.canvas = document.getElementById('gameCanvas');
         elements.canvasPlaceholder = document.querySelector('.canvas-placeholder');
-        elements.paletteButtons = Array.from(document.querySelectorAll('.palette-swatch'));
+        elements.paletteGrid = document.querySelector('.palette-grid');
+        elements.paletteSelect = document.getElementById('paletteSelect');
+        elements.paletteButtons = [];
         elements.gridTypeSelect = document.querySelector('select[name="gridType"]');
         elements.orientationSelect = document.querySelector('select[name="gridOrientation"]');
         elements.orientationField = document.getElementById('orientationField');
@@ -51,6 +53,77 @@ const UI = (() => {
         applyBoardShapeVisibility();
         applyGridTypeRestrictions();
         applyGridTypeVisibility();
+    }
+
+    /**
+     * Populates the palette selector with available palettes.
+     *
+     * @param {string} selectedPaletteId - Palette id to select after rendering options.
+     */
+    function initializePaletteSelector(selectedPaletteId) {
+        if (!elements.paletteSelect) return;
+        const palettes = Config.getAllPalettes();
+        elements.paletteSelect.innerHTML = '';
+        palettes.forEach((palette) => {
+            const option = document.createElement('option');
+            option.value = palette.id;
+            option.textContent = palette.name;
+            option.title = palette.description;
+            elements.paletteSelect.appendChild(option);
+        });
+        elements.paletteSelect.value = selectedPaletteId || Config.DEFAULT_PALETTE_ID;
+    }
+
+    /**
+     * Renders swatches for the requested palette and returns the color that
+     * should be considered selected (ensures the color exists in the palette).
+     *
+     * @param {string} paletteId - Palette identifier.
+     * @param {string} preferredColor - Hex color to keep selected when possible.
+     * @returns {{paletteId:string,color:string}} Resolved palette and color.
+     */
+    function renderColorPalette(paletteId, preferredColor) {
+        if (!elements.paletteGrid) return { paletteId, color: preferredColor };
+        const palette = Config.getPaletteById(paletteId) || Config.getDefaultPalette();
+        const resolvedColor = resolvePaletteColor(palette, preferredColor);
+
+        elements.paletteGrid.innerHTML = '';
+        palette.colors.forEach((swatch) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'palette-swatch';
+            button.dataset.color = swatch.hex;
+            button.style.setProperty('--swatch-color', swatch.hex);
+            button.setAttribute('aria-pressed', 'false');
+
+            const swatchSpan = document.createElement('span');
+            swatchSpan.className = 'swatch';
+            swatchSpan.setAttribute('aria-hidden', 'true');
+
+            const labelSpan = document.createElement('span');
+            labelSpan.className = 'swatch-label';
+            labelSpan.textContent = swatch.label;
+
+            button.appendChild(swatchSpan);
+            button.appendChild(labelSpan);
+            elements.paletteGrid.appendChild(button);
+        });
+
+        elements.paletteButtons = Array.from(elements.paletteGrid.querySelectorAll('.palette-swatch'));
+        setPaletteByColor(resolvedColor);
+
+        if (elements.paletteSelect) {
+            elements.paletteSelect.value = palette.id;
+        }
+
+        return { paletteId: palette.id, color: resolvedColor };
+    }
+
+    function resolvePaletteColor(palette, preferredColor) {
+        const normalizedPreferred = preferredColor?.toLowerCase() || '';
+        const match = palette.colors.find((entry) => entry.hex.toLowerCase() === normalizedPreferred);
+        if (match) return match.hex;
+        return palette.colors[0]?.hex || preferredColor || Config.DEFAULT_FILL;
     }
 
     function getElements() {
@@ -243,6 +316,8 @@ const UI = (() => {
         setPaletteByColor,
         applyBoardShapeVisibility,
         applyGridTypeVisibility,
-        applyGridTypeRestrictions
+        applyGridTypeRestrictions,
+        initializePaletteSelector,
+        renderColorPalette
     };
 })();

@@ -17,14 +17,18 @@ const Main = (() => {
     function initializeApp() {
         UI.init();
         const uiRefs = UI.getElements();
+        UI.initializePaletteSelector(Config.DEFAULT_PALETTE_ID);
+        AppState.setAvailablePalettes(Config.getAllPalettes());
+        const defaultPalette = Config.getDefaultPalette();
+        const paletteRender = UI.renderColorPalette(defaultPalette.id, defaultPalette.colors[0]?.hex);
+        AppState.setCurrentPaletteId(paletteRender.paletteId);
+        AppState.setCurrentColor(paletteRender.color);
         Renderer.initializeCanvas(uiRefs.canvas);
 
         Interactions.init(uiRefs);
         FileManager.init(uiRefs);
         Exporter.init(uiRefs);
         FileManager.setupAutoSave();
-
-        UI.setPaletteByColor(AppState.getState().currentColor);
 
         const autoSaved = FileManager.loadAutoSave();
         if (autoSaved) {

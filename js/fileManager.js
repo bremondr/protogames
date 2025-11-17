@@ -41,6 +41,7 @@ const FileManager = (() => {
         return {
             boardConfig: { ...state.boardConfig },
             currentColor: state.currentColor,
+            paletteId: state.currentPaletteId,
             polygons: Utils.clonePolygons(state.polygons)
         };
     }
@@ -142,12 +143,15 @@ const FileManager = (() => {
     function restoreState(payload, options = {}) {
         const statePayload = payload.appState;
         AppState.updateBoardConfig(statePayload.boardConfig);
-        AppState.setCurrentColor(statePayload.currentColor || AppState.getState().currentColor);
+        const paletteId = statePayload.paletteId || Config.DEFAULT_PALETTE_ID;
+        const palette = Config.getPaletteById(paletteId) || Config.getDefaultPalette();
+        const resolved = UI.renderColorPalette(palette.id, statePayload.currentColor || AppState.getState().currentColor);
+        AppState.setCurrentPaletteId(resolved.paletteId);
+        AppState.setCurrentColor(resolved.color);
         AppState.setPolygons(Utils.clonePolygons(statePayload.polygons || []));
         AppState.setProjectName(payload.projectName || Config.DEFAULT_PROJECT_NAME);
 
         UI?.updateBoardControls(AppState.getState().boardConfig);
-        UI?.setPaletteByColor(AppState.getState().currentColor);
         Renderer.renderBoard();
         UI?.updateCanvasMessage(AppState.getState().polygons.length);
 

@@ -108,40 +108,11 @@
                  -------------------------------------------- -->
             <section class="panel" aria-labelledby="color-palette-title">
                 <h2 id="color-palette-title">Color Palette</h2>
-                <div class="palette-grid" role="list">
-                    <button type="button" class="palette-swatch selected" style="--swatch-color:#0b3d1d" data-color="#0b3d1d" aria-pressed="true">
-                        <span class="swatch" aria-hidden="true"></span>
-                        <span class="swatch-label">Forest</span>
-                    </button>
-                    <button type="button" class="palette-swatch" style="--swatch-color:#4caf50" data-color="#4caf50">
-                        <span class="swatch" aria-hidden="true"></span>
-                        <span class="swatch-label">Grassland</span>
-                    </button>
-                    <button type="button" class="palette-swatch" style="--swatch-color:#1e88e5" data-color="#1e88e5">
-                        <span class="swatch" aria-hidden="true"></span>
-                        <span class="swatch-label">Water</span>
-                    </button>
-                    <button type="button" class="palette-swatch" style="--swatch-color:#cbb279" data-color="#cbb279">
-                        <span class="swatch" aria-hidden="true"></span>
-                        <span class="swatch-label">Desert</span>
-                    </button>
-                    <button type="button" class="palette-swatch" style="--swatch-color:#607d8b" data-color="#607d8b">
-                        <span class="swatch" aria-hidden="true"></span>
-                        <span class="swatch-label">Mountain</span>
-                    </button>
-                    <button type="button" class="palette-swatch" style="--swatch-color:#795548" data-color="#795548">
-                        <span class="swatch" aria-hidden="true"></span>
-                        <span class="swatch-label">Village</span>
-                    </button>
-                    <button type="button" class="palette-swatch" style="--swatch-color:#ff7043" data-color="#ff7043">
-                        <span class="swatch" aria-hidden="true"></span>
-                        <span class="swatch-label">Volcanic</span>
-                    </button>
-                    <button type="button" class="palette-swatch" style="--swatch-color:#9c27b0" data-color="#9c27b0">
-                        <span class="swatch" aria-hidden="true"></span>
-                        <span class="swatch-label">Mystic</span>
-                    </button>
+                <div class="field">
+                    <span class="field-label">Theme</span>
+                    <select id="paletteSelect" aria-label="Select color palette"></select>
                 </div>
+                <div class="palette-grid" role="list" aria-live="polite"></div>
             </section>
 
             <!-- --------------------------------------------
