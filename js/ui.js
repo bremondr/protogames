@@ -12,6 +12,7 @@ const UI = (() => {
     function init() {
         elements.canvas = document.getElementById('gameCanvas');
         elements.canvasPlaceholder = document.querySelector('.canvas-placeholder');
+        elements.randomFillButton = document.getElementById('randomFillButton');
         elements.paletteGrid = document.querySelector('.palette-grid');
         elements.paletteSelect = document.getElementById('paletteSelect');
         elements.eraserButton = document.getElementById('eraserButton');

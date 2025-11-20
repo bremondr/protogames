@@ -172,6 +172,7 @@ button {
     flex-direction: column;
     border: 1px solid var(--color-border);
     overflow: hidden;
+    position: relative;
 }
 
 #gameCanvas {
@@ -186,6 +187,35 @@ button {
         #f1f3fa 24px
     );
     border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+
+.canvas-toolbar {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    gap: 0.5rem;
+    z-index: 2;
+}
+
+.canvas-action-button {
+    background: rgba(16, 24, 40, 0.9);
+    color: #ffffff;
+    border: 1px solid rgba(31, 41, 55, 0.25);
+    padding: 0.55rem 0.85rem;
+    border-radius: var(--radius-sm);
+    font-weight: 600;
+    box-shadow: 0 6px 14px rgba(16, 24, 40, 0.2);
+    transition: background 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.canvas-action-button:hover {
+    background: rgba(16, 24, 40, 1);
+    box-shadow: 0 8px 18px rgba(16, 24, 40, 0.28);
+}
+
+.canvas-action-button:active {
+    transform: translateY(1px);
 }
 
 .canvas-placeholder {

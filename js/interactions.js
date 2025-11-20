@@ -52,6 +52,7 @@ const Interactions = (() => {
         ui?.undoButton?.addEventListener('click', handleUndo);
         ui?.redoButton?.addEventListener('click', handleRedo);
         ui?.clearButton?.addEventListener('click', handleClearBoard);
+        ui?.randomFillButton?.addEventListener('click', handleRandomFill);
     }
 
     function handleColorSelect(button) {
@@ -124,6 +125,32 @@ const Interactions = (() => {
         AppState.recordHistory();
         AppState.markDirty();
         FileManager.autoSaveToLocalStorage(true);
+    }
+
+    /**
+     * Fills the current board with a random mix of colors from the selected palette.
+     */
+    function handleRandomFill() {
+        const state = AppState.getState();
+        if (!state.polygons.length) {
+            UI?.showNotification('Generate a board before filling it');
+            return;
+        }
+        const palette = Config.getPaletteById(state.currentPaletteId) || Config.getDefaultPalette();
+        const swatches = palette?.colors || [];
+        if (!swatches.length) {
+            UI?.showNotification('Select a color palette to randomize with');
+            return;
+        }
+        state.polygons.forEach((polygon) => {
+            const randomSwatch = swatches[Math.floor(Math.random() * swatches.length)];
+            polygon.color = randomSwatch.hex;
+        });
+        Renderer.renderBoard();
+        AppState.recordHistory();
+        AppState.markDirty();
+        FileManager.autoSaveToLocalStorage(true);
+        UI?.showNotification('Board filled with random palette');
     }
 
     /**
