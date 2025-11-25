@@ -43,6 +43,12 @@ const Config = (() => {
             name: 'Stone Tiles',
             src: 'images/textures/stone-tiles.png',
             fallback: '#b6b7ba'
+        },
+        {
+            id: 'grass-tiles',
+            name: 'Grass Tiles',
+            src: 'images/textures/grass-tiles.png',
+            fallback: '#7cb342'
         }
     ];
 
@@ -128,7 +134,8 @@ const Config = (() => {
             name: 'Textures',
             description: 'Image-based fills for textured boards.',
             colors: [
-                { label: 'Stone Tiles', hex: '#b6b7ba', textureId: 'stone-tiles' }
+                { label: 'Stone Tiles', hex: '#b6b7ba', textureId: 'stone-tiles' },
+                { label: 'Grass Tiles', hex: '#7cb342', textureId: 'grass-tiles' }
             ]
         }        
     ];
