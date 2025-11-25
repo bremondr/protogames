@@ -37,6 +37,15 @@ const Config = (() => {
      *
      * @type {Array<{id:string,name:string,description:string,colors:Array<{label:string,hex:string}>}>}
      */
+    const TEXTURES = [
+        {
+            id: 'stone-tiles',
+            name: 'Stone Tiles',
+            src: 'images/textures/stone-tiles.png',
+            fallback: '#b6b7ba'
+        }
+    ];
+
     const COLOR_PALETTES = [
         {
             id: 'landscape',
@@ -112,6 +121,15 @@ const Config = (() => {
         { "hex": "#BBDEFB", "label": "Glacier" },
         { "hex": "#E0F7FA", "label": "Fresh Snow" }
         ]
+        }
+        ,
+        {
+            id: 'textures',
+            name: 'Textures',
+            description: 'Image-based fills for textured boards.',
+            colors: [
+                { label: 'Stone Tiles', hex: '#b6b7ba', textureId: 'stone-tiles' }
+            ]
         }        
     ];
     const DEFAULT_PALETTE_ID = 'landscape';
@@ -144,6 +162,16 @@ const Config = (() => {
         return getPaletteById(DEFAULT_PALETTE_ID) || COLOR_PALETTES[0];
     }
 
+    /**
+     * Finds a texture definition by id.
+     *
+     * @param {string} id - Texture identifier.
+     * @returns {{id:string,src:string,fallback?:string,name?:string}|null}
+     */
+    function getTextureById(id) {
+        return TEXTURES.find((entry) => entry.id === id) || null;
+    }
+
     return {
         VERSION,
         CANVAS_PADDING,
@@ -160,6 +188,7 @@ const Config = (() => {
         DEFAULT_PALETTE_ID,
         getPaletteById,
         getAllPalettes,
-        getDefaultPalette
+        getDefaultPalette,
+        getTextureById
     };
 })();

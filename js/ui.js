@@ -102,16 +102,26 @@ const UI = (() => {
 
         elements.paletteGrid.innerHTML = '';
         palette.colors.forEach((swatch) => {
+            const fillValue = swatch.textureId ? `texture:${swatch.textureId}` : swatch.hex;
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'palette-swatch';
-            button.dataset.color = swatch.hex;
+            button.dataset.color = fillValue;
+            button.dataset.type = swatch.textureId ? 'texture' : 'color';
             button.style.setProperty('--swatch-color', swatch.hex);
             button.setAttribute('aria-pressed', 'false');
 
             const swatchSpan = document.createElement('span');
             swatchSpan.className = 'swatch';
             swatchSpan.setAttribute('aria-hidden', 'true');
+            if (swatch.textureId) {
+                const texture = Config.getTextureById(swatch.textureId);
+                if (texture?.src) {
+                    swatchSpan.style.backgroundImage = `url('${texture.src}')`;
+                    swatchSpan.style.backgroundSize = 'cover';
+                    swatchSpan.style.backgroundPosition = 'center';
+                }
+            }
 
             const labelSpan = document.createElement('span');
             labelSpan.className = 'swatch-label';
@@ -134,9 +144,16 @@ const UI = (() => {
 
     function resolvePaletteColor(palette, preferredColor) {
         const normalizedPreferred = preferredColor?.toLowerCase() || '';
-        const match = palette.colors.find((entry) => entry.hex.toLowerCase() === normalizedPreferred);
-        if (match) return match.hex;
-        return palette.colors[0]?.hex || preferredColor || Config.DEFAULT_FILL;
+        const match = palette.colors.find((entry) => {
+            const entryColor = entry.hex?.toLowerCase();
+            const entryTexture = entry.textureId ? `texture:${entry.textureId}` : null;
+            return entryColor === normalizedPreferred || entryTexture === normalizedPreferred;
+        });
+        if (match) {
+            return match.textureId ? `texture:${match.textureId}` : match.hex;
+        }
+        const first = palette.colors[0];
+        return first?.textureId ? `texture:${first.textureId}` : first?.hex || preferredColor || Config.DEFAULT_FILL;
     }
 
     function getElements() {

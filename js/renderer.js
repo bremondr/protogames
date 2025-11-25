@@ -6,6 +6,10 @@
  * agnostic of how graphics are produced.
  */
 const Renderer = (() => {
+    const textureCache = new Map();
+    const TEXTURE_PREFIX = 'texture:';
+    const TEXTURE_FALLBACK = '#d1d5db';
+
     /**
      * Resizes the canvas to fit its parent container and stores the
      * updated context inside AppState.
@@ -83,7 +87,7 @@ const Renderer = (() => {
     function drawPolygon(polygon, options = {}) {
         const { ctx } = AppState.getState();
         if (!ctx) return;
-        const fill = options.fill || polygon.color || Config.DEFAULT_FILL;
+        const fill = resolveFillStyle(options.fill || polygon.color || Config.DEFAULT_FILL);
         const stroke = options.stroke || Config.GRID_STROKE;
         const lineWidth = options.lineWidth || 1;
 
@@ -110,6 +114,58 @@ const Renderer = (() => {
         ctx.strokeStyle = stroke;
         ctx.lineWidth = lineWidth;
         ctx.stroke();
+    }
+
+    /**
+     * Resolves a fill into a canvas-compatible style, supporting texture patterns.
+     *
+     * @param {string|CanvasPattern} fill
+     * @returns {string|CanvasPattern}
+     */
+    function resolveFillStyle(fill) {
+        if (typeof fill === 'string' && fill.startsWith(TEXTURE_PREFIX)) {
+            const textureId = fill.slice(TEXTURE_PREFIX.length);
+            const pattern = getTexturePattern(textureId);
+            return pattern || TEXTURE_FALLBACK;
+        }
+        return fill || Config.DEFAULT_FILL;
+    }
+
+    /**
+     * Returns (and caches) a CanvasPattern for a texture id, triggering a re-render when ready.
+     *
+     * @param {string} textureId
+     * @returns {CanvasPattern|null}
+     */
+    function getTexturePattern(textureId) {
+        if (!textureId) return null;
+        const cached = textureCache.get(textureId);
+        if (cached?.pattern) return cached.pattern;
+        if (cached?.status === 'loading') return cached.pattern || null;
+
+        const texture = Config.getTextureById(textureId);
+        if (!texture?.src) return null;
+
+        const entry = { status: 'loading', pattern: null };
+        textureCache.set(textureId, entry);
+        const img = new Image();
+        img.onload = () => {
+            const { ctx } = AppState.getState();
+            if (!ctx) return;
+            const pattern = ctx.createPattern(img, 'repeat');
+            if (pattern) {
+                entry.pattern = pattern;
+                entry.status = 'ready';
+                renderBoard();
+            } else {
+                entry.status = 'error';
+            }
+        };
+        img.onerror = () => {
+            entry.status = 'error';
+        };
+        img.src = texture.src;
+        return null;
     }
 
     return {

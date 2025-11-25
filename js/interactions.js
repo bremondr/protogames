@@ -144,7 +144,8 @@ const Interactions = (() => {
         }
         state.polygons.forEach((polygon) => {
             const randomSwatch = swatches[Math.floor(Math.random() * swatches.length)];
-            polygon.color = randomSwatch.hex;
+            const fillValue = randomSwatch.textureId ? `texture:${randomSwatch.textureId}` : randomSwatch.hex;
+            polygon.color = fillValue;
         });
         Renderer.renderBoard();
         AppState.recordHistory();
