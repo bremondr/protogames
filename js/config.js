@@ -53,6 +53,48 @@ const Config = (() => {
             name: 'Grass Tiles',
             src: 'images/textures/grass-tiles.png',
             fallback: '#7cb342'
+        },
+        {
+            id: 'rocky-terrain',
+            name: 'Rocky Terrain',
+            src: 'images/textures/rocky_terrain_02_diff_4k.jpg',
+            fallback: '#4e4a44'
+        },
+        {
+            id: 'aerial-rocks',
+            name: 'Aerial Rocks',
+            src: 'images/textures/aerial_rocks_02_diff_4k.jpg',
+            fallback: '#6d6a62'
+        },
+        {
+            id: 'coast-rocks',
+            name: 'Coast Rocks',
+            src: 'images/textures/coast_land_rocks_01_diff_4k.jpg',
+            fallback: '#6b5a4a'
+        },
+        {
+            id: 'coast-sand',
+            name: 'Coast Sand',
+            src: 'images/textures/coast_sand_01_diff_4k.jpg',
+            fallback: '#d1b88f'
+        },
+        {
+            id: 'snow-aerial',
+            name: 'Snow Aerial',
+            src: 'images/textures/snow_01_diff_4k.jpg',
+            fallback: '#f2f4f6'
+        },
+        {
+            id: 'snow-field-color',
+            name: 'Snow Field (Color)',
+            src: 'images/textures/snow_field_aerial_col_4k.jpg',
+            fallback: '#e7ecf4'
+        },
+        {
+            id: 'snow-field-rough',
+            name: 'Snow Field (Rough)',
+            src: 'images/textures/snow_field_aerial_rough_4k.jpg',
+            fallback: '#dfe3ea'
         }
     ];
 
@@ -146,7 +188,14 @@ const Config = (() => {
             description: 'Image-based fills for textured boards.',
             colors: [
                 { label: 'Stone Tiles', hex: '#b6b7ba', textureId: 'stone-tiles' },
-                { label: 'Grass Tiles', hex: '#7cb342', textureId: 'grass-tiles' }
+                { label: 'Grass Tiles', hex: '#7cb342', textureId: 'grass-tiles' },
+                { label: 'Rocky Terrain', hex: '#4e4a44', textureId: 'rocky-terrain' },
+                { label: 'Aerial Rocks', hex: '#6d6a62', textureId: 'aerial-rocks' },
+                { label: 'Coast Rocks', hex: '#6b5a4a', textureId: 'coast-rocks' },
+                { label: 'Coast Sand', hex: '#d1b88f', textureId: 'coast-sand' },
+                { label: 'Snow Aerial', hex: '#f2f4f6', textureId: 'snow-aerial' },
+                { label: 'Snow Field (Color)', hex: '#e7ecf4', textureId: 'snow-field-color' },
+                { label: 'Snow Field (Rough)', hex: '#dfe3ea', textureId: 'snow-field-rough' }
             ]
         }        
     ];
