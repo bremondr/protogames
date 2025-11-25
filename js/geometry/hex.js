@@ -1,5 +1,6 @@
 /**
- * Hexagon grid builders.
+ * Hexagon grid builders for rectangular canvases and true hex outlines,
+ * handling flat/pointy orientation, axial layout math, and center padding.
  */
 (function (global) {
     const helpers = global.GeometryHelpers;

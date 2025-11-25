@@ -2,8 +2,9 @@
  * PROTOGAMES APPLICATION STATE
  * --------------------------------------------------------------
  * Centralized store for canvas references, polygon data, history
- * stacks, and other user selections. Modules interact with the
- * state through this API to keep mutations predictable.
+ * stacks, palette/texture selection, autosave toggles, and project
+ * metadata. Modules interact with the state through this API to keep
+ * mutations predictable.
  */
 const AppState = (() => {
     const state = {
@@ -93,7 +94,7 @@ const AppState = (() => {
     /**
      * Updates the palette color used when painting.
      *
-     * @param {string} color - Hex color string.
+     * @param {string} color - Hex color string or texture identifier.
      */
     function setCurrentColor(color) {
         state.currentColor = color;
@@ -165,10 +166,16 @@ const AppState = (() => {
         state.lastColoredPolygonId = id;
     }
 
+    /**
+     * Flags the state as having unsaved changes, enabling autosave cadence.
+     */
     function markDirty() {
         state.isDirty = true;
     }
 
+    /**
+     * Clears the dirty flag, usually after a save/export completes.
+     */
     function clearDirty() {
         state.isDirty = false;
     }

@@ -1,9 +1,10 @@
 /**
  * PROTOGAMES INTERACTIONS
  * --------------------------------------------------------------
- * Handles pointer input, palette selection, and board generation
- * wiring. This module does not know about DOM querying; it simply
- * receives references from the UI module during initialization.
+ * Handles pointer input, palette/texture selection, random fills,
+ * and board generation wiring plus undo/redo/autosave hooks. This
+ * module does not know about DOM querying; it simply receives DOM
+ * references from the UI module during initialization.
  */
 const Interactions = (() => {
     let ui = null;
@@ -66,8 +67,9 @@ const Interactions = (() => {
     }
 
     /**
-     * Switches to a different palette, preserving the current color when
-     * available inside the new palette; otherwise selects the first swatch.
+     * Switches to a different palette (color or texture-backed), preserving
+     * the active color when present; otherwise selects the first swatch.
+     * Triggers dirty/autosave flows so the palette choice is persisted.
      *
      * @param {string} paletteId - Requested palette id.
      */
@@ -128,7 +130,8 @@ const Interactions = (() => {
     }
 
     /**
-     * Fills the current board with a random mix of colors from the selected palette.
+     * Fills the current board with a random mix of colors/textures from the
+     * selected palette and records history/autosave state.
      */
     function handleRandomFill() {
         const state = AppState.getState();
@@ -266,7 +269,7 @@ const Interactions = (() => {
      * Applies a color to a polygon with optional history/dirty tracking.
      *
      * @param {Object} polygon - Polygon to update.
-     * @param {string} color - Hex color string.
+     * @param {string} color - Hex color string or texture identifier (e.g., texture:grass-tiles).
      * @param {Object} [options] - Behavior flags.
      * @param {boolean} [options.recordHistory=true] - Whether to snapshot history.
      * @param {boolean} [options.markDirty=true] - Whether to mark state dirty/autosave.
@@ -285,10 +288,14 @@ const Interactions = (() => {
     }
 
     /**
-     * Generates a new polygon set using the supplied configuration.
+     * Generates a new polygon set using the supplied configuration and
+     * optional flags to preserve existing colors/history/dirty state.
      *
      * @param {Object} config - Board settings (grid, size, orientation).
      * @param {Object} [options] - Additional flags for regeneration.
+     * @param {boolean} [options.preserveColors=false] - Reapply colors by polygon id.
+     * @param {boolean} [options.preserveHistory=false] - Keep undo/redo stack intact.
+     * @param {boolean} [options.skipDirtyFlag=false] - Prevent marking dirty/autosaving.
      */
     function generateBoard(config, options = {}) {
         const state = AppState.getState();

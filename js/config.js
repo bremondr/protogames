@@ -1,9 +1,9 @@
 /**
  * PROTOGAMES CONFIGURATION
  * --------------------------------------------------------------
- * Central repository for constants that need to be shared across
- * modules. Keeping all values here makes it easier to tweak sizing,
- * colors, or default behaviors without digging through the codebase.
+ * Central repository for shared constants: board defaults, palette
+ * and texture definitions, auto-save tuning, and UI styling helpers.
+ * Tweaking values here keeps feature toggles and visuals consistent.
  */
 const Config = (() => {
     const VERSION = '1.0';
@@ -21,6 +21,10 @@ const Config = (() => {
     const AUTO_SAVE_INTERVAL = 30000;
     const DEFAULT_PROJECT_NAME = 'protogames-board';
     const NOTIFICATION_DURATION = 3000;
+    /**
+     * Baseline board configuration used on first load and resets. Covers
+     * grid type, board outline, sizing knobs, and triangle orientation.
+     */
     const DEFAULT_BOARD_CONFIG = {
         gridType: 'hexagon',
         orientation: 'pointy-top',
@@ -32,10 +36,10 @@ const Config = (() => {
         triangleOrientation: 'point-up'
     };
     /**
-     * Themeable color palettes. Each palette carries an id, a human-friendly
-     * name/description, and labeled swatches for clarity in the UI.
+     * Image textures that can be used as fills; palette entries can reference
+     * them via `textureId` to render pattern-backed swatches.
      *
-     * @type {Array<{id:string,name:string,description:string,colors:Array<{label:string,hex:string}>}>}
+     * @type {Array<{id:string,name:string,src:string,fallback?:string}>}
      */
     const TEXTURES = [
         {
@@ -52,6 +56,13 @@ const Config = (() => {
         }
     ];
 
+    /**
+     * Themeable color palettes (some include texture-backed swatches). Each
+     * palette carries an id, a human-friendly name/description, and labeled
+     * swatches so the UI can render tooltips and legends accurately.
+     *
+     * @type {Array<{id:string,name:string,description:string,colors:Array<{label:string,hex:string,textureId?:string}>}>}
+     */
     const COLOR_PALETTES = [
         {
             id: 'landscape',

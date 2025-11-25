@@ -2,8 +2,9 @@
  * PROTOGAMES UI MODULE
  * --------------------------------------------------------------
  * Centralizes DOM lookups, helper methods for updating controls,
- * and lightweight notifications so other modules can stay focused
- * on logic rather than DOM bookkeeping.
+ * palette/texture rendering, auto-save toggles, and lightweight
+ * notifications so other modules can stay focused on logic rather
+ * than DOM bookkeeping.
  */
 const UI = (() => {
     const elements = {};
@@ -88,8 +89,9 @@ const UI = (() => {
     }
 
     /**
-     * Renders swatches for the requested palette and returns the color that
-     * should be considered selected (ensures the color exists in the palette).
+     * Renders swatches for the requested palette (color and texture-backed)
+     * and returns the color that should be considered selected, ensuring the
+     * value exists in the palette.
      *
      * @param {string} paletteId - Palette identifier.
      * @param {string} preferredColor - Hex color to keep selected when possible.
@@ -179,6 +181,10 @@ const UI = (() => {
             : 'Configure a board and click Generate Board to begin.';
     }
 
+    /**
+     * Reads board controls and returns a normalized config supporting all
+     * outlines (rectangle, hexagon, triangle, circle) and grid types.
+     */
     function getBoardConfig() {
         const boardShape = elements.boardShapeSelect?.value || Config.DEFAULT_BOARD_CONFIG.boardShape;
         const gridType = elements.gridTypeSelect?.value || Config.DEFAULT_BOARD_CONFIG.gridType;

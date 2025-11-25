@@ -1,9 +1,10 @@
 /**
  * PROTOGAMES RENDERER
  * --------------------------------------------------------------
- * Handles all drawing operations for the HTML5 canvas. Rendering is
- * kept separate from business logic to keep the rest of the app
- * agnostic of how graphics are produced.
+ * Handles all drawing operations for the HTML5 canvas, including
+ * texture pattern caching/resolution. Rendering is kept separate
+ * from business logic to keep the rest of the app agnostic of how
+ * graphics are produced.
  */
 const Renderer = (() => {
     const textureCache = new Map();
@@ -117,7 +118,8 @@ const Renderer = (() => {
     }
 
     /**
-     * Resolves a fill into a canvas-compatible style, supporting texture patterns.
+     * Resolves a fill into a canvas-compatible style, supporting texture
+     * patterns via the `texture:` prefix and falling back to solid fills.
      *
      * @param {string|CanvasPattern} fill
      * @returns {string|CanvasPattern}
@@ -132,7 +134,8 @@ const Renderer = (() => {
     }
 
     /**
-     * Returns (and caches) a CanvasPattern for a texture id, triggering a re-render when ready.
+     * Returns (and caches) a CanvasPattern for a texture id. Async loading
+     * triggers a re-render once the pattern is ready; errors fallback later.
      *
      * @param {string} textureId
      * @returns {CanvasPattern|null}
