@@ -59,6 +59,7 @@ const Toolbar = (() => {
         });
 
         bindThemePanel();
+        bindFocusMode();
         window.addEventListener('pg:toolchange', sync);
         window.addEventListener('pg:themeschange', renderThemes);
         // Swatches are re-rendered on palette change; keep the brush color dot current.
@@ -153,6 +154,42 @@ const Toolbar = (() => {
             if (url) btn.querySelector('.object-img').style.backgroundImage = `url(${url})`;
             btn.querySelector('.object-label').textContent = o.label;
             el.objGrid.appendChild(btn);
+        });
+    }
+
+    // ---- Focus mode ---------------------------------------------------
+
+    /** Hides the header and sidebar and, where allowed, enters browser full screen. */
+    function setFocusMode(on) {
+        const body = document.body;
+        if (on === body.classList.contains('focus-mode')) return;
+        body.classList.toggle('focus-mode', on);
+        const button = $('focusButton');
+        if (button) {
+            const label = on ? 'Exit full screen' : 'Full screen';
+            button.setAttribute('aria-pressed', String(on));
+            button.setAttribute('aria-label', label);
+            button.dataset.tip = label;
+        }
+        setPopovers(false, false);
+        try {
+            if (on && document.documentElement.requestFullscreen && !document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            } else if (!on && document.fullscreenElement) {
+                document.exitFullscreen().catch(() => {});
+            }
+        } catch (e) { /* full screen not allowed (e.g. in a frame): hiding the chrome still applies */ }
+        // Let the canvas re-measure and the board re-fit the new workspace size.
+        setTimeout(() => window.dispatchEvent(new Event('resize')), 30);
+    }
+
+    function bindFocusMode() {
+        $('focusButton')?.addEventListener('click', () => setFocusMode(!document.body.classList.contains('focus-mode')));
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) setFocusMode(false);
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && document.body.classList.contains('focus-mode') && !brushOpen && !objOpen) setFocusMode(false);
         });
     }
 
