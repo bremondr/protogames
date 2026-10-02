@@ -10,7 +10,7 @@
     const tri = global.GeometryTriangle;
     const square = global.GeometrySquare;
 
-    function generateGrid(config, canvas, colorMap) {
+    function buildGrid(config, canvas, colorMap) {
         switch (config.gridType) {
             case 'triangle':
                 return tri.buildTriangleGrid(config, canvas, colorMap);
@@ -20,6 +20,11 @@
             default:
                 return hex.buildHexGrid(config, canvas, colorMap);
         }
+    }
+
+    /** Builds the tiles, then fits whatever survived clipping into the drawable area. */
+    function generateGrid(config, canvas, colorMap) {
+        return helpers.fitPolygonsToCanvas(buildGrid(config, canvas, colorMap), canvas);
     }
 
     const Geometry = {

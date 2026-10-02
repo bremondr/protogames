@@ -25,14 +25,18 @@
         const availableWidth = canvas.width - Config.CANVAS_PADDING * 2;
         const availableHeight = canvas.height - Config.CANVAS_PADDING * 2;
 
+        // Alternate rows (pointy-top) or columns (flat-top) are shifted by half a tile,
+        // which widens/heightens the board by half a tile once there is more than one.
+        const rowShift = orientation === 'pointy-top' && rows > 1 ? 0.5 : 0;
+        const colShift = orientation === 'flat-top' && cols > 1 ? 0.5 : 0;
         const sizeFromWidth =
             orientation === 'pointy-top'
-                ? availableWidth / (Math.sqrt(3) * Math.max(cols, 1))
+                ? availableWidth / (Math.sqrt(3) * (Math.max(cols, 1) + rowShift))
                 : availableWidth / (2 + 1.5 * Math.max(cols - 1, 0));
         const sizeFromHeight =
             orientation === 'pointy-top'
                 ? availableHeight / (2 + 1.5 * Math.max(rows - 1, 0))
-                : availableHeight / (Math.sqrt(3) * Math.max(rows, 1));
+                : availableHeight / (Math.sqrt(3) * (Math.max(rows, 1) + colShift));
 
         const size = Math.max(8, Math.floor(Math.min(sizeFromWidth, sizeFromHeight)));
         const hexWidth = orientation === 'pointy-top' ? Math.sqrt(3) * size : 2 * size;
@@ -42,12 +46,12 @@
 
         const boardWidth =
             orientation === 'pointy-top'
-                ? Math.sqrt(3) * size * cols
+                ? Math.sqrt(3) * size * (cols + rowShift)
                 : 2 * size + (cols - 1) * 1.5 * size;
         const boardHeight =
             orientation === 'pointy-top'
                 ? 2 * size + (rows - 1) * 1.5 * size
-                : Math.sqrt(3) * size * rows;
+                : Math.sqrt(3) * size * (rows + colShift);
 
         const offsetX = (canvas.width - boardWidth) / 2;
         const offsetY = (canvas.height - boardHeight) / 2;
