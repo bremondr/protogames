@@ -34,6 +34,7 @@
         isPointInPolygon: helpers.isPointInPolygon,
         findPolygonAtPoint: helpers.findPolygonAtPoint,
         buildAdjacency: neighbors.buildAdjacency,
+        buildLocator: neighbors.buildLocator,
         floodFill: neighbors.floodFill,
         neighborhood: neighbors.neighborhood,
         shortestPath: neighbors.shortestPath,
