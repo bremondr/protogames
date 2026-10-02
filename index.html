@@ -132,6 +132,16 @@
             </section>
 
             <!-- --------------------------------------------
+                 SHOWCASE
+                 Ready-made boards that ship with the app so
+                 everyone can open an example in one click.
+                 -------------------------------------------- -->
+            <section class="panel" aria-labelledby="showcase-title">
+                <h2 id="showcase-title">Showcase</h2>
+                <div id="showcaseList" class="showcase-list"></div>
+            </section>
+
+            <!-- --------------------------------------------
                  THEMES
                  Import custom tile themes and object item sets
                  from JSON files or plain images.
@@ -245,6 +255,9 @@
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>
                 </button>
             </div>
+
+            <!-- Notification banner: sits centered above the tool bar -->
+            <div id="notificationBar" class="notification" role="status" aria-live="polite"></div>
         </main>
     </div>
 
@@ -275,9 +288,6 @@
         </div>
     </div>
     <input type="file" id="themeEditorFile" class="visually-hidden" accept="image/*" aria-label="Choose image">
-
-    <!-- Notification banner for lightweight status updates -->
-    <div id="notificationBar" class="notification" role="status" aria-live="polite"></div>
     <script src="js/config.js"></script>
     <script src="js/textures.js"></script>
     <script src="js/objects.js"></script>
