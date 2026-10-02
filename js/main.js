@@ -41,6 +41,7 @@ const Main = (() => {
         window.addEventListener('resize', debouncedResize);
 
         const autoSaved = FileManager.loadAutoSave();
+        FileManager.showStartupMessage();
         if (autoSaved) {
             FileManager.promptAutosaveRestore(autoSaved);
             return;
