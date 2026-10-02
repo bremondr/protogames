@@ -185,10 +185,82 @@
                 }
             }
         }
-        return path;
+        return pullTight(adjacency, path);
+    }
+
+    /**
+     * Removes tiles a path only grazes: from each tile, jump straight to the
+     * furthest later tile that is directly adjacent to it. Keeps the path gap-free
+     * and never longer, and trims the extra tile a line picks up when it clips a
+     * corner of a tile it does not really cross.
+     */
+    function pullTight(adjacency, path) {
+        if (path.length < 3) return path;
+        const indices = path.map((id) => adjacency.index.get(id));
+        const position = new Map(indices.map((tile, i) => [tile, i]));
+        const result = [path[0]];
+        let at = 0;
+        while (at < path.length - 1) {
+            let furthest = at + 1;
+            for (const neighbor of adjacency.neighbors[indices[at]]) {
+                const j = position.get(neighbor);
+                if (j !== undefined && j > furthest) furthest = j;
+            }
+            result.push(path[furthest]);
+            at = furthest;
+        }
+        return result;
+    }
+
+    /**
+     * Spatial index for point lookups: buckets tiles by the grid cells their
+     * bounding boxes touch, so locate() tests a handful of tiles instead of all
+     * of them. Same answer as GeometryHelpers.findPolygonAtPoint (the containing
+     * tile whose centre is closest), but fast enough for 100x100 boards.
+     */
+    function buildLocator(polygons) {
+        if (!polygons.length) return { locate: () => null };
+        const sample = polygons.slice(0, 200);
+        const average =
+            sample.reduce((sum, p) => sum + Math.min(p.bounds.maxX - p.bounds.minX, p.bounds.maxY - p.bounds.minY), 0) / sample.length;
+        const cell = Math.max(4, average || 4);
+        const buckets = new Map();
+        const key = (cx, cy) => `${cx},${cy}`;
+
+        for (const polygon of polygons) {
+            const { minX, maxX, minY, maxY } = polygon.bounds;
+            for (let cx = Math.floor(minX / cell); cx <= Math.floor(maxX / cell); cx++) {
+                for (let cy = Math.floor(minY / cell); cy <= Math.floor(maxY / cell); cy++) {
+                    const k = key(cx, cy);
+                    if (!buckets.has(k)) buckets.set(k, []);
+                    buckets.get(k).push(polygon);
+                }
+            }
+        }
+
+        function locate(point) {
+            const bucket = buckets.get(key(Math.floor(point.x / cell), Math.floor(point.y / cell)));
+            if (!bucket) return null;
+            let best = null;
+            let bestDistance = Infinity;
+            for (const polygon of bucket) {
+                const b = polygon.bounds;
+                if (point.x < b.minX || point.x > b.maxX || point.y < b.minY || point.y > b.maxY) continue;
+                if (!global.GeometryHelpers.isPointInPolygon(point, polygon.vertices)) continue;
+                const distance = Math.hypot(point.x - polygon.center.x, point.y - polygon.center.y);
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    best = polygon;
+                }
+            }
+            return best;
+        }
+
+        return { locate };
     }
 
     global.GeometryNeighbors = {
+        buildLocator,
         buildAdjacency,
         floodFill,
         neighborhood,
