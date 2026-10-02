@@ -197,6 +197,8 @@ const FileManager = (() => {
         AppState.setCurrentColor(resolved.color);
         AppState.setEraserActive(Boolean(statePayload.isEraserActive));
         UI.setEraserActive(statePayload.isEraserActive);
+        AppState.setObjectToolActive(false);
+        window.dispatchEvent(new CustomEvent('pg:toolchange'));
         if (typeof statePayload.autoSaveEnabled === 'boolean') {
             AppState.setAutoSaveEnabled(statePayload.autoSaveEnabled);
             if (ui?.autoSaveToggle) {

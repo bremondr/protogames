@@ -110,59 +110,6 @@
             </section>
 
             <!-- --------------------------------------------
-                 COLOR PALETTE
-                 Gives players a visual palette for terrain
-                 colors. JavaScript toggles selection states.
-                 -------------------------------------------- -->
-            <section class="panel" aria-labelledby="color-palette-title">
-                <h2 id="color-palette-title">Color Palette</h2>
-                <button type="button" id="eraserButton" class="eraser-button" aria-pressed="false">Eraser</button>
-                <div class="field">
-                    <span class="field-label">Theme</span>
-                    <select id="paletteSelect" aria-label="Select color palette"></select>
-                </div>
-                <div class="palette-grid" role="list" aria-live="polite"></div>
-            </section>
-
-            <!-- --------------------------------------------
-                 ACTION BUTTONS
-                 Undo/redo and clear board shortcuts appear
-                 here. Icons reinforce what each button does.
-                 -------------------------------------------- -->
-            <section class="panel" aria-labelledby="actions-title">
-                <h2 id="actions-title">Actions</h2>
-                <div class="action-buttons">
-                    <button type="button" class="icon-button" data-action="undo" aria-label="Undo action">
-                        <span class="icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" focusable="false">
-                                <path d="M9 7H4v5" />
-                                <path d="M4 12a8 8 0 1 0 2.34-5.66" />
-                            </svg>
-                        </span>
-                        <span>Undo</span>
-                    </button>
-                    <button type="button" class="icon-button" data-action="redo" aria-label="Redo action">
-                        <span class="icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" focusable="false">
-                                <path d="M15 7h5v5" />
-                                <path d="M20 12a8 8 0 1 1-2.34-5.66" />
-                            </svg>
-                        </span>
-                        <span>Redo</span>
-                    </button>
-                    <button type="button" class="icon-button destructive" data-action="clear-board" aria-label="Clear board">
-                        <span class="icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" focusable="false">
-                                <line x1="6" y1="6" x2="18" y2="18" />
-                                <line x1="18" y1="6" x2="6" y2="18" />
-                            </svg>
-                        </span>
-                        <span>Clear</span>
-                    </button>
-                </div>
-            </section>
-
-            <!-- --------------------------------------------
                  FILE MANAGEMENT
                  Allows saving/loading project JSON files and
                  placeholders for exporting to other formats.
@@ -180,6 +127,42 @@
                             <button type="button" id="exportPDFBtn" class="secondary-button">PDF</button>
                             <button type="button" id="exportSVGBtn" class="secondary-button">SVG</button>
                         </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- --------------------------------------------
+                 THEMES
+                 Import custom tile themes and object item sets
+                 from JSON files or plain images.
+                 -------------------------------------------- -->
+            <section class="panel" aria-labelledby="themes-title">
+                <h2 id="themes-title">Themes</h2>
+                <p class="field-hint panel-intro">Import a JSON file or images. Images become tiles or items named after the file.</p>
+                <div class="theme-groups">
+                    <div class="theme-group">
+                        <div class="theme-group-head">
+                            <span class="field-label">Tile themes</span>
+                            <button type="button" id="tileTemplate" class="link-button">JSON template</button>
+                        </div>
+                        <div id="tileThemeList" class="theme-list hidden" role="list"></div>
+                        <button type="button" id="tilePick" class="secondary-button import-button">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>
+                            Import tile theme
+                        </button>
+                        <input type="file" id="tileThemeInput" class="visually-hidden" multiple accept=".json,application/json,image/*" aria-label="Import tile theme">
+                    </div>
+                    <div class="theme-group">
+                        <div class="theme-group-head">
+                            <span class="field-label">Item sets</span>
+                            <button type="button" id="itemTemplate" class="link-button">JSON template</button>
+                        </div>
+                        <div id="itemThemeList" class="theme-list hidden" role="list"></div>
+                        <button type="button" id="itemPick" class="secondary-button import-button">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>
+                            Import item set
+                        </button>
+                        <input type="file" id="itemThemeInput" class="visually-hidden" multiple accept=".json,application/json,image/*" aria-label="Import item set">
                     </div>
                 </div>
             </section>
@@ -203,12 +186,65 @@
             <div class="canvas-wrapper">
                 <canvas id="gameCanvas" aria-label="Board editor canvas"></canvas>
             </div>
+
+            <!-- Floating tool bar: brush, objects, eraser, undo/redo, clear -->
+            <div id="toolBar" class="tool-bar" role="toolbar" aria-label="Board tools">
+                <div class="tool-split">
+                    <button type="button" id="brushButton" class="tool-button tool-split-main pg-tip" data-tip="Brush" aria-label="Brush" aria-pressed="true">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"></path><path id="brushIconFill" d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"></path></svg>
+                    </button>
+                    <button type="button" id="brushColorButton" class="tool-chevron pg-tip" data-tip="Brush color" aria-label="Choose brush color" aria-expanded="false">
+                        <span id="brushColorDot" class="color-dot" aria-hidden="true"></span>
+                        <svg id="brushChevronIcon" class="chevron-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m18 15-6-6-6 6"></path></svg>
+                    </button>
+                </div>
+                <div id="brushPopover" class="tool-popover pg-pop" role="dialog" aria-label="Brush colors">
+                    <label class="pop-row">
+                        <span class="pop-title">Theme</span>
+                        <select id="paletteSelect" aria-label="Select color palette"></select>
+                    </label>
+                    <div class="palette-grid" role="list" aria-live="polite"></div>
+                </div>
+
+                <div id="objectGroup" class="object-group pg-tip" data-tip="Objects" role="group" aria-label="Object tool">
+                    <button type="button" id="objectButton" class="object-main" aria-label="Place object" aria-pressed="false">
+                        <span id="objectThumb" class="object-main-thumb" aria-hidden="true"></span>
+                    </button>
+                    <button type="button" id="objectChevron" class="object-chevron" aria-label="Choose object" aria-expanded="false">
+                        <svg id="objectChevronIcon" class="chevron-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m18 15-6-6-6 6"></path></svg>
+                    </button>
+                </div>
+                <div id="objectPopover" class="tool-popover" role="dialog" aria-label="Objects">
+                    <label class="pop-row">
+                        <span class="pop-title">Theme</span>
+                        <select id="objectThemeSelect" aria-label="Select object theme"></select>
+                    </label>
+                    <div id="objectGrid" class="object-grid" role="list"></div>
+                </div>
+
+                <button type="button" id="eraserButton" class="eraser-button pg-tip" data-tip="Eraser" aria-pressed="false" aria-label="Eraser">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 21-4.3-4.3a1 1 0 0 1 0-1.4l10-10a1 1 0 0 1 1.4 0l5.6 5.6a1 1 0 0 1 0 1.4L11 21"></path><path d="M22 21H7"></path><path d="m5 11 9 9"></path></svg>
+                </button>
+                <span class="tool-sep" aria-hidden="true"></span>
+                <button type="button" class="tool-button pg-tip" data-tip="Undo" data-action="undo" aria-label="Undo">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"></path><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"></path></svg>
+                </button>
+                <button type="button" class="tool-button pg-tip" data-tip="Redo" data-action="redo" aria-label="Redo">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 14 5-5-5-5"></path><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"></path></svg>
+                </button>
+                <span class="tool-sep" aria-hidden="true"></span>
+                <button type="button" class="tool-button destructive pg-tip" data-tip="Clear board" data-action="clear-board" aria-label="Clear board">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>
+                </button>
+            </div>
         </main>
     </div>
 
     <!-- Notification banner for lightweight status updates -->
     <div id="notificationBar" class="notification" role="status" aria-live="polite"></div>
     <script src="js/config.js"></script>
+    <script src="js/textures.js"></script>
+    <script src="js/objects.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/state.js"></script>
     <script src="js/geometry/helpers.js"></script>
@@ -220,7 +256,9 @@
     <script src="js/interactions.js"></script>
     <script src="js/fileManager.js"></script>
     <script src="js/exporter.js"></script>
+    <script src="js/themeManager.js"></script>
     <script src="js/ui.js"></script>
+    <script src="js/toolbar.js"></script>
     <script src="js/main.js"></script>
     <!-- 100% privacy-first analytics -->
 <script async src="https://scripts.simpleanalyticscdn.com/latest.js"></script>

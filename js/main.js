@@ -30,7 +30,14 @@ const Main = (() => {
         Interactions.init(uiRefs);
         FileManager.init(uiRefs);
         Exporter.init(uiRefs);
+        Toolbar.init();
+        ThemeManager.init().catch((error) => console.error('Theme restore failed:', error)).finally(startBoard);
+    }
+
+    function startBoard() {
         FileManager.setupAutoSave();
+
+        window.addEventListener('resize', debouncedResize);
 
         const autoSaved = FileManager.loadAutoSave();
         if (autoSaved) {
@@ -40,8 +47,6 @@ const Main = (() => {
 
         Interactions.generateBoard(AppState.getState().boardConfig, { skipDirtyFlag: true });
         UI.updateCanvasMessage(AppState.getState().polygons.length);
-
-        window.addEventListener('resize', debouncedResize);
     }
 
     document.addEventListener('DOMContentLoaded', initializeApp);

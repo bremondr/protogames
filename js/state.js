@@ -19,6 +19,9 @@ const AppState = (() => {
          * blank color instead of applying a swatch color.
          */
         isEraserActive: false,
+        /** When true, clicks place the current object instead of painting terrain. */
+        isObjectToolActive: false,
+        currentObject: 'castle',
         /**
          * Controls whether auto-save is enabled. When false, auto-save timers
          * and save attempts are skipped.
@@ -108,6 +111,14 @@ const AppState = (() => {
         state.isEraserActive = Boolean(active);
     }
 
+    function setObjectToolActive(active) {
+        state.isObjectToolActive = Boolean(active);
+    }
+
+    function setCurrentObject(id) {
+        state.currentObject = id;
+    }
+
     /**
      * Updates the auto-save enabled flag.
      *
@@ -180,7 +191,8 @@ const AppState = (() => {
         if (!state.polygons.length) return;
         const snapshot = state.polygons.map((polygon) => ({
             id: polygon.id,
-            color: polygon.color
+            color: polygon.color,
+            object: polygon.object || null
         }));
 
         if (state.historyIndex < state.history.length - 1) {
@@ -201,10 +213,12 @@ const AppState = (() => {
      */
     function restoreSnapshot(snapshot) {
         if (!snapshot) return;
-        const colorMap = new Map(snapshot.map((entry) => [entry.id, entry.color]));
+        const entries = new Map(snapshot.map((entry) => [entry.id, entry]));
         state.polygons.forEach((polygon) => {
-            if (colorMap.has(polygon.id)) {
-                polygon.color = colorMap.get(polygon.id);
+            const entry = entries.get(polygon.id);
+            if (entry) {
+                polygon.color = entry.color;
+                if (entry.object) polygon.object = entry.object; else delete polygon.object;
             }
         });
     }
@@ -237,6 +251,8 @@ const AppState = (() => {
         setAvailablePalettes,
         setCurrentColor,
         setEraserActive,
+        setObjectToolActive,
+        setCurrentObject,
         setAutoSaveEnabled,
         setCurrentPaletteId,
         setHoverPolygonId,
