@@ -1,0 +1,85 @@
+/**
+ * PROTOGAMES TOOL OPERATIONS
+ * --------------------------------------------------------------
+ * Pure planning/applying logic for the fill and line tools, kept apart from
+ * pointer handling so it can be unit-tested in Node.
+ *
+ * A "source" says what is being painted:
+ *   { kind: 'color',  color }          paint terrain
+ *   { kind: 'eraser', defaultColor }   reset terrain to blank and remove objects
+ *   { kind: 'object', object }         place an object
+ */
+const ToolOps = (() => {
+    const norm = (value) => String(value || '').toLowerCase();
+
+    /** What a tile must look like to belong to the same fill region. */
+    function regionKey(source, polygon) {
+        return source.kind === 'object' ? polygon.object || '' : norm(polygon.color);
+    }
+
+    /** Would painting `source` onto this tile change anything? */
+    function wouldChange(source, polygon) {
+        if (source.kind === 'color') return norm(polygon.color) !== norm(source.color);
+        if (source.kind === 'object') return (polygon.object || '') !== source.object;
+        return norm(polygon.color) !== norm(source.defaultColor) || Boolean(polygon.object);
+    }
+
+    /**
+     * Tiles a fill started on `startId` would change: every tile connected to it
+     * that shares its colour (or, for objects, its object). Uses the grid's
+     * adjacency, so it works for hexagon, square and triangle tiles and stops at
+     * board edges. Returns ids; empty when nothing would change.
+     *
+     * @param polygons  tiles in the same order the adjacency was built from
+     * @param adjacency GeometryNeighbors adjacency of those tiles
+     */
+    function planFill(polygons, adjacency, startId, source) {
+        const startIndex = adjacency.index.get(startId);
+        if (startIndex === undefined) return [];
+        const start = polygons[startIndex];
+        if (source.kind !== 'eraser' && !wouldChange(source, start)) return [];
+
+        const startKey = regionKey(source, start);
+        const region = Geometry.floodFill(adjacency, startId, (i) => regionKey(source, polygons[i]) === startKey);
+        return source.kind === 'eraser'
+            ? region.filter((id) => wouldChange(source, polygons[adjacency.index.get(id)]))
+            : region;
+    }
+
+    /**
+     * Tiles a line from `fromId` to `toId` would change (gap-free path, see
+     * GeometryNeighbors.linePath), skipping tiles that already look right.
+     */
+    function planLine(polygons, adjacency, locate, fromId, toId, source) {
+        const path = Geometry.linePath(polygons, adjacency, fromId, toId, locate);
+        return path.filter((id) => wouldChange(source, polygons[adjacency.index.get(id)]));
+    }
+
+    /** Paints `source` onto the tiles with these ids. Returns how many tiles changed. */
+    function applyToTiles(polygons, adjacency, ids, source) {
+        let changed = 0;
+        for (const id of ids) {
+            const polygon = polygons[adjacency.index.get(id)];
+            if (!polygon || !wouldChange(source, polygon)) continue;
+            if (source.kind === 'color') {
+                polygon.color = source.color;
+            } else if (source.kind === 'object') {
+                polygon.object = source.object;
+            } else {
+                polygon.color = source.defaultColor;
+                delete polygon.object;
+            }
+            changed++;
+        }
+        return changed;
+    }
+
+    /** Builds the paint source from the editor state. */
+    function sourceFromState(state, defaultColor) {
+        if (state.isObjectToolActive) return { kind: 'object', object: state.currentObject };
+        if (state.isEraserActive) return { kind: 'eraser', defaultColor };
+        return { kind: 'color', color: state.currentColor };
+    }
+
+    return { planFill, planLine, applyToTiles, sourceFromState, wouldChange };
+})();
