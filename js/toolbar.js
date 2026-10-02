@@ -39,6 +39,9 @@ const Toolbar = (() => {
         };
 
         el.brush?.addEventListener('click', selectBrush);
+        $('brushSmaller')?.addEventListener('click', () => Interactions.changeBrushSize(-1));
+        $('brushLarger')?.addEventListener('click', () => Interactions.changeBrushSize(1));
+        window.addEventListener('pg:brushsize', syncBrushSize);
         el.fill?.addEventListener('click', () => Interactions.setDrawMode('fill'));
         el.line?.addEventListener('click', () => Interactions.setDrawMode('line'));
         el.brushChevron?.addEventListener('click', () => setPopovers(!brushOpen, false));
@@ -70,6 +73,17 @@ const Toolbar = (() => {
         el.paletteGrid && new MutationObserver(sync).observe(el.paletteGrid, { attributes: true, subtree: true, attributeFilter: ['class'] });
         sync();
         renderThemes();
+    }
+
+    /** Shows the brush size and disables the stepper buttons at the limits. */
+    function syncBrushSize() {
+        const size = AppState.getState().brushSize;
+        const value = $('brushSizeValue');
+        if (value) value.textContent = String(size);
+        const smaller = $('brushSmaller');
+        const larger = $('brushLarger');
+        if (smaller) smaller.disabled = size <= Config.BRUSH_SIZE_MIN;
+        if (larger) larger.disabled = size >= Config.BRUSH_SIZE_MAX;
     }
 
     function toolName() {
@@ -105,6 +119,7 @@ const Toolbar = (() => {
         const s = AppState.getState();
         const tool = toolName();
         const color = s.currentColor;
+        syncBrushSize();
 
         // Brush is highlighted only when painting terrain colour with the plain brush; fill and
         // line are highlighted by mode and combine with whichever paint source (colour, object, eraser) is active.
@@ -296,5 +311,5 @@ const Toolbar = (() => {
         sync();
     }
 
-    return { init, sync };
+    return { init, sync, selectBrush };
 })();

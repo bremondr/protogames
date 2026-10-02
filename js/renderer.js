@@ -68,13 +68,14 @@ const Renderer = (() => {
      * @param {number} scene.height           canvas height in pixels
      * @param {Object} [scene.view]           { scale, x, y }; identity when omitted
      * @param {string|null} [scene.hoverPolygonId]  tile to outline (omit for exports)
+     * @param {string[]} [scene.hoverIds]           tiles to outline when the brush covers several
      * @param {string[]} [scene.linePreviewIds]     line-tool preview tiles (omit for exports)
      * @returns {{drawn:number,total:number}} how many tiles were actually drawn (the rest were off-screen)
      */
     function paint(ctx, scene) {
         const { polygons, width, height } = scene;
         const view = scene.view || ViewMath.identity();
-        const hoverPolygonId = scene.hoverPolygonId || null;
+        const hoverIds = scene.hoverIds && scene.hoverIds.length ? scene.hoverIds : scene.hoverPolygonId ? [scene.hoverPolygonId] : [];
         const linePreviewIds = scene.linePreviewIds || [];
 
         ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -128,17 +129,18 @@ const Renderer = (() => {
             });
         }
 
-        if (hoverPolygonId && !linePreviewIds.length) {
-            const hovered = polygons.find((poly) => poly.id === hoverPolygonId);
-            if (hovered) {
-                drawPolygon(ctx, hovered, {
-                    fill: hovered.color,
+        if (hoverIds.length && !linePreviewIds.length) {
+            const hovered = new Set(hoverIds);
+            polygons.forEach((poly) => {
+                if (!hovered.has(poly.id) || !inView(poly)) return;
+                drawPolygon(ctx, poly, {
+                    fill: poly.color,
                     stroke: Config.HOVER_OUTLINE,
                     lineWidth: 2,
                     overlay: 'rgba(47, 111, 237, 0.15)'
                 }, view.scale);
-                if (typeof Objects !== 'undefined') Objects.drawOnPolygon(ctx, hovered);
-            }
+                if (typeof Objects !== 'undefined') Objects.drawOnPolygon(ctx, poly);
+            });
         }
 
         ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -149,7 +151,7 @@ const Renderer = (() => {
      * Draws the board on the visible canvas with the current pan/zoom view.
      */
     function renderBoard() {
-        const { ctx, canvas, polygons, hoverPolygonId, linePreviewIds, view } = AppState.getState();
+        const { ctx, canvas, polygons, hoverPolygonId, hoverIds, linePreviewIds, view } = AppState.getState();
         if (!ctx || !canvas) return;
         const stats = paint(ctx, {
             polygons,
@@ -157,6 +159,7 @@ const Renderer = (() => {
             height: canvas.height,
             view,
             hoverPolygonId,
+            hoverIds,
             linePreviewIds
         });
         renderListeners.forEach((listener) => listener(stats));

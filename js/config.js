@@ -17,6 +17,9 @@ const Config = (() => {
     const ZOOM_MAX = 24;
     /** The "100%" zoom level shows a typical tile at this many CSS pixels. */
     const ACTUAL_TILE_PX = 64;
+    /** Brush size range: size n paints the tile under the pointer plus its neighbours up to n - 1 steps away. */
+    const BRUSH_SIZE_MIN = 1;
+    const BRUSH_SIZE_MAX = 7;
     /** localStorage key for the minimap on/off preference. */
     const MINIMAP_KEY = 'protogames_minimap';
     const HISTORY_LIMIT = 50;
@@ -178,6 +181,8 @@ const Config = (() => {
         ZOOM_MAX,
         ACTUAL_TILE_PX,
         MINIMAP_KEY,
+        BRUSH_SIZE_MIN,
+        BRUSH_SIZE_MAX,
         HISTORY_LIMIT,
         DEFAULT_FILL,
         DEFAULT_TILE_COLOR,
