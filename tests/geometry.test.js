@@ -192,3 +192,97 @@ test('the SAT overlap helper treats touching tiles as non-overlapping and shifte
     assert.equal(Checks.polygonsOverlap(square(0, 0), square(10, 10)), false);
     assert.equal(Checks.polygonsOverlap(square(0, 0), square(5, 5)), true);
 });
+
+// ---- Symmetry and roundness (regression: circle boards used to be lopsided) ----------------
+
+test('boards that should be rotationally symmetric are, on every combination and several sizes', () => {
+    for (const radius of [1, 2, 3, 4, 5, 6, 8]) {
+        for (const combo of Checks.allCombinations({ radius, size: radius + 2, width: radius + 3, height: radius + 1 })) {
+            if (!combo.valid) continue;
+            const order = Checks.expectedSymmetry(combo.config);
+            if (!order) continue;
+            const polygons = generate(combo.config);
+            assert.equal(Checks.rotationMisses(polygons, order), 0, `${combo.key} radius ${radius} should be ${order}-fold symmetric`);
+        }
+    }
+});
+
+test('triangle boards are left-right symmetric for every tile shape', () => {
+    for (const size of [2, 3, 4, 5, 6, 7, 8, 9]) {
+        for (const combo of Checks.allCombinations({ size })) {
+            if (!combo.valid || combo.config.boardShape !== 'triangle') continue;
+            if (!Checks.expectedMirror(combo.config)) continue;
+            assert.equal(Checks.mirrorMisses(generate(combo.config)), 0, `${combo.key} size ${size}`);
+        }
+    }
+});
+
+test('known limitation: flat-top hexagons on an even-sized triangle board cannot mirror', () => {
+    // Documented in expectedMirror(); this test fails if that ever changes, so the exception can be removed.
+    for (const size of [2, 4, 6]) {
+        const config = Checks.makeConfig('triangle', 'hexagon', 'flat-top', 'point-up', { size });
+        assert.equal(Checks.expectedMirror(config), false);
+        assert.ok(Checks.mirrorMisses(generate(config)) > 0, `size ${size} unexpectedly mirrors`);
+    }
+    const odd = Checks.makeConfig('triangle', 'hexagon', 'flat-top', 'point-up', { size: 5 });
+    assert.equal(Checks.expectedMirror(odd), true);
+    assert.equal(Checks.mirrorMisses(generate(odd)), 0);
+});
+
+test('the symmetry check really detects a lopsided layout', () => {
+    const polygons = generate(Checks.makeConfig('circle', 'hexagon', 'pointy-top', 'point-up', { radius: 4 }));
+    const lopsided = polygons.filter((p, i) => !(i % 7 === 0 && p.center.x < 600));
+    assert.ok(Checks.rotationMisses(lopsided, 6) > 0);
+    assert.ok(Checks.rotationMisses(polygons.slice(0, polygons.length - 3), 6) > 0);
+});
+
+test('circle boards with hexagon tiles contain every tile within (radius + 0.5) tile widths of the middle tile', () => {
+    const counts = { 1: 7, 2: 19, 3: 43, 4: 73, 5: 109, 6: 151, 8: 253 };
+    for (const orientation of ['pointy-top', 'flat-top']) {
+        for (const [radius, expected] of Object.entries(counts)) {
+            const polygons = generate(Checks.makeConfig('circle', 'hexagon', orientation, 'point-up', { radius: Number(radius) }));
+            assert.equal(polygons.length, expected, `${orientation} radius ${radius}`);
+            // The disc includes the whole hexagon of the same radius.
+            assert.ok(polygons.length >= 3 * radius * (Number(radius) + 1) + 1);
+        }
+    }
+});
+
+test('circle boards with hexagon tiles are centred on a tile, so the middle of the board is a tile', () => {
+    for (const orientation of ['pointy-top', 'flat-top']) {
+        const polygons = generate(Checks.makeConfig('circle', 'hexagon', orientation, 'point-up', { radius: 4 }));
+        const near = polygons.filter((p) => Math.hypot(p.center.x - CANVAS.width / 2, p.center.y - (CANVAS.height - Config.CANVAS_PADDING * 2 - Config.TOOLBAR_CLEARANCE) / 2 - Config.CANVAS_PADDING) < 1);
+        assert.equal(near.length, 1, `${orientation}: exactly one tile in the middle`);
+    }
+});
+
+test('circle boards with triangle tiles contain at least the hexagon of the same radius and are centred on a vertex', () => {
+    for (const radius of [1, 2, 3, 4, 5, 8]) {
+        const disc = generate(Checks.makeConfig('circle', 'triangle', 'pointy-top', 'point-up', { radius }));
+        assert.ok(disc.length >= 6 * radius * radius, `radius ${radius}: ${disc.length} tiles`);
+        // Six triangles meet at the centre vertex, so a vertex of every central tile is the middle of the board.
+        const middle = { x: CANVAS.width / 2, y: Config.CANVAS_PADDING + (CANVAS.height - Config.CANVAS_PADDING * 2 - Config.TOOLBAR_CLEARANCE) / 2 };
+        const touching = disc.filter((p) => p.vertices.some((v) => Math.hypot(v.x - middle.x, v.y - middle.y) < 1));
+        assert.equal(touching.length, 6, `radius ${radius}`);
+    }
+});
+
+test('circle boards are round: no tile is far beyond the edge reached by the boundary tiles', () => {
+    for (const gridType of ['hexagon', 'triangle', 'square']) {
+        for (const radius of [4, 6, 8]) {
+            const polygons = generate(Checks.makeConfig('circle', gridType, 'pointy-top', 'point-up', { radius }));
+            const adjacency = Geometry.buildAdjacency(polygons);
+            const ratio = Checks.roundness(polygons, adjacency);
+            assert.ok(ratio < 1.32, `${gridType} radius ${radius}: roundness ${ratio.toFixed(3)}`);
+        }
+    }
+});
+
+test('circle ids are stable for a given layout, so colours survive regeneration', () => {
+    const config = Checks.makeConfig('circle', 'hexagon', 'pointy-top', 'point-up', { radius: 3 });
+    const first = generate(config);
+    const colors = new Map(first.map((p, i) => [p.id, `#00${(i + 10).toString(16).padStart(2, '0')}ff`]));
+    const second = Geometry.generateGrid(config, SMALL_CANVAS, colors);
+    assert.deepEqual(plain(second.map((p) => p.id)), plain(first.map((p) => p.id)));
+    for (const p of second) assert.equal(p.color, colors.get(p.id));
+});
