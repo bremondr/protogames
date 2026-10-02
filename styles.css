@@ -1411,3 +1411,64 @@ button:focus-visible {
     font-size: 0.8rem;
     color: rgba(255, 255, 255, 0.6);
 }
+
+/* ==============================================================
+   FOCUS MODE
+   --------------------------------------------------------------
+   Full-screen button in the workspace corner. In focus mode the
+   header and sidebar are hidden so the board gets the whole window.
+   ============================================================== */
+.focus-button {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    z-index: 5;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: #151b26;
+    color: #e6e9f0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 24px rgba(16, 24, 40, 0.22), 0 2px 6px rgba(16, 24, 40, 0.12);
+}
+
+.focus-button:hover {
+    background: #222a38;
+}
+
+.focus-button svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-width: 1.9;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.focus-button .icon-exit,
+.focus-mode .focus-button .icon-enter {
+    display: none;
+}
+
+.focus-mode .focus-button .icon-exit {
+    display: block;
+}
+
+/* The button sits at the top edge, so its tooltip opens downward. */
+.focus-button.pg-tip::after {
+    bottom: auto;
+    top: calc(100% + 10px);
+    left: auto;
+    right: 0;
+    transform: none;
+}
+
+.focus-mode .app-header,
+.focus-mode .sidebar {
+    display: none;
+}

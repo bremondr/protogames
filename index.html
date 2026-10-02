@@ -205,6 +205,12 @@
                 <canvas id="gameCanvas" aria-label="Board editor canvas"></canvas>
             </div>
 
+            <!-- Focus mode: hides the header and sidebar and goes full screen -->
+            <button type="button" id="focusButton" class="focus-button pg-tip" data-tip="Full screen" aria-label="Full screen" aria-pressed="false">
+                <svg class="icon-enter" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"></path><path d="M21 8V5a2 2 0 0 0-2-2h-3"></path><path d="M3 16v3a2 2 0 0 0 2 2h3"></path><path d="M16 21h3a2 2 0 0 0 2-2v-3"></path></svg>
+                <svg class="icon-exit" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3v3a2 2 0 0 1-2 2H3"></path><path d="M21 8h-3a2 2 0 0 1-2-2V3"></path><path d="M3 16h3a2 2 0 0 1 2 2v3"></path><path d="M16 21v-3a2 2 0 0 1 2-2h3"></path></svg>
+            </button>
+
             <!-- Floating tool bar: brush, objects, eraser, undo/redo, clear -->
             <div id="toolBar" class="tool-bar" role="toolbar" aria-label="Board tools">
                 <div class="tool-split">
