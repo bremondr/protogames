@@ -12,6 +12,13 @@ const Config = (() => {
      * tool bar never covers the lowest row of tiles.
      */
     const TOOLBAR_CLEARANCE = 56;
+    /** Zoom limits (1 = the board fitted to the canvas). */
+    const ZOOM_MIN = 0.25;
+    const ZOOM_MAX = 24;
+    /** The "100%" zoom level shows a typical tile at this many CSS pixels. */
+    const ACTUAL_TILE_PX = 64;
+    /** localStorage key for the minimap on/off preference. */
+    const MINIMAP_KEY = 'protogames_minimap';
     const HISTORY_LIMIT = 50;
     /**
      * Baseline tile color used for blank/erased cells.
@@ -167,6 +174,10 @@ const Config = (() => {
     return {
         CANVAS_PADDING,
         TOOLBAR_CLEARANCE,
+        ZOOM_MIN,
+        ZOOM_MAX,
+        ACTUAL_TILE_PX,
+        MINIMAP_KEY,
         HISTORY_LIMIT,
         DEFAULT_FILL,
         DEFAULT_TILE_COLOR,
