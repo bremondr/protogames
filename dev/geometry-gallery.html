@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Protogames geometry gallery</title>
+    <!--
+        Dev-only page (not linked from the app). Renders every board shape x tile
+        shape x orientation combination as a small thumbnail so broken tessellations
+        are easy to spot, and runs the same checks as the unit tests.
+        Open it through any static server, e.g. `python -m http.server`, then visit
+        /dev/geometry-gallery.html. Query options: ?radius=3&size=5&width=6&height=4
+    -->
+    <style>
+        body { margin: 0; padding: 1.5rem; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f6fb; color: #1f2933; }
+        h1 { margin: 0 0 0.25rem; font-size: 1.3rem; }
+        p.lead { margin: 0 0 1rem; color: #5f6b7c; }
+        #summary { margin: 0 0 1.25rem; font-weight: 600; }
+        #summary.fail { color: #b3261e; }
+        #summary.ok { color: #1b7f3b; }
+        #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1rem; }
+        figure { margin: 0; background: #fff; border: 1px solid #dfe3eb; border-radius: 8px; padding: 0.6rem; }
+        figure.bad { border-color: #d64545; box-shadow: 0 0 0 2px rgba(214, 69, 69, 0.2); }
+        figure.invalid { border-style: dashed; background: #fbfbfd; }
+        canvas { display: block; width: 100%; height: auto; background: #fafbff; border-radius: 4px; }
+        figcaption { margin-top: 0.5rem; font-size: 0.8rem; line-height: 1.35; }
+        .tag { display: inline-block; padding: 0 0.4rem; border-radius: 999px; font-size: 0.7rem; font-weight: 600; }
+        .tag.ok { background: #d9f2e1; color: #1b7f3b; }
+        .tag.bad { background: #fbd9d6; color: #b3261e; }
+        .tag.invalid { background: #e8eaf0; color: #5f6b7c; }
+        .issues { color: #b3261e; margin: 0.25rem 0 0; padding-left: 1rem; }
+        .reason { color: #5f6b7c; margin: 0.25rem 0 0; }
+    </style>
+</head>
+<body>
+    <h1>Geometry gallery</h1>
+    <p class="lead">Every valid combination is checked for tile count, overlaps, bounds, centring and the toolbar clearance. Invalid combinations are shown as dashed cards with the reason they are blocked.</p>
+    <p id="summary">Running checks…</p>
+    <div id="grid"></div>
+
+    <script src="../js/config.js"></script>
+    <script src="../js/geometry/helpers.js"></script>
+    <script src="../js/geometry/hex.js"></script>
+    <script src="../js/geometry/triangle.js"></script>
+    <script src="../js/geometry/square.js"></script>
+    <script src="../js/geometry/neighbors.js"></script>
+    <script src="../js/geometry.js"></script>
+    <script src="geometry-checks.js"></script>
+    <script>
+        (function () {
+            const params = new URLSearchParams(location.search);
+            const sizes = {};
+            for (const key of ['radius', 'size', 'width', 'height']) {
+                const value = parseInt(params.get(key), 10);
+                if (value > 0) sizes[key] = value;
+            }
+            const canvasSize = { width: 480, height: 400 };
+            const grid = document.getElementById('grid');
+            const combinations = GeometryChecks.allCombinations(sizes);
+            let failures = 0;
+            let checked = 0;
+
+            for (const combo of combinations) {
+                const figure = document.createElement('figure');
+                const canvas = document.createElement('canvas');
+                canvas.width = canvasSize.width;
+                canvas.height = canvasSize.height;
+                const caption = document.createElement('figcaption');
+                const title = document.createElement('strong');
+                title.textContent = combo.key;
+                caption.appendChild(title);
+                caption.appendChild(document.createTextNode(' '));
+
+                const tag = document.createElement('span');
+                tag.className = 'tag';
+                caption.appendChild(tag);
+
+                let polygons = [];
+                let issues = [];
+                try {
+                    polygons = Geometry.generateGrid(combo.config, canvasSize, null);
+                    issues = GeometryChecks.checkPolygons(polygons, canvasSize, combo.config);
+                } catch (error) {
+                    issues = ['threw: ' + error.message];
+                }
+
+                if (!combo.valid) {
+                    figure.classList.add('invalid');
+                    tag.classList.add('invalid');
+                    tag.textContent = 'invalid';
+                    const reason = document.createElement('p');
+                    reason.className = 'reason';
+                    reason.textContent = combo.reason;
+                    caption.appendChild(reason);
+                } else {
+                    checked++;
+                    if (issues.length) {
+                        failures++;
+                        figure.classList.add('bad');
+                        tag.classList.add('bad');
+                        tag.textContent = 'FAIL';
+                    } else {
+                        tag.classList.add('ok');
+                        tag.textContent = polygons.length + ' tiles';
+                    }
+                    if (issues.length) {
+                        const list = document.createElement('ul');
+                        list.className = 'issues';
+                        for (const issue of issues) {
+                            const item = document.createElement('li');
+                            item.textContent = issue;
+                            list.appendChild(item);
+                        }
+                        caption.appendChild(list);
+                    }
+                }
+
+                const ctx = canvas.getContext('2d');
+                ctx.strokeStyle = '#333741';
+                ctx.fillStyle = '#ffffff';
+                ctx.lineWidth = 1;
+                for (const polygon of polygons) {
+                    ctx.beginPath();
+                    polygon.vertices.forEach((v, i) => (i ? ctx.lineTo(v.x, v.y) : ctx.moveTo(v.x, v.y)));
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+                }
+                // Mark the drawable area so clipping or off-centre boards are obvious.
+                ctx.strokeStyle = 'rgba(47, 111, 237, 0.35)';
+                ctx.setLineDash([4, 4]);
+                const pad = Config.CANVAS_PADDING;
+                ctx.strokeRect(pad, pad, canvasSize.width - pad * 2, canvasSize.height - pad * 2 - Config.TOOLBAR_CLEARANCE);
+
+                figure.appendChild(canvas);
+                figure.appendChild(caption);
+                grid.appendChild(figure);
+            }
+
+            const summary = document.getElementById('summary');
+            summary.textContent = failures
+                ? failures + ' of ' + checked + ' valid combinations failed'
+                : 'All ' + checked + ' valid combinations passed (' + (combinations.length - checked) + ' invalid shown separately)';
+            summary.className = failures ? 'fail' : 'ok';
+            window.__galleryResult = { checked, failures, total: combinations.length };
+        })();
+    </script>
+</body>
+</html>
