@@ -129,18 +129,90 @@ const FileManager = (() => {
         });
     }
 
+    /**
+     * In-page replacement for window.prompt (unsupported in some embedded
+     * browsers, where it silently returns null).
+     *
+     * @param {string} title - Dialog heading.
+     * @param {string} defaultValue - Pre-filled input value.
+     * @param {Function} onConfirm - Called with the entered text.
+     */
+    function promptForText(title, defaultValue, onConfirm) {
+        const modal = document.createElement('div');
+        modal.className = 'modal-backdrop';
+        modal.innerHTML = `
+            <form class="modal">
+                <h3></h3>
+                <input type="text" class="modal-input" aria-label="Project name">
+                <div class="modal-actions">
+                    <button type="button" class="secondary-button" data-action="cancel">Cancel</button>
+                    <button type="submit" class="primary-button">Save</button>
+                </div>
+            </form>
+        `;
+        modal.querySelector('h3').textContent = title;
+        const input = modal.querySelector('input');
+        input.value = defaultValue;
+        document.body.appendChild(modal);
+        input.focus();
+        input.select();
+
+        const close = () => modal.remove();
+        modal.addEventListener('click', (event) => {
+            if (event.target === modal || event.target.closest('[data-action="cancel"]')) close();
+        });
+        modal.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') close();
+        });
+        modal.querySelector('form').addEventListener('submit', (event) => {
+            event.preventDefault();
+            const value = input.value.trim();
+            close();
+            onConfirm(value);
+        });
+    }
+
+    /** In-page replacement for window.confirm when loading over an existing board. */
+    function confirmReplace(onConfirm) {
+        const modal = document.createElement('div');
+        modal.className = 'modal-backdrop';
+        modal.innerHTML = `
+            <div class="modal">
+                <h3>Replace current board?</h3>
+                <p>Loading a project will replace your current board.</p>
+                <div class="modal-actions">
+                    <button type="button" class="secondary-button" data-action="cancel">Cancel</button>
+                    <button type="button" class="primary-button" data-action="confirm">Load</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        modal.querySelector('[data-action="confirm"]').focus();
+        modal.addEventListener('click', (event) => {
+            const button = event.target.closest('button[data-action]');
+            if (!button && event.target !== modal) return;
+            modal.remove();
+            if (button?.dataset.action === 'confirm') onConfirm();
+        });
+        modal.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') modal.remove();
+        });
+    }
+
     function saveProjectFile() {
         const state = AppState.getState();
         if (!state.polygons.length) {
-            alert('Generate a board before saving a project.');
+            UI?.showNotification('Generate a board before saving a project.');
             return;
         }
         const defaultName = state.currentProjectName || Config.DEFAULT_PROJECT_NAME;
-        const input = prompt('Enter a project name', defaultName);
-        if (!input) return;
-        const trimmed = input.trim();
-        AppState.setProjectName(trimmed || Config.DEFAULT_PROJECT_NAME);
+        promptForText('Enter a project name', defaultName, (name) => {
+            AppState.setProjectName(name || Config.DEFAULT_PROJECT_NAME);
+            downloadProject();
+        });
+    }
 
+    function downloadProject() {
         const payload = prepareProjectData();
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
         const filename = `${Utils.sanitizeFileName(payload.projectName)}.protogames.json`;
@@ -161,10 +233,8 @@ const FileManager = (() => {
                 if (!validateProjectFile(payload)) {
                     throw new Error('This file does not look like a Protogames project.');
                 }
-                if (
-                    AppState.getState().polygons.length &&
-                    !confirm('Loading a project will replace your current board. Continue?')
-                ) {
+                if (AppState.getState().polygons.length) {
+                    confirmReplace(() => restoreState(payload));
                     return;
                 }
                 restoreState(payload);
