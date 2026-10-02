@@ -728,6 +728,10 @@ button:focus-visible {
     bottom: 2.5rem;
     transform: translateX(-50%);
     display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: max-content;
+    max-width: calc(100% - 1rem);
     align-items: center;
     gap: 4px;
     padding: 6px;
@@ -1471,4 +1475,138 @@ button:focus-visible {
 .focus-mode .app-header,
 .focus-mode .sidebar {
     display: none;
+}
+
+/* ==============================================================
+   ZOOM CONTROLS + MINIMAP
+   --------------------------------------------------------------
+   Bottom-right cluster over the canvas. The minimap shows the
+   whole board with the visible area outlined.
+   ============================================================== */
+.zoom-controls {
+    position: absolute;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px;
+    background: #151b26;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(16, 24, 40, 0.22), 0 2px 6px rgba(16, 24, 40, 0.12);
+}
+
+.zoom-button,
+.zoom-label {
+    height: 32px;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: #e6e9f0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.zoom-button {
+    width: 32px;
+}
+
+.zoom-label {
+    min-width: 54px;
+    padding: 0 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.zoom-button:hover,
+.zoom-label:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.zoom-button[aria-pressed="true"] {
+    background: rgba(47, 111, 237, 0.35);
+}
+
+.zoom-button svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Tooltips in the corner open leftwards so they stay on screen. */
+.zoom-controls .pg-tip::after {
+    left: auto;
+    right: 0;
+    transform: none;
+}
+
+.minimap {
+    position: absolute;
+    right: 1rem;
+    bottom: calc(1rem + 44px);
+    z-index: 5;
+    padding: 4px;
+    background: rgba(21, 27, 38, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(16, 24, 40, 0.22), 0 2px 6px rgba(16, 24, 40, 0.12);
+}
+
+.minimap canvas {
+    display: block;
+    width: 168px;
+    height: 126px;
+    border-radius: 6px;
+    background: #e8ecf4;
+    cursor: crosshair;
+    touch-action: none;
+}
+
+#gameCanvas.pan-ready {
+    cursor: grab !important;
+}
+
+#gameCanvas.panning {
+    cursor: grabbing !important;
+}
+
+@media (max-width: 960px) {
+    .minimap canvas {
+        width: 120px;
+        height: 90px;
+    }
+}
+
+/* On phones the bottom edge belongs to the tool bar (which may wrap), so the zoom
+   controls and minimap move to the top-left corner. */
+@media (max-width: 700px) {
+    .zoom-controls {
+        right: auto;
+        bottom: auto;
+        left: 1rem;
+        top: 1rem;
+    }
+
+    .minimap {
+        right: auto;
+        bottom: auto;
+        left: 1rem;
+        top: calc(1rem + 44px);
+    }
+
+    .zoom-controls .pg-tip::after {
+        left: 0;
+        right: auto;
+        bottom: auto;
+        top: calc(100% + 10px);
+    }
 }

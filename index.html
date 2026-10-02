@@ -268,6 +268,28 @@
                 </button>
             </div>
 
+            <!-- Minimap: whole board with the visible area outlined; click or drag to move the view -->
+            <div id="minimap" class="minimap hidden" aria-label="Board minimap">
+                <canvas id="minimapCanvas" width="168" height="126"></canvas>
+            </div>
+
+            <!-- Zoom controls -->
+            <div class="zoom-controls" role="group" aria-label="Zoom">
+                <button type="button" id="zoomOut" class="zoom-button pg-tip" data-tip="Zoom out" aria-label="Zoom out">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path></svg>
+                </button>
+                <button type="button" id="zoomLabel" class="zoom-label pg-tip" data-tip="Actual size" aria-label="Zoom level; activate for actual size">100%</button>
+                <button type="button" id="zoomIn" class="zoom-button pg-tip" data-tip="Zoom in" aria-label="Zoom in">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
+                </button>
+                <button type="button" id="zoomFit" class="zoom-button pg-tip" data-tip="Fit to screen" aria-label="Fit to screen">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"></path><path d="M21 8V5a2 2 0 0 0-2-2h-3"></path><path d="M3 16v3a2 2 0 0 0 2 2h3"></path><path d="M16 21h3a2 2 0 0 0 2-2v-3"></path><rect x="8" y="8" width="8" height="8" rx="1"></rect></svg>
+                </button>
+                <button type="button" id="minimapToggle" class="zoom-button pg-tip" data-tip="Minimap" aria-label="Toggle minimap" aria-pressed="true">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><rect x="12" y="11" width="6" height="6" rx="1"></rect></svg>
+                </button>
+            </div>
+
             <!-- Notification banner: sits centered above the tool bar -->
             <div id="notificationBar" class="notification" role="status" aria-live="polite"></div>
         </main>
@@ -320,6 +342,7 @@
     <script src="js/exporter.js"></script>
     <script src="js/themeManager.js"></script>
     <script src="js/ui.js"></script>
+    <script src="js/viewControls.js"></script>
     <script src="js/toolbar.js"></script>
     <script src="js/themeEditor.js"></script>
     <script src="js/main.js"></script>
