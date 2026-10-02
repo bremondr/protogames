@@ -16,6 +16,8 @@ const Toolbar = (() => {
         el = {
             bar: $('toolBar'),
             brush: $('brushButton'),
+            fill: $('fillButton'),
+            line: $('lineButton'),
             brushChevron: $('brushColorButton'),
             brushColorDot: $('brushColorDot'),
             brushChevronIcon: $('brushChevronIcon'),
@@ -37,6 +39,8 @@ const Toolbar = (() => {
         };
 
         el.brush?.addEventListener('click', selectBrush);
+        el.fill?.addEventListener('click', () => Interactions.setDrawMode('fill'));
+        el.line?.addEventListener('click', () => Interactions.setDrawMode('line'));
         el.brushChevron?.addEventListener('click', () => setPopovers(!brushOpen, false));
         el.paletteGrid?.addEventListener('click', (e) => {
             if (e.target.closest('.palette-swatch')) setTimeout(() => setPopovers(false, objOpen), 120);
@@ -74,6 +78,7 @@ const Toolbar = (() => {
     }
 
     function selectBrush() {
+        Interactions.setDrawMode('brush');
         const btns = Array.from(el.paletteGrid?.querySelectorAll('.palette-swatch') || []);
         const color = (AppState.getState().currentColor || '').toLowerCase();
         const match = btns.find((b) => (b.dataset.color || '').toLowerCase() === color) || btns[0];
@@ -101,8 +106,16 @@ const Toolbar = (() => {
         const tool = toolName();
         const color = s.currentColor;
 
-        el.brush.classList.toggle('active', tool === 'brush');
-        el.brush.setAttribute('aria-pressed', String(tool === 'brush'));
+        // Brush is highlighted only when painting terrain colour with the plain brush; fill and
+        // line are highlighted by mode and combine with whichever paint source (colour, object, eraser) is active.
+        const mode = s.drawMode;
+        const brushActive = tool === 'brush' && mode === 'brush';
+        el.brush.classList.toggle('active', brushActive);
+        el.brush.setAttribute('aria-pressed', String(brushActive));
+        el.fill?.classList.toggle('active', mode === 'fill');
+        el.fill?.setAttribute('aria-pressed', String(mode === 'fill'));
+        el.line?.classList.toggle('active', mode === 'line');
+        el.line?.setAttribute('aria-pressed', String(mode === 'line'));
         el.brushIconFill?.setAttribute('fill', color);
         el.brushChevron.classList.toggle('open', brushOpen);
         el.brushChevron.setAttribute('aria-expanded', String(brushOpen));

@@ -23,6 +23,15 @@ const AppState = (() => {
         isObjectToolActive: false,
         currentObject: 'castle',
         /**
+         * How strokes are applied: 'brush' paints tiles under the pointer, 'fill'
+         * floods the connected region, 'line' paints a tile path between two tiles.
+         * The paint source (colour, eraser or object) is chosen separately.
+         */
+        drawMode: 'brush',
+        /** Line tool: tile the line started on, and the tiles currently previewed. */
+        lineStartId: null,
+        linePreviewIds: [],
+        /**
          * Controls whether auto-save is enabled. When false, auto-save timers
          * and save attempts are skipped.
          */
@@ -73,6 +82,7 @@ const AppState = (() => {
     function setPolygons(polygons) {
         state.polygons = polygons;
         state.hoverPolygonId = null;
+        clearLinePreview();
     }
 
     /**
@@ -117,6 +127,50 @@ const AppState = (() => {
 
     function setCurrentObject(id) {
         state.currentObject = id;
+    }
+
+    const DRAW_MODES = ['brush', 'fill', 'line'];
+
+    function setDrawMode(mode) {
+        if (!DRAW_MODES.includes(mode)) return;
+        state.drawMode = mode;
+        clearLinePreview();
+    }
+
+    /** Remembers where a line started (null to clear) and drops any previewed path. */
+    function setLineStart(id) {
+        state.lineStartId = id;
+        state.linePreviewIds = id ? [id] : [];
+    }
+
+    function setLinePreview(ids) {
+        state.linePreviewIds = ids;
+    }
+
+    function clearLinePreview() {
+        state.lineStartId = null;
+        state.linePreviewIds = [];
+    }
+
+    // Adjacency and the point locator only depend on tile geometry, which is fixed
+    // for a given polygons array (colours/objects change in place), so cache per array.
+    const topologyCache = new WeakMap();
+
+    /**
+     * Lazily built { adjacency, locate } for the current tiles. Tile order in
+     * the adjacency matches state.polygons.
+     */
+    function getTopology() {
+        const polygons = state.polygons;
+        let topology = topologyCache.get(polygons);
+        if (!topology) {
+            topology = {
+                adjacency: Geometry.buildAdjacency(polygons),
+                locate: Geometry.buildLocator(polygons).locate
+            };
+            topologyCache.set(polygons, topology);
+        }
+        return topology;
     }
 
     /**
@@ -253,6 +307,11 @@ const AppState = (() => {
         setEraserActive,
         setObjectToolActive,
         setCurrentObject,
+        setDrawMode,
+        setLineStart,
+        setLinePreview,
+        clearLinePreview,
+        getTopology,
         setAutoSaveEnabled,
         setCurrentPaletteId,
         setHoverPolygonId,

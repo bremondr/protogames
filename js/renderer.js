@@ -66,7 +66,23 @@ const Renderer = (() => {
             polygons.filter((p) => p.object).sort((a, b) => a.center?.y - b.center?.y).forEach((p) => Objects.drawOnPolygon(ctx, p));
         }
 
-        if (hoverPolygonId) {
+        // Line tool preview: highlight the tiles the line would paint.
+        const { linePreviewIds } = AppState.getState();
+        if (linePreviewIds.length) {
+            const preview = new Set(linePreviewIds);
+            polygons.forEach((poly) => {
+                if (!preview.has(poly.id)) return;
+                drawPolygon(poly, {
+                    fill: poly.color,
+                    stroke: Config.HOVER_OUTLINE,
+                    lineWidth: 2,
+                    overlay: 'rgba(47, 111, 237, 0.35)'
+                });
+                if (typeof Objects !== 'undefined') Objects.drawOnPolygon(ctx, poly);
+            });
+        }
+
+        if (hoverPolygonId && !linePreviewIds.length) {
             const hovered = polygons.find((poly) => poly.id === hoverPolygonId);
             if (hovered) {
                 drawPolygon(hovered, {

@@ -25,8 +25,14 @@ const Interactions = (() => {
         canvas.addEventListener('pointerdown', handlePointerDown);
         canvas.addEventListener('pointermove', handlePointerMove);
         canvas.addEventListener('pointerup', handlePointerUp);
-        canvas.addEventListener('pointerleave', handlePointerCancel);
+        canvas.addEventListener('pointerleave', (event) => {
+            // A captured line keeps tracking outside the canvas; everything else ends here.
+            if (!AppState.getState().lineStartId) handlePointerCancel(event);
+        });
         canvas.addEventListener('pointercancel', handlePointerCancel);
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') cancelLine();
+        });
     }
 
     function bindPaletteEvents() {
@@ -174,9 +180,78 @@ const Interactions = (() => {
         FileManager.autoSaveToLocalStorage(true);
     }
 
+    /** Finds the tile under a canvas point using the cached spatial index. */
+    function tileAt(point) {
+        return AppState.getTopology().locate(point);
+    }
+
+    /** Records one undo step for a finished fill/line and persists it. */
+    function commitChange() {
+        Renderer.renderBoard();
+        AppState.recordHistory();
+        AppState.markDirty();
+        FileManager.autoSaveToLocalStorage(true);
+    }
+
+    function currentSource() {
+        return ToolOps.sourceFromState(AppState.getState(), Config.DEFAULT_TILE_COLOR);
+    }
+
     /**
-     * Handles pointer presses by entering drawing mode and coloring
-     * the polygon immediately under the cursor/touch.
+     * Fill tool: repaints the connected region the tile belongs to as a single
+     * undo step. Returns how many tiles changed.
+     */
+    function applyFill(polygon) {
+        const state = AppState.getState();
+        const { adjacency } = AppState.getTopology();
+        const source = currentSource();
+        const ids = ToolOps.planFill(state.polygons, adjacency, polygon.id, source);
+        if (!ids.length) return 0;
+        const changed = ToolOps.applyToTiles(state.polygons, adjacency, ids, source);
+        if (changed) commitChange();
+        return changed;
+    }
+
+    /** The tiles a line from the start tile to `polygon` passes through (for preview and commit). */
+    function linePathTo(polygon) {
+        const state = AppState.getState();
+        const { adjacency, locate } = AppState.getTopology();
+        return Geometry.linePath(state.polygons, adjacency, state.lineStartId, polygon.id, locate);
+    }
+
+    /** Line tool: paints the previewed path as a single undo step. Returns how many tiles changed. */
+    function finishLine(polygon) {
+        const state = AppState.getState();
+        if (!state.lineStartId) return 0;
+        const { adjacency } = AppState.getTopology();
+        const source = currentSource();
+        const path = polygon ? linePathTo(polygon) : state.linePreviewIds;
+        AppState.clearLinePreview();
+        const changed = ToolOps.applyToTiles(state.polygons, adjacency, path, source);
+        if (changed) commitChange(); else Renderer.renderBoard();
+        return changed;
+    }
+
+    /** Abandons an in-progress line without painting. */
+    function cancelLine() {
+        if (!AppState.getState().lineStartId) return;
+        AppState.clearLinePreview();
+        Renderer.renderBoard();
+    }
+
+    /** Switches between brush, fill and line (the paint source is unchanged). */
+    function setDrawMode(mode) {
+        AppState.setDrawMode(mode);
+        const canvas = AppState.getState().canvas;
+        if (canvas) canvas.style.cursor = mode === 'brush' ? '' : 'crosshair';
+        notifyToolChange();
+        Renderer.renderBoard();
+    }
+
+    /**
+     * Handles pointer presses. Brush mode starts a stroke and paints the tile
+     * under the pointer; fill repaints a region at once; line remembers where
+     * the line starts.
      *
      * @param {PointerEvent} event - Pointer down event.
      */
@@ -184,7 +259,21 @@ const Interactions = (() => {
         event.preventDefault();
         const point = getCanvasCoordinates(event);
         const state = AppState.getState();
-        const polygon = Geometry.findPolygonAtPoint(point, state.polygons);
+        const polygon = tileAt(point);
+
+        if (state.drawMode === 'fill') {
+            if (polygon) applyFill(polygon);
+            return;
+        }
+        if (state.drawMode === 'line') {
+            if (!polygon) return;
+            AppState.setLineStart(polygon.id);
+            // Keep receiving moves/up even if the pointer leaves the canvas mid-line.
+            try { event.target.setPointerCapture(event.pointerId); } catch (error) { /* synthetic events */ }
+            Renderer.renderBoard();
+            return;
+        }
+
         AppState.setDrawingActive(true, polygon?.id || null);
         if (polygon) {
             applyToolToPolygon(polygon, true);
@@ -193,8 +282,8 @@ const Interactions = (() => {
     }
 
     /**
-     * Handles pointer movement for both hover feedback and brush coloring.
-     * Movement events are throttled so dragging feels smooth even on tablets.
+     * Handles pointer movement for hover feedback, brush coloring and the line
+     * preview. Movement events are throttled so dragging feels smooth on tablets.
      *
      * @param {PointerEvent} event - Pointer move event.
      */
@@ -202,13 +291,23 @@ const Interactions = (() => {
         const state = AppState.getState();
         const point = getCanvasCoordinates(event);
 
+        if (state.lineStartId) {
+            const polygon = tileAt(point);
+            if (!polygon) return;
+            const preview = state.linePreviewIds;
+            if (preview.length && preview[preview.length - 1] === polygon.id) return;
+            AppState.setLinePreview(linePathTo(polygon));
+            Renderer.renderBoard();
+            return;
+        }
+
         if (state.isDrawing) {
             const now = performance.now();
             if (now - lastMoveTimestamp < MOVE_THROTTLE_MS) {
                 return;
             }
             lastMoveTimestamp = now;
-            const polygon = Geometry.findPolygonAtPoint(point, state.polygons);
+            const polygon = tileAt(point);
             if (polygon && polygon.id !== state.lastColoredPolygonId) {
                 applyToolToPolygon(polygon, false);
                 AppState.setLastColoredPolygonId(polygon.id);
@@ -217,7 +316,7 @@ const Interactions = (() => {
             return;
         }
 
-        const polygon = Geometry.findPolygonAtPoint(point, state.polygons);
+        const polygon = tileAt(point);
         const polygonId = polygon?.id || null;
         if (polygonId !== state.hoverPolygonId) {
             AppState.setHoverPolygonId(polygonId);
@@ -226,10 +325,16 @@ const Interactions = (() => {
     }
 
     /**
-     * Finalizes a brush stroke by recording history and resetting drawing flags.
+     * Finishes a line, or finalizes a brush stroke by recording history.
+     *
+     * @param {PointerEvent} event - Pointer up event.
      */
-    function handlePointerUp() {
+    function handlePointerUp(event) {
         const state = AppState.getState();
+        if (state.lineStartId) {
+            finishLine(tileAt(getCanvasCoordinates(event)));
+            return;
+        }
         if (!state.isDrawing) return;
         const didColor = Boolean(state.lastColoredPolygonId);
         AppState.setDrawingActive(false);
@@ -246,6 +351,10 @@ const Interactions = (() => {
      */
     function handlePointerCancel() {
         const state = AppState.getState();
+        if (state.lineStartId) {
+            cancelLine();
+            return;
+        }
         if (state.isDrawing) {
             const didColor = Boolean(state.lastColoredPolygonId);
             AppState.setDrawingActive(false);
@@ -342,6 +451,10 @@ const Interactions = (() => {
     return {
         init,
         generateBoard,
-        selectObjectTool
+        selectObjectTool,
+        setDrawMode,
+        applyFill,
+        finishLine,
+        cancelLine
     };
 })();
