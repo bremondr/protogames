@@ -571,9 +571,10 @@ button:focus-visible {
    viewport. Automatically fades away after a short delay.
    ============================================================== */
 .notification {
-    position: fixed;
+    position: absolute;
     left: 50%;
-    bottom: 24px;
+    /* tool bar bottom offset (2.5rem) + tool bar height (~54px) + gap */
+    bottom: calc(2.5rem + 54px + 12px);
     transform: translateX(-50%);
     background: #101828;
     color: #ffffff;
@@ -583,7 +584,7 @@ button:focus-visible {
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.3s ease;
-    z-index: 20;
+    z-index: 4; /* below the tool bar (5) so open popovers cover it */
     min-width: 220px;
     text-align: center;
 }
@@ -907,9 +908,12 @@ button:focus-visible {
 /* Popovers */
 .tool-popover {
     position: absolute;
-    left: 0;
+    left: 50%;
+    transform: translateX(-50%);
     bottom: calc(100% + 10px);
-    width: 300px;
+    width: max(100%, 300px);
+    max-width: calc(100vw - 2rem);
+    box-sizing: border-box;
     display: none;
     flex-direction: column;
     gap: 8px;
