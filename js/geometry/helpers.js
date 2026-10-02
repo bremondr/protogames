@@ -25,6 +25,74 @@
         };
     }
 
+    /**
+     * Midpoint of a vertex list's bounding box. Unlike the centroid, this is the
+     * same for upward and downward triangles in a row, so clipping a triangle
+     * grid to an outline stays symmetric.
+     */
+    function boundsCenter(vertices) {
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let minY = Infinity;
+        let maxY = -Infinity;
+        for (const v of vertices) {
+            minX = Math.min(minX, v.x);
+            maxX = Math.max(maxX, v.x);
+            minY = Math.min(minY, v.y);
+            maxY = Math.max(maxY, v.y);
+        }
+        return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+    }
+
+    /**
+     * Scales and translates a finished polygon set so the tiles that actually
+     * remain after clipping fill the drawable area (canvas minus padding and the
+     * tool bar clearance) and are centered in it. Generators can therefore lay
+     * tiles out at any scale; this guarantees nothing overflows or sits off-center.
+     */
+    function fitPolygonsToCanvas(polygons, canvas) {
+        if (!canvas || !polygons.length) return polygons;
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let minY = Infinity;
+        let maxY = -Infinity;
+        for (const polygon of polygons) {
+            for (const v of polygon.vertices) {
+                minX = Math.min(minX, v.x);
+                maxX = Math.max(maxX, v.x);
+                minY = Math.min(minY, v.y);
+                maxY = Math.max(maxY, v.y);
+            }
+        }
+        const width = maxX - minX;
+        const height = maxY - minY;
+        const availableWidth = canvas.width - Config.CANVAS_PADDING * 2;
+        const availableHeight = canvas.height - Config.CANVAS_PADDING * 2 - Config.TOOLBAR_CLEARANCE;
+        if (width <= 0 || height <= 0 || availableWidth <= 0 || availableHeight <= 0) return polygons;
+
+        const scale = Math.min(availableWidth / width, availableHeight / height);
+        const sourceX = (minX + maxX) / 2;
+        const sourceY = (minY + maxY) / 2;
+        const targetX = canvas.width / 2;
+        const targetY = Config.CANVAS_PADDING + availableHeight / 2;
+        const map = (p) => ({ x: (p.x - sourceX) * scale + targetX, y: (p.y - sourceY) * scale + targetY });
+
+        for (const polygon of polygons) {
+            polygon.vertices = polygon.vertices.map(map);
+            polygon.center = map(polygon.center);
+            polygon.bounds = polygon.vertices.reduce(
+                (acc, v) => ({
+                    minX: Math.min(acc.minX, v.x),
+                    maxX: Math.max(acc.maxX, v.x),
+                    minY: Math.min(acc.minY, v.y),
+                    maxY: Math.max(acc.maxY, v.y)
+                }),
+                { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
+            );
+        }
+        return polygons;
+    }
+
     function shouldIncludePolygon(center, boardMetrics) {
         if (!boardMetrics) return true;
         if (boardMetrics.circle) {
@@ -223,6 +291,8 @@
 
     global.GeometryHelpers = {
         createPolygon,
+        boundsCenter,
+        fitPolygonsToCanvas,
         shouldIncludePolygon,
         createBoardMetrics,
         createBoardHexOutline,

@@ -8,6 +8,11 @@
 const Config = (() => {
     const VERSION = '1.0';
     const CANVAS_PADDING = 48;
+    /**
+     * Extra space kept free along the bottom edge of the canvas so the floating
+     * tool bar never covers the lowest row of tiles.
+     */
+    const TOOLBAR_CLEARANCE = 40;
     const HISTORY_LIMIT = 50;
     /**
      * Baseline tile color used for blank/erased cells.
@@ -163,6 +168,7 @@ const Config = (() => {
     return {
         VERSION,
         CANVAS_PADDING,
+        TOOLBAR_CLEARANCE,
         HISTORY_LIMIT,
         DEFAULT_FILL,
         DEFAULT_TILE_COLOR,
