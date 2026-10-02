@@ -304,3 +304,48 @@ test('sourceFromState picks object over eraser over colour', () => {
     assert.deepEqual(plain(ToolOps.sourceFromState({ ...state, isEraserActive: true }, BLANK)), { kind: 'eraser', defaultColor: BLANK });
     assert.deepEqual(plain(ToolOps.sourceFromState({ ...state, isEraserActive: true, isObjectToolActive: true }, BLANK)), { kind: 'object', object: 'castle' });
 });
+
+// ---- Brush size -------------------------------------------------------------------------
+
+test('brush footprints grow ring by ring: hexagon 1, 7, 19, 37 and square 1, 5, 13, 25', () => {
+    const hex = board(Checks.makeConfig('hexagon', 'hexagon', 'pointy-top', 'point-up', { radius: 6 }));
+    const centerHex = hex.polygons.reduce((best, p) => (Math.hypot(p.center.x - 600, p.center.y - 400) < Math.hypot(best.center.x - 600, best.center.y - 400) ? p : best));
+    assert.deepEqual([1, 2, 3, 4].map((size) => ToolOps.brushTiles(hex.adjacency, centerHex.id, size).length), [1, 7, 19, 37]);
+
+    const square = board(Checks.makeConfig('rectangle', 'square', 'pointy-top', 'point-up', { width: 11, height: 11 }));
+    const centerSquare = 'square_5_5';
+    assert.deepEqual([1, 2, 3, 4].map((size) => ToolOps.brushTiles(square.adjacency, centerSquare, size).length), [1, 5, 13, 25]);
+});
+
+test('a brush near the board edge is clipped to the board, and size 1 or an unknown tile is handled', () => {
+    const square = board(Checks.makeConfig('rectangle', 'square', 'pointy-top', 'point-up', { width: 6, height: 6 }));
+    const corner = ToolOps.brushTiles(square.adjacency, 'square_0_0', 3);
+    assert.equal(corner.length, 6, 'a corner tile reaches 1 + 2 + 3 tiles');
+    assert.ok(corner.every((id) => square.adjacency.index.has(id)));
+    assert.deepEqual(plain(ToolOps.brushTiles(square.adjacency, 'square_2_2', 1)), ['square_2_2']);
+    assert.deepEqual(plain(ToolOps.brushTiles(square.adjacency, 'square_2_2', 0)), ['square_2_2']);
+    assert.deepEqual(plain(ToolOps.brushTiles(square.adjacency, 'nope', 3)), []);
+    assert.deepEqual(plain(ToolOps.brushTiles(square.adjacency, 'nope', 1)), []);
+});
+
+test('brush footprints contain the centre, stay on the board and are connected on every combination', () => {
+    for (const combo of validCombos()) {
+        const b = board(combo.config);
+        const centre = b.polygons[Math.floor(b.polygons.length / 2)];
+        for (const size of [2, 3, 5]) {
+            const tiles = ToolOps.brushTiles(b.adjacency, centre.id, size);
+            assert.ok(tiles.includes(centre.id), `${combo.key} size ${size}`);
+            assert.equal(new Set(tiles).size, tiles.length);
+            const reached = Geometry.floodFill(b.adjacency, centre.id, (i) => tiles.includes(b.adjacency.ids[i]));
+            assert.equal(reached.length, tiles.length, `${combo.key} size ${size}: footprint must be connected`);
+        }
+    }
+});
+
+test('painting a footprint changes exactly those tiles', () => {
+    const b = board(Checks.makeConfig('rectangle', 'hexagon', 'pointy-top', 'point-up', { width: 9, height: 9 }));
+    const centre = b.polygons[40].id;
+    const tiles = ToolOps.brushTiles(b.adjacency, centre, 3);
+    assert.equal(ToolOps.applyToTiles(b.polygons, b.adjacency, tiles, color('#c0ffee')), tiles.length);
+    assert.equal(b.polygons.filter((p) => p.color === '#c0ffee').length, tiles.length);
+});

@@ -74,6 +74,15 @@ const ToolOps = (() => {
         return changed;
     }
 
+    /**
+     * Tiles covered by a brush of `size` centred on `centerId`: the tile itself plus
+     * everything within size - 1 steps (size 1 = just the tile).
+     */
+    function brushTiles(adjacency, centerId, size) {
+        if (!(size > 1)) return adjacency.index.has(centerId) ? [centerId] : [];
+        return Geometry.neighborhood(adjacency, centerId, size - 1);
+    }
+
     /** Builds the paint source from the editor state. */
     function sourceFromState(state, defaultColor) {
         if (state.isObjectToolActive) return { kind: 'object', object: state.currentObject };
@@ -81,5 +90,5 @@ const ToolOps = (() => {
         return { kind: 'color', color: state.currentColor };
     }
 
-    return { planFill, planLine, applyToTiles, sourceFromState, wouldChange };
+    return { planFill, planLine, applyToTiles, brushTiles, sourceFromState, wouldChange };
 })();

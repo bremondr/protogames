@@ -39,6 +39,10 @@ const AppState = (() => {
          */
         autoSaveEnabled: true,
         hoverPolygonId: null,
+        /** Tiles outlined under the pointer (several when the brush is larger than 1). */
+        hoverIds: [],
+        /** Brush size: 1 = single tile, n = tiles within n - 1 steps of the pointer tile. */
+        brushSize: 1,
         history: [],
         historyIndex: -1,
         currentProjectName: null,
@@ -84,6 +88,7 @@ const AppState = (() => {
     function setPolygons(polygons) {
         state.polygons = polygons;
         state.hoverPolygonId = null;
+        state.hoverIds = [];
         state.view = ViewMath.identity();
         clearLinePreview();
     }
@@ -130,6 +135,14 @@ const AppState = (() => {
 
     function setCurrentObject(id) {
         state.currentObject = id;
+    }
+
+    /** Sets the brush size, clamped to the allowed range. Returns the size now in effect. */
+    function setBrushSize(size) {
+        const wanted = Math.round(Number(size));
+        const value = Number.isFinite(wanted) ? wanted : state.brushSize;
+        state.brushSize = Math.min(Config.BRUSH_SIZE_MAX, Math.max(Config.BRUSH_SIZE_MIN, value));
+        return state.brushSize;
     }
 
     function setView(view) {
@@ -207,8 +220,9 @@ const AppState = (() => {
      *
      * @param {string|null} id - Polygon id or null when none.
      */
-    function setHoverPolygonId(id) {
+    function setHoverPolygonId(id, ids) {
         state.hoverPolygonId = id;
+        state.hoverIds = id ? ids || [id] : [];
     }
 
     /**
@@ -319,6 +333,7 @@ const AppState = (() => {
         setObjectToolActive,
         setCurrentObject,
         setDrawMode,
+        setBrushSize,
         setView,
         resetView,
         setLineStart,

@@ -121,6 +121,29 @@ const Interactions = (() => {
     }
 
     /**
+     * Applies the brush at a tile: the tile itself, or every tile in the brush
+     * footprint when the brush size is larger than 1.
+     */
+    function paintAt(polygon, isStrokeStart) {
+        const state = AppState.getState();
+        if (state.brushSize <= 1) {
+            applyToolToPolygon(polygon, isStrokeStart);
+            return;
+        }
+        const { adjacency } = AppState.getTopology();
+        for (const id of ToolOps.brushTiles(adjacency, polygon.id, state.brushSize)) {
+            applyToolToPolygon(state.polygons[adjacency.index.get(id)], isStrokeStart);
+        }
+    }
+
+    /** The tiles to outline for the pointer tile: the brush footprint in brush mode, otherwise the tile. */
+    function hoverFootprint(polygon) {
+        const state = AppState.getState();
+        if (state.drawMode !== 'brush' || state.brushSize <= 1) return [polygon.id];
+        return ToolOps.brushTiles(AppState.getTopology().adjacency, polygon.id, state.brushSize);
+    }
+
+    /**
      * Applies the active tool to a polygon. Returns true when something changed.
      * Eraser removes an object first; a second pass clears the terrain.
      */
@@ -263,9 +286,31 @@ const Interactions = (() => {
         Renderer.renderBoard();
     }
 
+    /** Recomputes the outline under the pointer after the brush size or draw mode changed. */
+    function refreshHover() {
+        const state = AppState.getState();
+        if (!state.hoverPolygonId) return;
+        const polygon = state.polygons.find((p) => p.id === state.hoverPolygonId);
+        if (polygon) AppState.setHoverPolygonId(polygon.id, hoverFootprint(polygon));
+    }
+
+    /** Sets the brush size (clamped) and refreshes the outline under the pointer. Returns the new size. */
+    function setBrushSize(size) {
+        const value = AppState.setBrushSize(size);
+        refreshHover();
+        window.dispatchEvent(new CustomEvent('pg:brushsize', { detail: { size: value } }));
+        Renderer.renderBoard();
+        return value;
+    }
+
+    function changeBrushSize(delta) {
+        return setBrushSize(AppState.getState().brushSize + delta);
+    }
+
     /** Switches between brush, fill and line (the paint source is unchanged). */
     function setDrawMode(mode) {
         AppState.setDrawMode(mode);
+        refreshHover();
         const canvas = AppState.getState().canvas;
         if (canvas) canvas.style.cursor = mode === 'brush' ? '' : 'crosshair';
         notifyToolChange();
@@ -300,7 +345,7 @@ const Interactions = (() => {
 
         AppState.setDrawingActive(true, polygon?.id || null);
         if (polygon) {
-            applyToolToPolygon(polygon, true);
+            paintAt(polygon, true);
             Renderer.renderBoard();
         }
     }
@@ -333,7 +378,7 @@ const Interactions = (() => {
             lastMoveTimestamp = now;
             const polygon = tileAt(point);
             if (polygon && polygon.id !== state.lastColoredPolygonId) {
-                applyToolToPolygon(polygon, false);
+                paintAt(polygon, false);
                 AppState.setLastColoredPolygonId(polygon.id);
                 Renderer.renderBoard();
             }
@@ -343,7 +388,7 @@ const Interactions = (() => {
         const polygon = tileAt(point);
         const polygonId = polygon?.id || null;
         if (polygonId !== state.hoverPolygonId) {
-            AppState.setHoverPolygonId(polygonId);
+            AppState.setHoverPolygonId(polygonId, polygon ? hoverFootprint(polygon) : null);
             Renderer.renderBoard();
         }
     }
@@ -477,6 +522,8 @@ const Interactions = (() => {
         generateBoard,
         selectObjectTool,
         setDrawMode,
+        setBrushSize,
+        changeBrushSize,
         applyFill,
         finishLine,
         cancelLine,

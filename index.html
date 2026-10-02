@@ -233,6 +233,14 @@
                         <span class="pop-title">Theme</span>
                         <select id="paletteSelect" aria-label="Select color palette"></select>
                     </label>
+                    <div class="pop-row">
+                        <span class="pop-title" id="brushSizeLabel">Brush size</span>
+                        <div class="size-stepper" role="group" aria-labelledby="brushSizeLabel">
+                            <button type="button" id="brushSmaller" aria-label="Smaller brush">&minus;</button>
+                            <output id="brushSizeValue" aria-live="polite">1</output>
+                            <button type="button" id="brushLarger" aria-label="Larger brush">+</button>
+                        </div>
+                    </div>
                     <div class="palette-grid" role="list" aria-live="polite"></div>
                 </div>
 

@@ -1610,3 +1610,39 @@ button:focus-visible {
         top: calc(100% + 10px);
     }
 }
+
+/* Brush size stepper inside the brush popover */
+.size-stepper {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.size-stepper button {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #e6e9f0;
+    font-size: 1rem;
+    line-height: 1;
+}
+
+.size-stepper button:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+.size-stepper button:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.size-stepper output {
+    min-width: 28px;
+    text-align: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
