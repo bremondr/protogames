@@ -111,6 +111,12 @@ const UI = (() => {
             const swatchSpan = document.createElement('span');
             swatchSpan.className = 'swatch';
             swatchSpan.setAttribute('aria-hidden', 'true');
+            const textureUrl = typeof Textures !== 'undefined' ? Textures.dataUrlFor(swatch.hex) : null;
+            if (textureUrl) {
+                swatchSpan.style.backgroundImage = `url(${textureUrl})`;
+                swatchSpan.style.backgroundSize = Textures.isFeature(swatch.hex) ? 'cover' : '96px';
+                swatchSpan.style.backgroundPosition = 'center';
+            }
 
             const labelSpan = document.createElement('span');
             labelSpan.className = 'swatch-label';

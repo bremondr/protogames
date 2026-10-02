@@ -60,8 +60,10 @@ const Interactions = (() => {
             getComputedStyle(button).getPropertyValue('--swatch-color').trim();
         AppState.setCurrentColor(color);
         AppState.setEraserActive(false);
+        AppState.setObjectToolActive(false);
         UI?.setPaletteSelection(button);
         UI?.setEraserActive(false);
+        notifyToolChange();
     }
 
     /**
@@ -81,6 +83,8 @@ const Interactions = (() => {
         AppState.setCurrentColor(resolved.color);
         UI.setPaletteByColor(resolved.color);
         UI.setEraserActive(false);
+        AppState.setObjectToolActive(false);
+        notifyToolChange();
         AppState.markDirty();
         FileManager.autoSaveToLocalStorage(true);
     }
@@ -90,7 +94,50 @@ const Interactions = (() => {
      */
     function handleEraserSelect() {
         AppState.setEraserActive(true);
+        AppState.setObjectToolActive(false);
         UI?.setEraserActive(true);
+        notifyToolChange();
+    }
+
+    /** Activates the object tool, optionally switching the object to place. */
+    function selectObjectTool(objectId) {
+        if (objectId) AppState.setCurrentObject(objectId);
+        AppState.setObjectToolActive(true);
+        AppState.setEraserActive(false);
+        UI?.setEraserActive(false);
+        UI?.setPaletteSelection(null);
+        notifyToolChange();
+    }
+
+    /** Lets the toolbar (and anything else) react to tool/color changes. */
+    function notifyToolChange() {
+        window.dispatchEvent(new CustomEvent('pg:toolchange'));
+    }
+
+    /**
+     * Applies the active tool to a polygon. Returns true when something changed.
+     * Eraser removes an object first; a second pass clears the terrain.
+     */
+    function applyToolToPolygon(polygon, isStrokeStart) {
+        const state = AppState.getState();
+        if (state.isObjectToolActive) {
+            if (polygon.object === state.currentObject) {
+                if (!isStrokeStart) return false;
+                delete polygon.object;
+            } else {
+                polygon.object = state.currentObject;
+            }
+            return true;
+        }
+        if (state.isEraserActive) {
+            if (polygon.object) { delete polygon.object; return true; }
+            if (polygon.color === Config.DEFAULT_TILE_COLOR) return false;
+            polygon.color = Config.DEFAULT_TILE_COLOR;
+            return true;
+        }
+        if (polygon.color === state.currentColor) return false;
+        polygon.color = state.currentColor;
+        return true;
     }
 
     function handleBoardGeneration() {
@@ -119,6 +166,7 @@ const Interactions = (() => {
         if (!state.polygons.length) return;
         state.polygons.forEach((polygon) => {
             polygon.color = Config.DEFAULT_TILE_COLOR;
+            delete polygon.object;
         });
         Renderer.renderBoard();
         AppState.recordHistory();
@@ -139,8 +187,7 @@ const Interactions = (() => {
         const polygon = Geometry.findPolygonAtPoint(point, state.polygons);
         AppState.setDrawingActive(true, polygon?.id || null);
         if (polygon) {
-            const paintColor = state.isEraserActive ? Config.DEFAULT_TILE_COLOR : state.currentColor;
-            applyColorToPolygon(polygon, paintColor, { recordHistory: false, markDirty: false });
+            applyToolToPolygon(polygon, true);
             Renderer.renderBoard();
         }
     }
@@ -163,8 +210,7 @@ const Interactions = (() => {
             lastMoveTimestamp = now;
             const polygon = Geometry.findPolygonAtPoint(point, state.polygons);
             if (polygon && polygon.id !== state.lastColoredPolygonId) {
-                const paintColor = state.isEraserActive ? Config.DEFAULT_TILE_COLOR : state.currentColor;
-                applyColorToPolygon(polygon, paintColor, { recordHistory: false, markDirty: false });
+                applyToolToPolygon(polygon, false);
                 AppState.setLastColoredPolygonId(polygon.id);
                 Renderer.renderBoard();
             }
@@ -268,7 +314,9 @@ const Interactions = (() => {
             options.preserveColors && state.polygons.length
                 ? new Map(state.polygons.map((polygon) => [polygon.id, polygon.color]))
                 : null;
+        const objectMap = colorMap ? new Map(state.polygons.filter((p) => p.object).map((p) => [p.id, p.object])) : null;
         const polygons = Geometry.generateGrid(config, state.canvas, colorMap);
+        if (objectMap) polygons.forEach((p) => { if (objectMap.has(p.id)) p.object = objectMap.get(p.id); });
         AppState.setPolygons(polygons);
         AppState.updateBoardConfig(config);
         Renderer.renderBoard();
@@ -293,6 +341,7 @@ const Interactions = (() => {
 
     return {
         init,
-        generateBoard
+        generateBoard,
+        selectObjectTool
     };
 })();

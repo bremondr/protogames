@@ -61,6 +61,11 @@ const Renderer = (() => {
             drawPolygon(polygon);
         });
 
+        // Object layer sits above all terrain; sorted top-to-bottom so lower objects overlap higher ones.
+        if (typeof Objects !== 'undefined') {
+            polygons.filter((p) => p.object).sort((a, b) => a.center?.y - b.center?.y).forEach((p) => Objects.drawOnPolygon(ctx, p));
+        }
+
         if (hoverPolygonId) {
             const hovered = polygons.find((poly) => poly.id === hoverPolygonId);
             if (hovered) {
@@ -70,6 +75,7 @@ const Renderer = (() => {
                     lineWidth: 2,
                     overlay: 'rgba(47, 111, 237, 0.15)'
                 });
+                if (typeof Objects !== 'undefined') Objects.drawOnPolygon(ctx, hovered);
             }
         }
     }
@@ -97,8 +103,9 @@ const Renderer = (() => {
         });
         ctx.closePath();
 
-        ctx.fillStyle = fill;
+        ctx.fillStyle = (typeof Textures !== 'undefined' && Textures.patternFor(ctx, fill)) || fill;
         ctx.fill();
+        if (typeof Textures !== 'undefined') Textures.drawFeature(ctx, fill, polygon);
 
         if (options.overlay) {
             ctx.save();
