@@ -20,6 +20,23 @@ Protogames lets designers sketch and iterate on board layouts quickly—no build
 - Input: Mouse, touch, stylus; responsive layout
 - Navigation: wheel/pinch zoom at the pointer, pan, fit-to-screen and actual-size buttons, and an optional minimap for large boards (exports are always independent of the current zoom)
 
+## Keyboard shortcuts
+Press **?** (or use the keyboard button in the bottom-right corner) for the full list. On macOS use Cmd instead of Ctrl. Shortcuts are paused while you type in a field or a dialog is open.
+
+| Action | Key |
+|---|---|
+| Undo / Redo | Ctrl+Z / Ctrl+Shift+Z or Ctrl+Y |
+| Brush / Fill / Line | B / G / L |
+| Eraser on/off | E |
+| Smaller / larger brush (1-7) | [ / ] |
+| Pick swatch | 1 - 9, or Tab / Shift+Tab to cycle |
+| Zoom in / out / fit | + / - / 0 |
+| Pan | Space + drag |
+| Save project | Ctrl+S (only this key is taken over from the browser) |
+| Show shortcuts | ? |
+
+`V` is reserved for the Select tool, which does not exist yet.
+
 ## Navigating large boards
 Painting and navigating never share a gesture, so you cannot pan by accident while painting:
 
@@ -88,13 +105,16 @@ python -m http.server 8000
 ```
 Optional query parameters change the sizes, e.g. `?radius=5&size=8&width=10&height=6`.
 
+### Adding a keyboard shortcut
+All shortcuts live in `BINDINGS` in `js/shortcuts.js` (id, label, group, keys). Add the binding there, add its action to `ACTIONS` further down the same file, and mark any button that triggers it with `data-shortcut="<id>"` so its tooltip shows the key. `tests/shortcuts.test.js` fails if two bindings use the same key.
+
 ### Continuous integration
 `.github/workflows/test.yml` runs `npm test` on every push to `main` and on every pull request, so a failing geometry test fails the check.
 
 ## Roadmap (near-term)
 - Further polish of triangle-hex tessellation and palette/eraser UX
 - Additional palette themes
-- Keyboard shortcuts and improved visual feedback
+- Improved visual feedback
 
 ## Status
 Active development — MVP. Last updated: November 2025.
