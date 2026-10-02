@@ -56,6 +56,28 @@ protogames/
 - Modules use IIFEs; configuration lives in `config.js`.
 - Defaults: `DEFAULT_TILE_COLOR` defines the blank/erased color; palettes are declared in `COLOR_PALETTES`.
 
+## Development
+The app itself needs no tooling. The tests need [Node.js](https://nodejs.org) 22 or newer (no dependencies to install).
+
+### Unit tests
+```
+npm test
+```
+Runs the Node test runner over `tests/**/*.test.js`. The app's browser scripts are plain IIFE files, so `tests/support/load.js` evaluates them in an isolated `vm` context instead of needing a bundler or a DOM.
+
+The geometry tests (`tests/geometry.test.js`, `tests/neighbors.test.js`) cover every board shape x tile shape x orientation combination: expected tile counts, no duplicate or overlapping tiles, correct bounds, centring inside the drawable area, hit-testing and tile adjacency (symmetric, correct neighbour counts). Every fixed shape bug has a regression test. When you fix a geometry bug, add a case there.
+
+### Geometry gallery
+`dev/geometry-gallery.html` renders every combination as a thumbnail, runs the same checks as the tests, and marks failing combinations in red and unsupported ones as dashed "invalid" cards with the reason. Serve the repository root with any static server and open the page:
+```
+python -m http.server 8000
+# then visit http://localhost:8000/dev/geometry-gallery.html
+```
+Optional query parameters change the sizes, e.g. `?radius=5&size=8&width=10&height=6`.
+
+### Continuous integration
+`.github/workflows/test.yml` runs `npm test` on every push to `main` and on every pull request, so a failing geometry test fails the check.
+
 ## Roadmap (near-term)
 - Further polish of triangle-hex tessellation and palette/eraser UX
 - Additional palette themes
