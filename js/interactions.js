@@ -180,9 +180,15 @@ const Interactions = (() => {
         FileManager.autoSaveToLocalStorage(true);
     }
 
-    /** Finds the tile under a canvas point using the cached spatial index. */
+    /** Finds the tile under a point in world space using the cached spatial index. */
     function tileAt(point) {
         return AppState.getTopology().locate(point);
+    }
+
+    /** Pointer position in world (board) space, accounting for the current pan/zoom. */
+    function getWorldPoint(event) {
+        const screen = getCanvasCoordinates(event);
+        return ViewMath.toWorld(AppState.getState().view, screen.x, screen.y);
     }
 
     /** Records one undo step for a finished fill/line and persists it. */
@@ -232,6 +238,24 @@ const Interactions = (() => {
         return changed;
     }
 
+    /**
+     * Abandons whatever stroke is in progress without keeping it: a brush stroke
+     * is rolled back to the last undo snapshot and a line is dropped. Used when a
+     * second finger lands and the touch becomes a pan/zoom gesture.
+     */
+    function cancelStroke() {
+        const state = AppState.getState();
+        if (state.lineStartId) {
+            cancelLine();
+            return;
+        }
+        if (!state.isDrawing) return;
+        AppState.setDrawingActive(false);
+        const snapshot = state.history[state.historyIndex];
+        if (snapshot) AppState.restoreSnapshot(snapshot);
+        Renderer.renderBoard();
+    }
+
     /** Abandons an in-progress line without painting. */
     function cancelLine() {
         if (!AppState.getState().lineStartId) return;
@@ -257,7 +281,7 @@ const Interactions = (() => {
      */
     function handlePointerDown(event) {
         event.preventDefault();
-        const point = getCanvasCoordinates(event);
+        const point = getWorldPoint(event);
         const state = AppState.getState();
         const polygon = tileAt(point);
 
@@ -289,7 +313,7 @@ const Interactions = (() => {
      */
     function handlePointerMove(event) {
         const state = AppState.getState();
-        const point = getCanvasCoordinates(event);
+        const point = getWorldPoint(event);
 
         if (state.lineStartId) {
             const polygon = tileAt(point);
@@ -332,7 +356,7 @@ const Interactions = (() => {
     function handlePointerUp(event) {
         const state = AppState.getState();
         if (state.lineStartId) {
-            finishLine(tileAt(getCanvasCoordinates(event)));
+            finishLine(tileAt(getWorldPoint(event)));
             return;
         }
         if (!state.isDrawing) return;
@@ -455,6 +479,7 @@ const Interactions = (() => {
         setDrawMode,
         applyFill,
         finishLine,
-        cancelLine
+        cancelLine,
+        cancelStroke
     };
 })();

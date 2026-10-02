@@ -18,6 +18,18 @@ Protogames lets designers sketch and iterate on board layouts quickly—no build
 - History: Undo/redo, autosave to localStorage
 - File ops: Save/load JSON projects; export PNG/PDF/SVG
 - Input: Mouse, touch, stylus; responsive layout
+- Navigation: wheel/pinch zoom at the pointer, pan, fit-to-screen and actual-size buttons, and an optional minimap for large boards (exports are always independent of the current zoom)
+
+## Navigating large boards
+Painting and navigating never share a gesture, so you cannot pan by accident while painting:
+
+| Input | Paint | Navigate |
+|---|---|---|
+| Mouse | click / drag | wheel = zoom at the pointer; **Space + drag** or **middle-button drag** = pan |
+| Touch | one finger | **two fingers**: drag to pan, pinch to zoom (a stroke in progress is undone when the second finger lands; the finger left behind does not paint until you lift it) |
+| Stylus | pen | wheel, Space + drag, or the on-screen controls |
+
+The cluster in the bottom-right corner (top-left on phones) has zoom out / in, the zoom level (click it for **actual size**, where a typical tile is 64 px wide), **fit to screen**, and a **minimap** toggle. The minimap shows the whole board with the visible area outlined; click or drag on it to move the view. Zoom is clamped between 25% of the fitted size and 24x, and the board can never be panned completely out of sight.
 
 ## Project Structure
 ```

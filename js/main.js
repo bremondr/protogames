@@ -27,6 +27,8 @@ const Main = (() => {
         UI.setEraserActive(false);
         Renderer.initializeCanvas(uiRefs.canvas);
 
+        // Registered before the painting handlers so pan/zoom gestures can claim pointer events first.
+        ViewControls.init();
         Interactions.init(uiRefs);
         FileManager.init(uiRefs);
         Exporter.init(uiRefs);

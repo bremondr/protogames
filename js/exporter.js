@@ -20,8 +20,8 @@ const Exporter = (() => {
             alert('Generate a board before exporting.');
             return;
         }
-        Renderer.renderBoard();
-        const dataUrl = state.canvas.toDataURL('image/png');
+        // Painted at the identity view on a separate canvas, so exports ignore the current zoom/pan.
+        const dataUrl = Renderer.createExportCanvas().toDataURL('image/png');
         const base = state.currentProjectName || Config.DEFAULT_PROJECT_NAME;
         Utils.triggerDataUrlDownload(dataUrl, `${Utils.sanitizeFileName(base)}.png`);
         UI?.showNotification('PNG exported', 3000);
@@ -56,8 +56,8 @@ const Exporter = (() => {
             alert('Generate a board before exporting.');
             return;
         }
-        Renderer.renderBoard();
-        const dataUrl = state.canvas.toDataURL('image/png');
+        // Painted at the identity view on a separate canvas, so exports ignore the current zoom/pan.
+        const dataUrl = Renderer.createExportCanvas().toDataURL('image/png');
         const base = state.currentProjectName || Config.DEFAULT_PROJECT_NAME;
         const win = window.open('', '_blank');
         if (!win) {

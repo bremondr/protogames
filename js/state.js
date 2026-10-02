@@ -28,6 +28,8 @@ const AppState = (() => {
          * The paint source (colour, eraser or object) is chosen separately.
          */
         drawMode: 'brush',
+        /** Pan/zoom: screen = world * scale + (x, y). Reset whenever a new board is set. */
+        view: { scale: 1, x: 0, y: 0 },
         /** Line tool: tile the line started on, and the tiles currently previewed. */
         lineStartId: null,
         linePreviewIds: [],
@@ -82,6 +84,7 @@ const AppState = (() => {
     function setPolygons(polygons) {
         state.polygons = polygons;
         state.hoverPolygonId = null;
+        state.view = ViewMath.identity();
         clearLinePreview();
     }
 
@@ -127,6 +130,14 @@ const AppState = (() => {
 
     function setCurrentObject(id) {
         state.currentObject = id;
+    }
+
+    function setView(view) {
+        state.view = { scale: view.scale, x: view.x, y: view.y };
+    }
+
+    function resetView() {
+        state.view = ViewMath.identity();
     }
 
     const DRAW_MODES = ['brush', 'fill', 'line'];
@@ -308,6 +319,8 @@ const AppState = (() => {
         setObjectToolActive,
         setCurrentObject,
         setDrawMode,
+        setView,
+        resetView,
         setLineStart,
         setLinePreview,
         clearLinePreview,
