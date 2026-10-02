@@ -128,6 +128,83 @@
         return bounds;
     }
 
+    function centroidOfCentres(polygons) {
+        const n = polygons.length;
+        return {
+            x: polygons.reduce((sum, p) => sum + p.center.x, 0) / n,
+            y: polygons.reduce((sum, p) => sum + p.center.y, 0) / n
+        };
+    }
+
+    /**
+     * The n-fold rotational symmetry a board should have, or null when none is expected.
+     * Circle and hexagon boards are centred on a tile (or lattice vertex), so hexagon and
+     * triangle tiles repeat every 60 degrees and square tiles every 90. A square board of
+     * square tiles repeats every 90 degrees.
+     */
+    function expectedSymmetry(config) {
+        const { boardShape, gridType } = config;
+        if (boardShape === 'circle' || boardShape === 'hexagon') return gridType === 'square' ? 4 : 6;
+        if (boardShape === 'square' && gridType === 'square') return 4;
+        return null;
+    }
+
+    /**
+     * Whether a board should be mirror-symmetric about its vertical axis. Triangle boards
+     * should be, with one known exception: flat-top hexagon columns are staggered, so with an
+     * even number of columns the axis falls between two columns at different heights and the
+     * layout cannot mirror.
+     */
+    function expectedMirror(config) {
+        if (config.boardShape !== 'triangle') return false;
+        if (config.gridType === 'hexagon' && config.orientation === 'flat-top' && config.size % 2 === 0) return false;
+        return true;
+    }
+
+    /**
+     * How many tiles have no partner when the layout is rotated 360/order degrees about
+     * its centre (0 = perfectly symmetric). Compares tile centres.
+     */
+    function rotationMisses(polygons, order, tolerance) {
+        const tol = tolerance === undefined ? 1.5 : tolerance;
+        const c = centroidOfCentres(polygons);
+        const angle = (2 * Math.PI) / order;
+        let misses = 0;
+        for (const p of polygons) {
+            const dx = p.center.x - c.x;
+            const dy = p.center.y - c.y;
+            const x = c.x + dx * Math.cos(angle) - dy * Math.sin(angle);
+            const y = c.y + dx * Math.sin(angle) + dy * Math.cos(angle);
+            if (!polygons.some((q) => Math.hypot(q.center.x - x, q.center.y - y) < tol)) misses++;
+        }
+        return misses;
+    }
+
+    /** How many tiles have no left-right mirror partner (0 = symmetric about the vertical axis). */
+    function mirrorMisses(polygons, tolerance) {
+        const tol = tolerance === undefined ? 1.5 : tolerance;
+        const c = centroidOfCentres(polygons);
+        return polygons.filter((p) => !polygons.some((q) => Math.hypot(q.center.x - (2 * c.x - p.center.x), q.center.y - p.center.y) < tol)).length;
+    }
+
+    /**
+     * Roundness of a board: farthest tile centre divided by the nearest *boundary* tile
+     * centre (a boundary tile has fewer neighbours than an interior one). 1 is a perfect
+     * disc; a hexagon is about 1.15, a lopsided blob is much larger.
+     */
+    function roundness(polygons, adjacency) {
+        const c = centroidOfCentres(polygons);
+        const maxNeighbours = Math.max(...adjacency.neighbors.map((list) => list.length));
+        let far = 0;
+        let nearBoundary = Infinity;
+        polygons.forEach((p, i) => {
+            const d = Math.hypot(p.center.x - c.x, p.center.y - c.y);
+            far = Math.max(far, d);
+            if (adjacency.neighbors[i].length < maxNeighbours) nearBoundary = Math.min(nearBoundary, d);
+        });
+        return nearBoundary === Infinity || nearBoundary === 0 ? 1 : far / nearBoundary;
+    }
+
     function findOverlaps(polygons) {
         const overlaps = [];
         for (let i = 0; i < polygons.length; i++) {
@@ -188,6 +265,16 @@
         if (config) {
             const expected = expectedCount(config);
             if (expected !== null && expected !== polygons.length) issues.push(`expected ${expected} tiles but got ${polygons.length}`);
+
+            const order = expectedSymmetry(config);
+            if (order) {
+                const misses = rotationMisses(polygons, order);
+                if (misses) issues.push(`not ${order}-fold rotationally symmetric (${misses} tile(s) have no partner)`);
+            }
+            if (expectedMirror(config)) {
+                const misses = mirrorMisses(polygons);
+                if (misses) issues.push(`not left-right symmetric (${misses} tile(s) have no mirror partner)`);
+            }
         }
         return issues;
     }
@@ -199,6 +286,11 @@
         makeConfig,
         allCombinations,
         expectedCount,
+        expectedSymmetry,
+        expectedMirror,
+        rotationMisses,
+        mirrorMisses,
+        roundness,
         polygonsOverlap,
         findOverlaps,
         verticesBounds,

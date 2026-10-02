@@ -16,6 +16,9 @@
         if (config.boardShape === 'hexagon') {
             return buildHexagonShapedGrid(config, canvas, colorMap);
         }
+        if (config.boardShape === 'circle') {
+            return buildCircleHexGrid(config, canvas, colorMap);
+        }
 
         const dims = normalizeBoardDimensions(config);
         const cols = dims.cols;
@@ -88,6 +91,50 @@
                         type: 'hexagon',
                         center,
                         vertices,
+                        color: colorMap?.get(id)
+                    })
+                );
+            }
+        }
+        return polygons;
+    }
+
+    /**
+     * Circle-shaped board of hexagons: every tile whose centre lies within
+     * (radius + 0.5) tile widths of the middle tile. Centring the disc on a tile (not
+     * on the corner of a staggered grid) gives the full 6-fold symmetry of the hex
+     * lattice, so the board is round instead of lopsided. Laid out at a fixed scale
+     * around the canvas centre; Geometry.generateGrid fits it to the canvas.
+     */
+    function buildCircleHexGrid(config, canvas, colorMap) {
+        if (!canvas) return [];
+        const radius = Math.max(
+            0,
+            Number.isFinite(config.radius) ? Math.floor(config.radius) : Config.DEFAULT_BOARD_CONFIG.radius
+        );
+        const orientation = config.orientation === 'flat-top' ? 'flat-top' : 'pointy-top';
+        const size = 40;
+        const width = Math.sqrt(3) * size; // distance between neighbouring tile centres
+        // (radius + 0.5) * width squared is never a lattice distance squared, so no tile sits on the edge.
+        const limit = (radius + 0.5) * width;
+        const span = radius + 2;
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
+
+        const polygons = [];
+        for (let r = -span; r <= span; r++) {
+            for (let q = -span; q <= span; q++) {
+                const x = orientation === 'pointy-top' ? width * (q + r / 2) : 1.5 * size * q;
+                const y = orientation === 'pointy-top' ? 1.5 * size * r : width * (r + q / 2);
+                if (Math.hypot(x, y) > limit) continue;
+                const id = `hex_${q}_${r}`;
+                const center = { x: cx + x, y: cy + y };
+                polygons.push(
+                    createPolygon({
+                        id,
+                        type: 'hexagon',
+                        center,
+                        vertices: createHexVertices(center, size, orientation),
                         color: colorMap?.get(id)
                     })
                 );
@@ -199,6 +246,7 @@
     global.GeometryHex = {
         buildHexGrid,
         buildHexagonShapedGrid,
+        buildCircleHexGrid,
         createHexagonRowPlan,
         computeHexagonAxialLayout,
         calculateHexagonCentering
