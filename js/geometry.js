@@ -27,10 +27,17 @@
         return helpers.fitPolygonsToCanvas(buildGrid(config, canvas, colorMap), canvas);
     }
 
+    const neighbors = global.GeometryNeighbors;
+
     const Geometry = {
         generateGrid,
         isPointInPolygon: helpers.isPointInPolygon,
-        findPolygonAtPoint: helpers.findPolygonAtPoint
+        findPolygonAtPoint: helpers.findPolygonAtPoint,
+        buildAdjacency: neighbors.buildAdjacency,
+        floodFill: neighbors.floodFill,
+        neighborhood: neighbors.neighborhood,
+        shortestPath: neighbors.shortestPath,
+        linePath: neighbors.linePath
     };
 
     global.Geometry = Geometry;
