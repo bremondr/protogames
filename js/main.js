@@ -31,6 +31,7 @@ const Main = (() => {
         FileManager.init(uiRefs);
         Exporter.init(uiRefs);
         Toolbar.init();
+        ThemeEditor.init();
         ThemeManager.init().catch((error) => console.error('Theme restore failed:', error)).finally(startBoard);
     }
 

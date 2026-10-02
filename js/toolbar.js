@@ -164,7 +164,13 @@ const Toolbar = (() => {
             $(template)?.addEventListener('click', () => ThemeManager.downloadTemplate(kind));
             el[input]?.addEventListener('change', (e) => importThemes(kind, e.target));
         });
+        [['tiles', 'tileNew', 'tileExport', 'tileExportSelect'], ['items', 'itemNew', 'itemExport', 'itemExportSelect']].forEach(([kind, create, exportBtn, select]) => {
+            $(create)?.addEventListener('click', () => { setPopovers(false, false); ThemeEditor.open(kind); });
+            $(exportBtn)?.addEventListener('click', () => { const id = $(select)?.value; if (id) ThemeManager.exportTheme(kind, id); });
+        });
         [el.tileList, el.itemList].forEach((list) => list?.addEventListener('click', (e) => {
+            const edit = e.target.closest('[data-edit]');
+            if (edit) { ThemeEditor.open(edit.dataset.kind, edit.dataset.edit); return; }
             const btn = e.target.closest('[data-remove]');
             if (!btn) return;
             const kind = btn.dataset.kind;
@@ -172,6 +178,23 @@ const Toolbar = (() => {
             if (kind === 'items' && objTheme === id) objTheme = 'medieval';
             ThemeManager.remove(kind, id);
         }));
+    }
+
+    /** Fills the export dropdowns with every tile theme / item set, keeping the current choice. */
+    function renderExportOptions() {
+        [['tileExportSelect', Config.getAllPalettes()], ['itemExportSelect', Objects.themes()]].forEach(([id, options]) => {
+            const select = $(id);
+            if (!select) return;
+            const previous = select.value;
+            select.innerHTML = '';
+            options.forEach((o) => {
+                const opt = document.createElement('option');
+                opt.value = o.id;
+                opt.textContent = o.name;
+                select.appendChild(opt);
+            });
+            if (options.some((o) => o.id === previous)) select.value = previous;
+        });
     }
 
     async function importThemes(kind, input) {
@@ -201,6 +224,13 @@ const Toolbar = (() => {
                 const count = document.createElement('span');
                 count.className = 'theme-row-count';
                 count.textContent = c.count + (kind === 'tiles' ? ' tiles' : ' items');
+                const edit = document.createElement('button');
+                edit.type = 'button';
+                edit.className = 'theme-row-remove theme-row-edit';
+                edit.dataset.edit = c.id;
+                edit.dataset.kind = kind;
+                edit.setAttribute('aria-label', 'Edit ' + c.name);
+                edit.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>';
                 const remove = document.createElement('button');
                 remove.type = 'button';
                 remove.className = 'theme-row-remove';
@@ -208,10 +238,11 @@ const Toolbar = (() => {
                 remove.dataset.kind = kind;
                 remove.setAttribute('aria-label', 'Remove ' + c.name);
                 remove.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>';
-                row.append(name, count, remove);
+                row.append(name, count, edit, remove);
                 list.appendChild(row);
             });
         });
+        renderExportOptions();
         sync();
     }
 
