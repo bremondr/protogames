@@ -286,6 +286,45 @@ const Interactions = (() => {
         Renderer.renderBoard();
     }
 
+    /** True while a stroke or line is in progress (undo and friends must wait). */
+    function isStrokeActive() {
+        const state = AppState.getState();
+        return state.isDrawing || Boolean(state.lineStartId);
+    }
+
+    /** Re-selects the current colour as the paint source (keeps the draw mode). */
+    function selectColorTool() {
+        const buttons = UI.getElements().paletteButtons || [];
+        const color = (AppState.getState().currentColor || '').toLowerCase();
+        const match = buttons.find((b) => (b.dataset.color || '').toLowerCase() === color) || buttons[0];
+        if (match) handleColorSelect(match);
+    }
+
+    /** Eraser on/off: switching it off returns to painting with the current colour. */
+    function toggleEraser() {
+        if (AppState.getState().isEraserActive) selectColorTool();
+        else handleEraserSelect();
+    }
+
+    /** Picks the nth swatch (0-based) of the current palette. Returns its colour, or null if there is none. */
+    function pickSwatch(index) {
+        const button = (UI.getElements().paletteButtons || [])[index];
+        if (!button) return null;
+        handleColorSelect(button);
+        return button.dataset.color;
+    }
+
+    /** Moves the swatch selection forward (+1) or back (-1), wrapping around. */
+    function cycleSwatch(delta) {
+        const buttons = UI.getElements().paletteButtons || [];
+        if (!buttons.length) return null;
+        const color = (AppState.getState().currentColor || '').toLowerCase();
+        const current = buttons.findIndex((b) => (b.dataset.color || '').toLowerCase() === color);
+        const next = (current + delta + buttons.length) % buttons.length;
+        handleColorSelect(buttons[next]);
+        return buttons[next].dataset.color;
+    }
+
     /** Recomputes the outline under the pointer after the brush size or draw mode changed. */
     function refreshHover() {
         const state = AppState.getState();
@@ -521,6 +560,13 @@ const Interactions = (() => {
         init,
         generateBoard,
         selectObjectTool,
+        undo: handleUndo,
+        redo: handleRedo,
+        isStrokeActive,
+        selectColorTool,
+        toggleEraser,
+        pickSwatch,
+        cycleSwatch,
         setDrawMode,
         setBrushSize,
         changeBrushSize,

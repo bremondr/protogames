@@ -206,6 +206,191 @@ const Shortcuts = (() => {
     const isMacPlatform = () =>
         typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || '');
 
+    // ---- Browser glue -----------------------------------------------------------------------------------------
+    // Everything below needs the DOM and the rest of the app; it is exercised in the browser, not in the unit tests.
+
+    let macOverride = null;
+    const isMac = () => (macOverride === null ? isMacPlatform() : macOverride);
+
+    /** What each binding does. Keys are binding ids from BINDINGS. */
+    const ACTIONS = {
+        'undo': () => { if (!Interactions.isStrokeActive()) Interactions.undo(); },
+        'redo': () => { if (!Interactions.isStrokeActive()) Interactions.redo(); },
+        'tool-brush': () => Toolbar.selectBrush(),
+        'tool-fill': () => Interactions.setDrawMode('fill'),
+        'tool-line': () => Interactions.setDrawMode('line'),
+        'tool-eraser': () => Interactions.toggleEraser(),
+        'brush-smaller': () => announceBrushSize(Interactions.changeBrushSize(-1)),
+        'brush-larger': () => announceBrushSize(Interactions.changeBrushSize(1)),
+        'swatch-next': () => Interactions.cycleSwatch(1),
+        'swatch-prev': () => Interactions.cycleSwatch(-1),
+        'zoom-in': () => ViewControls.zoomIn(),
+        'zoom-out': () => ViewControls.zoomOut(),
+        'zoom-fit': () => ViewControls.fit(),
+        'save': () => FileManager.saveProjectFile(),
+        'help': () => toggleHelp()
+    };
+    for (let i = 1; i <= 9; i++) ACTIONS[`swatch-${i}`] = () => Interactions.pickSwatch(i - 1);
+
+    function announceBrushSize(size) {
+        UI.showNotification(`Brush size ${size}`, 1200);
+    }
+
+    function dialogOpen() {
+        return Boolean(document.querySelector('.modal-backdrop:not(.hidden)'));
+    }
+
+    /** Keyboard focus is on nothing in particular, so Tab may cycle swatches instead of moving focus. */
+    function focusNeutral() {
+        const active = document.activeElement;
+        return !active || active === document.body || active === document.getElementById('gameCanvas');
+    }
+
+    function onKeyDown(event) {
+        if (shouldIgnore(event, { dialogOpen: dialogOpen() })) return;
+        const binding = findBinding(event, isMac(), { focusNeutral: focusNeutral() });
+        if (!binding) return;
+        const action = ACTIONS[binding.id];
+        if (!action) return;
+        // Claim the key (stops Tab moving focus, Ctrl+S saving the page, Ctrl+Y opening history...).
+        event.preventDefault();
+        if (event.repeat && !binding.repeat) return;
+        action(event);
+    }
+
+    /** "Control+Shift+Z"-style value for aria-keyshortcuts. */
+    function ariaShortcut(descriptor) {
+        const combo = parseCombo(descriptor);
+        const names = { plus: '+', equal: '=', minus: '-', underscore: '_', bracketleft: '[', bracketright: ']', question: '?', tab: 'Tab', numpadadd: '+', numpadsubtract: '-' };
+        const parts = [];
+        if (combo.mod) parts.push(isMac() ? 'Meta' : 'Control');
+        if (combo.alt) parts.push('Alt');
+        if (combo.shift) parts.push('Shift');
+        parts.push(names[combo.key] || combo.key.toUpperCase());
+        return parts.join('+');
+    }
+
+    /**
+     * Adds the shortcut to the tooltip of every element marked data-shortcut="<binding id>"
+     * ("Undo" becomes "Undo (Ctrl+Z)") and sets aria-keyshortcuts.
+     */
+    function applyHints(root = document) {
+        root.querySelectorAll('[data-shortcut]').forEach((element) => {
+            const binding = BINDINGS.find((b) => b.id === element.dataset.shortcut);
+            if (!binding) return;
+            if (element.dataset.shortcutBase === undefined) {
+                element.dataset.shortcutBase = element.dataset.tip || element.getAttribute('title') || element.getAttribute('aria-label') || binding.label;
+            }
+            const hint = hintFor(binding, isMac());
+            const text = hint ? `${element.dataset.shortcutBase} (${hint})` : element.dataset.shortcutBase;
+            if (element.classList.contains('pg-tip')) element.dataset.tip = text;
+            else element.setAttribute('title', text);
+            if (binding.keys.length) element.setAttribute('aria-keyshortcuts', binding.keys.map(ariaShortcut).join(' '));
+        });
+    }
+
+    // ---- Help overlay ("?") -------------------------------------------------------------------------------------------
+
+    let helpReturnFocus = null;
+
+    function closeHelp() {
+        const overlay = document.getElementById('shortcutHelp');
+        if (!overlay) return;
+        overlay.remove();
+        if (helpReturnFocus && helpReturnFocus.focus) helpReturnFocus.focus();
+        helpReturnFocus = null;
+    }
+
+    function toggleHelp() {
+        if (document.getElementById('shortcutHelp')) closeHelp();
+        else showHelp();
+    }
+
+    /** Lists the current bindings, grouped, straight from the registry. */
+    function showHelp() {
+        if (document.getElementById('shortcutHelp')) return;
+        helpReturnFocus = document.activeElement;
+        const overlay = document.createElement('div');
+        overlay.id = 'shortcutHelp';
+        overlay.className = 'modal-backdrop';
+        const dialog = document.createElement('div');
+        dialog.className = 'modal shortcut-help';
+        dialog.setAttribute('role', 'dialog');
+        dialog.setAttribute('aria-modal', 'true');
+        dialog.setAttribute('aria-labelledby', 'shortcutHelpTitle');
+
+        const head = document.createElement('div');
+        head.className = 'shortcut-help-head';
+        const title = document.createElement('h3');
+        title.id = 'shortcutHelpTitle';
+        title.textContent = 'Keyboard shortcuts';
+        const close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'icon-close';
+        close.setAttribute('aria-label', 'Close');
+        close.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg>';
+        head.append(title, close);
+        dialog.appendChild(head);
+
+        const columns = document.createElement('div');
+        columns.className = 'shortcut-help-groups';
+        for (const group of GROUPS) {
+            const entries = BINDINGS.filter((b) => b.group === group && b.listed !== false);
+            if (!entries.length) continue;
+            const section = document.createElement('section');
+            const heading = document.createElement('h4');
+            heading.textContent = group;
+            const list = document.createElement('dl');
+            for (const binding of entries) {
+                const term = document.createElement('dt');
+                term.textContent = binding.label;
+                const keys = document.createElement('dd');
+                const text = binding.listed || displayFor(binding, isMac());
+                for (const [index, alternative] of text.split(' or ').entries()) {
+                    if (index) keys.append(' or ');
+                    const cap = document.createElement('kbd');
+                    cap.textContent = alternative;
+                    keys.appendChild(cap);
+                }
+                if (binding.available === false) term.classList.add('unavailable');
+                list.append(term, keys);
+            }
+            section.append(heading, list);
+            columns.appendChild(section);
+        }
+        dialog.appendChild(columns);
+
+        const note = document.createElement('p');
+        note.className = 'shortcut-help-note';
+        note.textContent = isMac() ? '⌘ is the Command key.' : 'Shortcuts are paused while you type in a field or a dialog is open.';
+        dialog.appendChild(note);
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+
+        close.addEventListener('click', closeHelp);
+        overlay.addEventListener('pointerdown', (event) => { if (event.target === overlay) closeHelp(); });
+        overlay.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' || event.key === '?') {
+                event.preventDefault();
+                event.stopPropagation();
+                closeHelp();
+            }
+        });
+        close.focus();
+    }
+
+    function init() {
+        document.addEventListener('keydown', onKeyDown);
+        document.getElementById('helpButton')?.addEventListener('click', toggleHelp);
+        applyHints();
+    }
+
+    /** Tests and demos can pretend to be on a Mac. Pass null to restore detection. */
+    function overridePlatform(mac) {
+        macOverride = mac;
+        applyHints();
+    }
+
     return {
         BINDINGS,
         GROUPS,
@@ -219,6 +404,11 @@ const Shortcuts = (() => {
         displayFor,
         hintFor,
         findConflicts,
-        isMacPlatform
+        isMacPlatform,
+        init,
+        applyHints,
+        showHelp,
+        closeHelp,
+        overridePlatform
     };
 })();

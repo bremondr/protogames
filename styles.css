@@ -1646,3 +1646,79 @@ button:focus-visible {
     font-weight: 600;
     font-variant-numeric: tabular-nums;
 }
+
+/* ==============================================================
+   KEYBOARD SHORTCUT HELP OVERLAY
+   ============================================================== */
+.modal.shortcut-help {
+    max-width: 680px;
+    max-height: min(640px, 88vh);
+    overflow-y: auto;
+}
+
+.shortcut-help-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+
+.shortcut-help-head h3 {
+    margin: 0;
+}
+
+.shortcut-help-groups {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 0.5rem 1.5rem;
+}
+
+.shortcut-help-groups h4 {
+    margin: 0.5rem 0 0.35rem;
+    font-size: 0.78rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.shortcut-help-groups dl {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.3rem 0.75rem;
+    margin: 0;
+    font-size: 0.88rem;
+}
+
+.shortcut-help-groups dt {
+    color: rgba(255, 255, 255, 0.88);
+}
+
+.shortcut-help-groups dt.unavailable {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.shortcut-help-groups dd {
+    margin: 0;
+    text-align: right;
+    white-space: nowrap;
+}
+
+kbd {
+    display: inline-block;
+    min-width: 1.5rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-bottom-width: 2px;
+    background: rgba(255, 255, 255, 0.08);
+    font: inherit;
+    font-size: 0.8rem;
+    text-align: center;
+    color: #f4f4f4;
+}
+
+.shortcut-help-note {
+    margin: 1rem 0 0;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.6);
+}

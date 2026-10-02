@@ -311,5 +311,5 @@ const Toolbar = (() => {
         sync();
     }
 
-    return { init, sync };
+    return { init, sync, selectBrush };
 })();
