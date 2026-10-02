@@ -120,6 +120,67 @@ const ThemeManager = (() => {
     async function importFiles(kind, files) {
         const parsed = await parseFiles(kind, files);
         if (!parsed) return null;
+        return addParsed(kind, parsed);
+    }
+
+    /** Detaches a stored theme's runtime pieces without touching the active selection. */
+    function detach(kind, id) {
+        if (kind === 'tiles') {
+            const t = store.tiles.find((x) => x.id === id);
+            if (t) t.tiles.forEach((tile) => Textures.unregister(tile.hex));
+            const i = Config.COLOR_PALETTES.findIndex((p) => p.id === id);
+            if (i >= 0) Config.COLOR_PALETTES.splice(i, 1);
+            Textures.resetLabels();
+        } else {
+            Objects.removeSet(id);
+        }
+    }
+
+    /**
+     * Creates (or, with replaceId, updates in place) a theme built in the in-app editor.
+     * tiles: [{ label, hex, image?, orig? }]  items: [{ label, image, id? }]
+     * For tile edits, painted tiles are recolored from each row's original hex to its new hex.
+     */
+    async function saveTheme(kind, data, replaceId) {
+        if (!replaceId) return addParsed(kind, data);
+        const list = kind === 'tiles' ? store.tiles : store.items;
+        const idx = list.findIndex((x) => x.id === replaceId);
+        if (idx < 0) return addParsed(kind, data);
+        detach(kind, replaceId);
+        if (kind === 'tiles') {
+            const used = usedHexes();
+            const tiles = data.tiles.map((tl) => ({ label: tl.label, hex: uniqueHex(tl.hex, used), image: tl.image || null, orig: tl.orig }));
+            const remap = new Map(tiles.filter((tl) => tl.orig).map((tl) => [tl.orig.toLowerCase(), tl.hex]));
+            const theme = { id: replaceId, name: data.name, tiles: tiles.map(({ orig, ...rest }) => rest) };
+            await applyTileTheme(theme);
+            list[idx] = theme;
+            AppState.getState().polygons.forEach((p) => { const n = remap.get(String(p.color).toLowerCase()); if (n) p.color = n; });
+            const s = AppState.getState();
+            const n = remap.get(String(s.currentColor).toLowerCase()); if (n) AppState.setCurrentColor(n);
+            refreshPaletteSelect();
+            if (s.currentPaletteId === replaceId) UI.renderColorPalette(replaceId, s.currentColor);
+        } else {
+            const taken = new Set();
+            const set = { id: replaceId, name: data.name, items: data.items.filter((it) => it.image).map((it) => {
+                const base = it.id && it.id.startsWith(replaceId + ':') ? it.id.slice(replaceId.length + 1) : slug(it.label);
+                const itemId = uid(base, taken); taken.add(itemId);
+                return { label: it.label, image: it.image, id: `${replaceId}:${itemId}` };
+            }) };
+            await applyItemSet(set);
+            list[idx] = set;
+        }
+        Renderer.renderBoard();
+        const saved = persist();
+        emit();
+        return { name: data.name, count: (data.tiles || data.items).length, saved };
+    }
+
+    function get(kind, id) {
+        const t = (kind === 'tiles' ? store.tiles : store.items).find((x) => x.id === id);
+        return t ? JSON.parse(JSON.stringify(t)) : null;
+    }
+
+    async function addParsed(kind, parsed) {
         if (kind === 'tiles') {
             const ids = new Set(Config.COLOR_PALETTES.map((p) => p.id));
             const used = usedHexes();
@@ -177,5 +238,26 @@ const ThemeManager = (() => {
         Utils.triggerBlobDownload(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), kind === 'tiles' ? 'tile-theme.template.json' : 'item-set.template.json');
     }
 
-    return { init, importFiles, remove, list, downloadTemplate };
+    /** Exports any tile theme (built-in or custom) or item set as an importable JSON file. */
+    function exportTheme(kind, id) {
+        let data;
+        if (kind === 'tiles') {
+            const p = Config.getPaletteById(id);
+            if (!p) return;
+            const stored = store.tiles.find((x) => x.id === id);
+            data = { type: 'protogames-tile-theme', name: p.name, tiles: p.colors.map((c) => {
+                const s = stored && stored.tiles.find((x) => x.hex.toLowerCase() === c.hex.toLowerCase());
+                return { label: c.label, hex: c.hex, image: (s && s.image) || Textures.dataUrlFor(c.hex) || null };
+            }) };
+        } else {
+            const th = Objects.themes().find((x) => x.id === id);
+            if (!th) return;
+            data = { type: 'protogames-item-set', name: th.name, items: Objects.list(id).map((o) => ({ label: o.label, image: Objects.dataUrlFor(o.id) })).filter((o) => o.image) };
+        }
+        const file = `${slug(data.name)}.${kind === 'tiles' ? 'tile-theme' : 'item-set'}.json`;
+        Utils.triggerBlobDownload(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), file);
+        UI?.showNotification(`Exported "${data.name}"`);
+    }
+
+    return { init, importFiles, saveTheme, get, remove, list, downloadTemplate, exportTheme };
 })();

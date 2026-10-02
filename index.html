@@ -146,10 +146,14 @@
                             <button type="button" id="tileTemplate" class="link-button">JSON template</button>
                         </div>
                         <div id="tileThemeList" class="theme-list hidden" role="list"></div>
-                        <button type="button" id="tilePick" class="secondary-button import-button">
-                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>
-                            Import tile theme
-                        </button>
+                        <div class="theme-actions">
+                            <button type="button" id="tileNew" class="secondary-button import-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>Create</button>
+                            <button type="button" id="tilePick" class="secondary-button import-button" aria-label="Import tile theme"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>Import</button>
+                        </div>
+                        <div class="theme-export">
+                            <select id="tileExportSelect" aria-label="Tile theme to export"></select>
+                            <button type="button" id="tileExport" class="secondary-button export-theme-button" aria-label="Export tile theme"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3"></path><path d="m7 8 5-5 5 5"></path><path d="M5 21h14"></path></svg>Export</button>
+                        </div>
                         <input type="file" id="tileThemeInput" class="visually-hidden" multiple accept=".json,application/json,image/*" aria-label="Import tile theme">
                     </div>
                     <div class="theme-group">
@@ -158,10 +162,14 @@
                             <button type="button" id="itemTemplate" class="link-button">JSON template</button>
                         </div>
                         <div id="itemThemeList" class="theme-list hidden" role="list"></div>
-                        <button type="button" id="itemPick" class="secondary-button import-button">
-                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>
-                            Import item set
-                        </button>
+                        <div class="theme-actions">
+                            <button type="button" id="itemNew" class="secondary-button import-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>Create</button>
+                            <button type="button" id="itemPick" class="secondary-button import-button" aria-label="Import item set"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>Import</button>
+                        </div>
+                        <div class="theme-export">
+                            <select id="itemExportSelect" aria-label="Item set to export"></select>
+                            <button type="button" id="itemExport" class="secondary-button export-theme-button" aria-label="Export item set"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3"></path><path d="m7 8 5-5 5 5"></path><path d="M5 21h14"></path></svg>Export</button>
+                        </div>
                         <input type="file" id="itemThemeInput" class="visually-hidden" multiple accept=".json,application/json,image/*" aria-label="Import item set">
                     </div>
                 </div>
@@ -240,6 +248,34 @@
         </main>
     </div>
 
+    <!-- Theme editor dialog (create / edit tile themes and item sets) -->
+    <div id="themeEditor" class="modal-backdrop hidden" role="presentation">
+        <div class="modal theme-editor" role="dialog" aria-modal="true" aria-labelledby="themeEditorTitle">
+            <div class="theme-editor-head">
+                <h3 id="themeEditorTitle">New tile theme</h3>
+                <button type="button" id="themeEditorClose" class="icon-close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+            </div>
+            <label class="theme-editor-name">
+                <span class="field-label">Name</span>
+                <input type="text" id="themeEditorName" class="modal-input" aria-label="Theme name">
+            </label>
+            <div class="theme-editor-rows-head">
+                <span class="field-label" id="themeEditorRowsTitle">Terrains</span>
+                <span class="theme-editor-hint" id="themeEditorRowsHint"></span>
+            </div>
+            <div class="theme-editor-rows" id="themeEditorRows" role="list"></div>
+            <button type="button" id="themeEditorAdd" class="secondary-button add-row-button"></button>
+            <div class="theme-editor-foot">
+                <span class="theme-editor-error" id="themeEditorError"></span>
+                <div class="modal-actions">
+                    <button type="button" id="themeEditorCancel" class="secondary-button">Cancel</button>
+                    <button type="button" id="themeEditorSave" class="primary-button">Create</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <input type="file" id="themeEditorFile" class="visually-hidden" accept="image/*" aria-label="Choose image">
+
     <!-- Notification banner for lightweight status updates -->
     <div id="notificationBar" class="notification" role="status" aria-live="polite"></div>
     <script src="js/config.js"></script>
@@ -259,6 +295,7 @@
     <script src="js/themeManager.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/toolbar.js"></script>
+    <script src="js/themeEditor.js"></script>
     <script src="js/main.js"></script>
     <!-- 100% privacy-first analytics -->
 <script async src="https://scripts.simpleanalyticscdn.com/latest.js"></script>
