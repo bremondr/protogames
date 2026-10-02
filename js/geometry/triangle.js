@@ -9,7 +9,7 @@
         createBoardMetrics,
         normalizeBoardDimensions,
         createTriangleVertices,
-        createHexVertices,
+        boundsCenter,
         isPointInPolygon
     } = helpers;
 
@@ -63,11 +63,7 @@
                     x: (vertices[0].x + vertices[1].x + vertices[2].x) / 3,
                     y: (vertices[0].y + vertices[1].y + vertices[2].y) / 3
                 };
-                const insideHex =
-                    boardMetrics && boardMetrics.outline
-                        ? isPointInPolygon(center, boardMetrics.outline) &&
-                          vertices.every((vertex) => isPointInPolygon(vertex, boardMetrics.outline))
-                        : shouldIncludePolygon(center, boardMetrics);
+                const insideHex = shouldIncludePolygon(boundsCenter(vertices), boardMetrics);
                 if (!insideHex) continue;
                 const id = `triangle_${row}_${col}`;
                 polygons.push(
@@ -85,6 +81,16 @@
         return polygons;
     }
 
+    /**
+     * Hexagon-shaped board tiled with triangles: exactly 6 * radius^2 tiles.
+     *
+     * The triangle lattice has a vertex at the board center, so a flat-top hexagon
+     * (vertices left/right) follows lattice lines exactly. A tile belongs to the
+     * board when its centroid is inside the hexagon; boundaries lie on lattice
+     * lines, so centroids are never ambiguous. Pointy-top boards are the same
+     * layout rotated 90 degrees. The result is laid out at unit scale around the
+     * origin and then moved/scaled onto the canvas by Geometry.generateGrid.
+     */
     function buildHexagonTriangleGrid(config, canvas, colorMap, radius, orientation) {
         if (!canvas) return [];
 
@@ -92,70 +98,50 @@
             1,
             Number.isFinite(radius) ? Math.floor(radius) : Config.DEFAULT_BOARD_CONFIG.radius
         );
-        const hexOrientation = orientation === 'flat-top' ? 'flat-top' : 'pointy-top';
+        const rotate = orientation !== 'flat-top';
+        const side = 100;
+        const rowHeight = (Math.sqrt(3) / 2) * side;
+        const cx = canvas.width / 2;
+        const cy = canvas.height / 2;
 
-        const availableWidth = canvas.width - Config.CANVAS_PADDING * 2;
-        const availableHeight = canvas.height - Config.CANVAS_PADDING * 2;
-
-        const hexWidthUnit = hexOrientation === 'pointy-top' ? Math.sqrt(3) : 2;
-        const hexHeightUnit = hexOrientation === 'pointy-top' ? 2 : Math.sqrt(3);
-
-        const maxHexSize = Math.max(
-            8,
-            Math.floor(Math.min(availableWidth / hexWidthUnit, availableHeight / hexHeightUnit))
-        );
-        const triangleSize = Math.max(8, Math.floor(maxHexSize / rings));
-        const size = triangleSize * rings; // actual hex radius after snapping to triangle grid
-        const triangleHeight = (Math.sqrt(3) / 2) * triangleSize;
-
-        const hexWidth = hexWidthUnit * size;
-        const hexHeight = hexHeightUnit * size;
-        const offsetX = (canvas.width - hexWidth) / 2;
-        const offsetY = (canvas.height - hexHeight) / 2;
-        const hexCenter = { x: offsetX + hexWidth / 2, y: offsetY + hexHeight / 2 };
-        const hexOutline = createHexVertices(hexCenter, size, hexOrientation);
-
-        const anchorX = hexCenter.x - triangleSize / 2;
-        const anchorY = hexCenter.y;
-
-        const minX = offsetX;
-        const maxX = offsetX + hexWidth;
-        const minY = offsetY;
-        const maxY = offsetY + hexHeight;
-        const bleed = 2;
-        const rowStart = Math.floor((minY - anchorY) / triangleHeight) - bleed;
-        const rowEnd = Math.ceil((maxY - anchorY) / triangleHeight) + bleed;
-        const colStart = Math.floor(((minX - anchorX) * 2) / triangleSize) - bleed;
-        const colEnd = Math.ceil(((maxX - anchorX) * 2) / triangleSize) + bleed;
+        // Lattice point (i, j) sits at x = i + j / 2, y = j * rowHeight (in triangle sides).
+        const point = (i, j) => ({ x: (i + j / 2) * side, y: j * rowHeight });
+        const inside = (p) => {
+            const x = Math.abs(p.x) / side;
+            const y = Math.abs(p.y) / rowHeight;
+            return x + y / 2 < rings && y < rings;
+        };
+        const place = (p) => (rotate ? { x: cx - p.y, y: cy + p.x } : { x: cx + p.x, y: cy + p.y });
 
         const polygons = [];
+        const span = rings * 2 + 1;
+        for (let j = -span; j <= span; j++) {
+            for (let i = -span; i <= span; i++) {
+                // Two triangles per lattice cell: one pointing down, one pointing up.
+                const cell = [
+                    { kind: 'down', corners: [point(i, j), point(i + 1, j), point(i, j + 1)] },
+                    { kind: 'up', corners: [point(i + 1, j), point(i + 1, j + 1), point(i, j + 1)] }
+                ];
+                for (const { kind, corners } of cell) {
+                    const centroid = {
+                        x: (corners[0].x + corners[1].x + corners[2].x) / 3,
+                        y: (corners[0].y + corners[1].y + corners[2].y) / 3
+                    };
+                    if (!inside(centroid)) continue;
 
-        for (let row = rowStart; row <= rowEnd; row++) {
-            const originY = anchorY + row * triangleHeight;
-            for (let col = colStart; col <= colEnd; col++) {
-                const originX = anchorX + (col * triangleSize) / 2;
-                const pointingUp = (row + col) % 2 === 0;
-                const vertices = createTriangleVertices({ x: originX, y: originY }, triangleSize, pointingUp);
-                const center = {
-                    x: (vertices[0].x + vertices[1].x + vertices[2].x) / 3,
-                    y: (vertices[0].y + vertices[1].y + vertices[2].y) / 3
-                };
-
-                const insideHex =
-                    isPointInPolygon(center, hexOutline) && vertices.every((vertex) => isPointInPolygon(vertex, hexOutline));
-                if (!insideHex) continue;
-
-                const id = `triangle_hex_${row}_${col}`;
-                polygons.push(
-                    createPolygon({
-                        id,
-                        type: 'triangle',
-                        center,
-                        vertices,
-                        color: colorMap?.get(id),
-                        metadata: { pointingUp }
-                    })
-                );
+                    const vertices = corners.map(place);
+                    const id = `triangle_hex_${j}_${i}_${kind}`;
+                    polygons.push(
+                        createPolygon({
+                            id,
+                            type: 'triangle',
+                            center: place(centroid),
+                            vertices,
+                            color: colorMap?.get(id),
+                            metadata: rotate ? {} : { pointingUp: kind === 'up' }
+                        })
+                    );
+                }
             }
         }
 
