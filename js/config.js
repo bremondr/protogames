@@ -117,6 +117,22 @@ const Config = (() => {
     const DEFAULT_PALETTE_ID = 'landscape';
 
     /**
+     * Showcase boards shipped with the app: project files in /showcases that
+     * every user can open from the Showcase panel. Add an entry (and the file)
+     * to publish another one.
+     *
+     * @type {Array<{id:string,name:string,description:string,file:string}>}
+     */
+    const SHOWCASES = [
+        {
+            id: 'fantasy-landscape',
+            name: 'Fantasy landscape',
+            description: 'A hex island with forests, mountains, a volcano, and a few landmarks.',
+            file: 'showcases/fantasy-landscape.protogames.json'
+        }
+    ];
+
+    /**
      * Returns a palette by id or null when not found.
      *
      * @param {string} id - Palette identifier.
@@ -149,6 +165,7 @@ const Config = (() => {
         CANVAS_PADDING,
         HISTORY_LIMIT,
         DEFAULT_FILL,
+        DEFAULT_TILE_COLOR,
         GRID_STROKE,
         HOVER_OUTLINE,
         AUTO_SAVE_KEY,
@@ -158,6 +175,7 @@ const Config = (() => {
         DEFAULT_BOARD_CONFIG,
         COLOR_PALETTES,
         DEFAULT_PALETTE_ID,
+        SHOWCASES,
         getPaletteById,
         getAllPalettes,
         getDefaultPalette

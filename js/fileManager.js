@@ -15,6 +15,65 @@ const FileManager = (() => {
             ui.loadButton.addEventListener('click', () => ui.loadInput.click());
             ui.loadInput.addEventListener('change', handleFileUpload);
         }
+        renderShowcases();
+    }
+
+    /** Builds the Showcase panel buttons from Config.SHOWCASES. */
+    function renderShowcases() {
+        const list = document.getElementById('showcaseList');
+        if (!list) return;
+        list.innerHTML = '';
+        Config.SHOWCASES.forEach((entry) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'showcase-item';
+            button.innerHTML = '<span class="showcase-name"></span><span class="showcase-desc"></span>';
+            button.querySelector('.showcase-name').textContent = entry.name;
+            button.querySelector('.showcase-desc').textContent = entry.description;
+            button.addEventListener('click', () => openShowcase(entry));
+            list.appendChild(button);
+        });
+    }
+
+    /** True when the board holds painted tiles or placed objects the user could lose. */
+    function hasUserWork() {
+        return AppState.getState().polygons.some(
+            (polygon) => polygon.object || (polygon.color && polygon.color !== Config.DEFAULT_TILE_COLOR)
+        );
+    }
+
+    function openShowcase(entry) {
+        if (hasUserWork()) {
+            confirmReplace(() => loadShowcase(entry));
+        } else {
+            loadShowcase(entry);
+        }
+    }
+
+    /**
+     * Fetches a showcase project and shows it. The saved geometry belongs to
+     * the author's canvas size, so the grid is regenerated for this canvas
+     * with the showcase's colors and objects carried over by tile id.
+     */
+    async function loadShowcase(entry) {
+        try {
+            const response = await fetch(entry.file);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const payload = await response.json();
+            if (!validateProjectFile(payload)) throw new Error('Invalid showcase file');
+            restoreState(payload, { skipNotification: true });
+            AppState.setProjectName(entry.id);
+            Interactions.generateBoard(AppState.getState().boardConfig, {
+                preserveColors: true,
+                preserveHistory: true,
+                skipDirtyFlag: true
+            });
+            autoSaveToLocalStorage(true);
+            UI?.showNotification(`Showcase "${entry.name}" loaded`, 3500);
+        } catch (error) {
+            console.error('Showcase load error:', error);
+            UI?.showNotification('Could not load showcase. Serve the app over http(s) to use showcases.', 5000);
+        }
     }
 
     function setupAutoSave() {
