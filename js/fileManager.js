@@ -7,6 +7,8 @@
 const FileManager = (() => {
     let ui = null;
     let autoSaveIntervalId = null;
+    // Set when startup could not restore the autosave; shown once the UI is ready.
+    let pendingStartupMessage = null;
 
     function init(uiRefs) {
         ui = uiRefs;
@@ -59,8 +61,7 @@ const FileManager = (() => {
         try {
             const response = await fetch(entry.file);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const payload = await response.json();
-            if (!validateProjectFile(payload)) throw new Error('Invalid showcase file');
+            const payload = ProjectFormat.parse(await response.text());
             restoreState(payload, { skipNotification: true });
             AppState.setProjectName(entry.id);
             Interactions.generateBoard(AppState.getState().boardConfig, {
@@ -90,12 +91,10 @@ const FileManager = (() => {
 
     function prepareProjectData() {
         const state = AppState.getState();
-        return {
-            version: Config.VERSION,
+        return ProjectFormat.createProject({
             projectName: state.currentProjectName || Config.DEFAULT_PROJECT_NAME,
-            created: new Date().toISOString(),
             appState: serializeAppState()
-        };
+        });
     }
 
     function serializeAppState() {
@@ -118,12 +117,10 @@ const FileManager = (() => {
         if (!window.localStorage) return;
 
         try {
-            const payload = {
-                version: Config.VERSION,
-                timestamp: Date.now(),
+            const payload = ProjectFormat.createAutosave({
                 projectName: state.currentProjectName || Config.DEFAULT_PROJECT_NAME,
                 appState: serializeAppState()
-            };
+            });
             localStorage.setItem(Config.AUTO_SAVE_KEY, JSON.stringify(payload));
             state.lastSaveTime = payload.timestamp;
             AppState.clearDirty();
@@ -140,9 +137,15 @@ const FileManager = (() => {
         try {
             const raw = localStorage.getItem(Config.AUTO_SAVE_KEY);
             if (!raw) return null;
-            return JSON.parse(raw);
+            return ProjectFormat.parse(raw);
         } catch (error) {
-            console.error('Failed to parse autosave payload.', error);
+            console.error('Could not restore the autosave.', error);
+            if (error instanceof ProjectFormat.ProjectFormatError) {
+                pendingStartupMessage = {
+                    title: 'Auto-saved work could not be restored',
+                    message: `${error.message} The next auto-save will replace it.`
+                };
+            }
             return null;
         }
     }
@@ -231,6 +234,40 @@ const FileManager = (() => {
         });
     }
 
+    /** In-page replacement for window.alert: a titled message with an OK button. */
+    function showMessage(title, message) {
+        const modal = document.createElement('div');
+        modal.className = 'modal-backdrop';
+        modal.innerHTML = `
+            <div class="modal" role="alertdialog" aria-modal="true">
+                <h3></h3>
+                <p></p>
+                <div class="modal-actions">
+                    <button type="button" class="primary-button" data-action="ok">OK</button>
+                </div>
+            </div>
+        `;
+        modal.querySelector('h3').textContent = title;
+        modal.querySelector('p').textContent = message;
+        document.body.appendChild(modal);
+        modal.querySelector('[data-action="ok"]').focus();
+        const close = () => modal.remove();
+        modal.addEventListener('click', (event) => {
+            if (event.target === modal || event.target.closest('[data-action="ok"]')) close();
+        });
+        modal.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') close();
+        });
+    }
+
+    /** Shows (once) the message recorded while trying to restore the autosave at startup. */
+    function showStartupMessage() {
+        if (!pendingStartupMessage) return;
+        const { title, message } = pendingStartupMessage;
+        pendingStartupMessage = null;
+        showMessage(title, message);
+    }
+
     /** In-page replacement for window.confirm when loading over an existing board. */
     function confirmReplace(onConfirm) {
         const modal = document.createElement('div');
@@ -288,10 +325,7 @@ const FileManager = (() => {
         const reader = new FileReader();
         reader.onload = (loadEvent) => {
             try {
-                const payload = JSON.parse(loadEvent.target.result);
-                if (!validateProjectFile(payload)) {
-                    throw new Error('This file does not look like a Protogames project.');
-                }
+                const payload = ProjectFormat.parse(loadEvent.target.result);
                 if (AppState.getState().polygons.length) {
                     confirmReplace(() => restoreState(payload));
                     return;
@@ -299,21 +333,12 @@ const FileManager = (() => {
                 restoreState(payload);
             } catch (error) {
                 console.error('Load error:', error);
-                alert(error.message || 'Unable to load project file.');
+                showMessage('Could not open this file', error.message || 'Unable to load project file.');
             } finally {
                 event.target.value = '';
             }
         };
         reader.readAsText(file);
-    }
-
-    function validateProjectFile(data) {
-        if (!data || typeof data !== 'object') return false;
-        if (data.version !== Config.VERSION) return false;
-        if (!data.appState || typeof data.appState !== 'object') return false;
-        if (!Array.isArray(data.appState.polygons)) return false;
-        if (!data.appState.boardConfig) return false;
-        return true;
     }
 
     function restoreState(payload, options = {}) {
@@ -359,6 +384,7 @@ const FileManager = (() => {
         loadAutoSave,
         restoreState,
         saveProjectFile,
-        promptAutosaveRestore
+        promptAutosaveRestore,
+        showStartupMessage
     };
 })();

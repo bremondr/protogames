@@ -6,7 +6,6 @@
  * colors, or default behaviors without digging through the codebase.
  */
 const Config = (() => {
-    const VERSION = '1.0';
     const CANVAS_PADDING = 48;
     /**
      * Extra space kept free along the bottom edge of the canvas so the floating
@@ -166,7 +165,6 @@ const Config = (() => {
     }
 
     return {
-        VERSION,
         CANVAS_PADDING,
         TOOLBAR_CLEARANCE,
         HISTORY_LIMIT,
