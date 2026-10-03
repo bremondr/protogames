@@ -123,3 +123,12 @@ test('urlFor replaces an existing hash and describeLength is readable', () => {
     assert.equal(ShareLink.describeLength(279), '279 characters link');
     assert.equal(ShareLink.describeLength(2048), '2.0 KB link');
 });
+
+test('link size levels: fine up to 2000 characters, long up to 8000, then very long', () => {
+    assert.equal(ShareLink.sizeLevel(0), 'ok');
+    assert.equal(ShareLink.sizeLevel(ShareLink.LONG_LINK), 'ok');
+    assert.equal(ShareLink.sizeLevel(ShareLink.LONG_LINK + 1), 'long');
+    assert.equal(ShareLink.sizeLevel(ShareLink.VERY_LONG_LINK), 'long');
+    assert.equal(ShareLink.sizeLevel(ShareLink.VERY_LONG_LINK + 1), 'veryLong');
+    assert.ok(ShareLink.LONG_LINK < ShareLink.VERY_LONG_LINK);
+});
