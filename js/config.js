@@ -74,12 +74,8 @@ const Config = (() => {
             colors: [
                 { label: 'Deep Space', hex: '#0D1B2A' },
                 { label: 'Nebula', hex: '#7B2CBF' },
-                { label: 'Star', hex: '#FFD60A' },
-                { label: 'Planet', hex: '#118AB2' },
-                { label: 'Asteroid', hex: '#495057' },
-                { label: 'Ice', hex: '#06FFA5' },
-                { label: 'Energy', hex: '#90E0EF' },
-                { label: 'Void', hex: '#240046' }
+                { label: 'Void', hex: '#05040A' },
+                { label: 'Asteroid Belt', hex: '#3A3530' }
             ]
         },
         {
@@ -115,16 +111,15 @@ const Config = (() => {
         {
         "id": "arctic",
         "name": "Arctic",
-        "description": "Frozen tundra and polar environments",
+        "description": "Polar seas, ice sheets and frozen peaks of the Arctic and Antarctica",
         "colors": [
-        { "hex": "#FFFFFF", "label": "Snow" },
-        { "hex": "#B3E5FC", "label": "Ice" },
-        { "hex": "#0288D1", "label": "Deep Ice" },
-        { "hex": "#01579B", "label": "Frozen Water" },
-        { "hex": "#546E7A", "label": "Rock" },
-        { "hex": "#37474F", "label": "Cave" },
-        { "hex": "#BBDEFB", "label": "Glacier" },
-        { "hex": "#E0F7FA", "label": "Fresh Snow" }
+        { "hex": "#1F5E86", "label": "Ocean" },
+        { "hex": "#D6E8F2", "label": "Frozen Ocean" },
+        { "hex": "#BFE3F2", "label": "Glacier" },
+        { "hex": "#2A6E96", "label": "Icebergs" },
+        { "hex": "#E4ECF5", "label": "Snow Hills" },
+        { "hex": "#A9BCD0", "label": "Snowy Mountains" },
+        { "hex": "#5E6B7A", "label": "Icy Peaks" }
         ]
         }        
     ];
