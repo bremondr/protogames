@@ -19,6 +19,9 @@ const ShareLink = (() => {
     const MAX_DIMENSION = 100;
     const HASH_PATTERN = /[#&]b=([A-Za-z0-9_-]+)/;
     const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+    // Rules of thumb for the apps a link gets pasted into (chat, email); browsers themselves take far more.
+    const LONG_LINK = 2000;
+    const VERY_LONG_LINK = 8000;
 
     // ---- Pure: payload -------------------------------------------------------------------------
 
@@ -145,6 +148,17 @@ const ShareLink = (() => {
         return `${baseUrl.split('#')[0]}#b=${encoded}`;
     }
 
+    /** How risky a link of this many characters is to paste around: 'ok', 'long' or 'veryLong'. */
+    function sizeLevel(length) {
+        if (length > VERY_LONG_LINK) return 'veryLong';
+        return length > LONG_LINK ? 'long' : 'ok';
+    }
+
+    const SIZE_WARNINGS = {
+        long: 'Long link: some chat or email apps may cut it off. Sharing the project file is safer.',
+        veryLong: 'This link is likely to break when pasted into chats or email. Share the project file instead.'
+    };
+
     function describeLength(length) {
         return `${length > 1024 ? `${(length / 1024).toFixed(1)} KB` : `${length} characters`} link`;
     }
@@ -209,6 +223,15 @@ const ShareLink = (() => {
         $('shareNote').textContent = usesCustomContent(state)
             ? 'Uses a custom theme or item set; others will see flat colours or missing items unless they import it too.'
             : '';
+        // The link always stays copyable; a long one just comes with a warning and a file download.
+        const level = sizeLevel(currentUrl.length);
+        const warning = $('shareWarning');
+        warning.textContent = SIZE_WARNINGS[level] || '';
+        warning.hidden = level === 'ok';
+        warning.dataset.level = level;
+        $('shareDownload').hidden = level === 'ok';
+        $('shareDownload').classList.toggle('primary-button', level === 'veryLong');
+        $('shareDownload').classList.toggle('secondary-button', level !== 'veryLong');
         $('shareCopy').textContent = 'Copy';
         $('shareDialog').classList.remove('hidden');
         $('shareUrl').focus();
@@ -256,6 +279,7 @@ const ShareLink = (() => {
         $('shareButton')?.addEventListener('click', openDialog);
         $('shareCopy')?.addEventListener('click', copyLink);
         $('shareClose')?.addEventListener('click', closeDialog);
+        $('shareDownload')?.addEventListener('click', () => { closeDialog(); FileManager.saveProjectFile(); });
         $('shareUrl')?.addEventListener('focus', (event) => event.target.select());
         const backdrop = $('shareDialog');
         backdrop?.addEventListener('pointerdown', (event) => { if (event.target === backdrop) closeDialog(); });
@@ -274,6 +298,9 @@ const ShareLink = (() => {
         fromBase64Url,
         hashPayload,
         urlFor,
+        LONG_LINK,
+        VERY_LONG_LINK,
+        sizeLevel,
         describeLength,
         encode,
         decode,

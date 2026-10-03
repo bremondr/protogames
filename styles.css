@@ -1985,3 +1985,31 @@ kbd {
     stroke-linejoin: round;
     margin-right: 0.5rem;
 }
+
+.share-warning {
+    margin-top: 0.75rem;
+    padding: 0.5rem 0.65rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    background: rgba(240, 180, 41, 0.14);
+    border: 1px solid rgba(240, 180, 41, 0.4);
+    color: #f6d58a;
+}
+
+.share-warning[data-level="veryLong"] {
+    background: rgba(214, 69, 69, 0.16);
+    border-color: rgba(214, 69, 69, 0.5);
+    color: #ffb3b3;
+}
+
+.share-warning[hidden],
+.share-download[hidden] {
+    display: none;
+}
+
+.share-download {
+    margin-top: 0.6rem;
+    width: 100%;
+    min-height: 44px;
+}
