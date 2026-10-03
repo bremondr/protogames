@@ -25,8 +25,8 @@ const Shortcuts = (() => {
         { id: 'tool-line', group: 'Tools', label: 'Line', keys: ['l'] },
         { id: 'tool-select', group: 'Tools', label: 'Select (not available yet)', keys: ['v'], available: false },
         { id: 'tool-eraser', group: 'Tools', label: 'Toggle eraser', keys: ['e'] },
-        { id: 'brush-smaller', group: 'Tools', label: 'Smaller brush', keys: ['bracketleft'], repeat: true },
-        { id: 'brush-larger', group: 'Tools', label: 'Larger brush', keys: ['bracketright'], repeat: true },
+        { id: 'brush-smaller', group: 'Tools', label: 'Smaller brush / eraser', keys: ['bracketleft'], repeat: true },
+        { id: 'brush-larger', group: 'Tools', label: 'Larger brush / eraser', keys: ['bracketright'], repeat: true },
 
         // Swatches 1-9 are nine bindings but shown as one line ("1 – 9") in the overlay.
         ...Array.from({ length: 9 }, (_, i) => ({
@@ -216,12 +216,12 @@ const Shortcuts = (() => {
     const ACTIONS = {
         'undo': () => { if (!Interactions.isStrokeActive()) Interactions.undo(); },
         'redo': () => { if (!Interactions.isStrokeActive()) Interactions.redo(); },
-        'tool-brush': () => Toolbar.selectBrush(),
+        'tool-brush': () => Interactions.setDrawMode('brush'),
         'tool-fill': () => Interactions.setDrawMode('fill'),
         'tool-line': () => Interactions.setDrawMode('line'),
         'tool-eraser': () => Interactions.toggleEraser(),
-        'brush-smaller': () => announceBrushSize(Interactions.changeBrushSize(-1)),
-        'brush-larger': () => announceBrushSize(Interactions.changeBrushSize(1)),
+        'brush-smaller': () => announceSize(Interactions.changeActiveSize(-1)),
+        'brush-larger': () => announceSize(Interactions.changeActiveSize(1)),
         'swatch-next': () => Interactions.cycleSwatch(1),
         'swatch-prev': () => Interactions.cycleSwatch(-1),
         'zoom-in': () => ViewControls.zoomIn(),
@@ -232,8 +232,9 @@ const Shortcuts = (() => {
     };
     for (let i = 1; i <= 9; i++) ACTIONS[`swatch-${i}`] = () => Interactions.pickSwatch(i - 1);
 
-    function announceBrushSize(size) {
-        UI.showNotification(`Brush size ${size}`, 1200);
+    function announceSize({ tool, size }) {
+        const text = tool === 'object' ? 'Objects are placed one tile at a time' : `${tool === 'eraser' ? 'Eraser' : 'Brush'} size ${size}`;
+        UI.showNotification(text, 1200);
     }
 
     function dialogOpen() {

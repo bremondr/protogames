@@ -1611,6 +1611,77 @@ button:focus-visible {
     }
 }
 
+/* Drawing tool: one button whose icon follows the mode, plus a Brush / Fill / Line switch in its popover */
+.tool-split-main .mode-icon,
+.mode-switch svg {
+    width: 20px;
+    height: 20px;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.tool-split-main[data-mode="brush"] .mode-fill,
+.tool-split-main[data-mode="brush"] .mode-line,
+.tool-split-main[data-mode="fill"] .mode-brush,
+.tool-split-main[data-mode="fill"] .mode-line,
+.tool-split-main[data-mode="line"] .mode-brush,
+.tool-split-main[data-mode="line"] .mode-fill {
+    display: none;
+}
+
+.mode-switch {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.mode-switch button {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 8px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: #e6e9f0;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.mode-switch button svg {
+    width: 16px;
+    height: 16px;
+}
+
+.mode-switch button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.mode-switch button[aria-pressed="true"] {
+    background: var(--color-accent);
+    color: #ffffff;
+}
+
+/* Eraser: split button with its own size popover */
+.eraser-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    border-radius: 8px;
+}
+
+.eraser-group .eraser-button {
+    border-radius: 8px 0 0 8px;
+}
+
 /* Brush size stepper inside the brush popover */
 .size-stepper {
     display: inline-flex;
@@ -1721,4 +1792,8 @@ kbd {
     margin: 1rem 0 0;
     font-size: 0.8rem;
     color: rgba(255, 255, 255, 0.6);
+}
+
+.pop-row[hidden] {
+    display: none;
 }
