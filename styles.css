@@ -724,17 +724,15 @@ button:focus-visible {
    ============================================================== */
 .tool-bar {
     position: absolute;
-    left: 50%;
-    bottom: 2.5rem;
-    transform: translateX(-50%);
+    right: 1rem;
+    top: calc(1rem + 112px);
+    width: 48px;
+    box-sizing: border-box;
     display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    width: max-content;
-    max-width: calc(100% - 1rem);
+    flex-direction: column;
     align-items: center;
     gap: 4px;
-    padding: 6px;
+    padding: 3px;
     background: #151b26;
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 12px;
@@ -793,23 +791,26 @@ button:focus-visible {
 
 .tool-split {
     display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 2px;
 }
 
 .tool-split-main {
-    border-radius: 8px 0 0 8px;
+    border-radius: 8px 8px 0 0;
 }
 
 .tool-chevron {
-    height: 40px;
-    padding: 0 6px 0 8px;
+    width: 40px;
+    height: 22px;
+    padding: 0;
     border: none;
-    border-radius: 0 8px 8px 0;
+    border-radius: 0 0 8px 8px;
     background: rgba(255, 255, 255, 0.06);
     color: #e6e9f0;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 4px;
     transition: background 0.15s ease;
 }
@@ -820,8 +821,8 @@ button:focus-visible {
 }
 
 .color-dot {
-    width: 16px;
-    height: 16px;
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
     background-size: 48px;
     background-position: center;
@@ -829,33 +830,34 @@ button:focus-visible {
 }
 
 .chevron-icon {
-    width: 14px;
-    height: 14px;
+    width: 11px;
+    height: 11px;
     stroke: currentColor;
-    stroke-width: 2;
+    stroke-width: 2.4;
     fill: none;
     stroke-linecap: round;
     stroke-linejoin: round;
-    transform: rotate(180deg);
+    transform: rotate(-90deg);
     transition: transform 0.15s ease;
 }
 
 .chevron-icon.flipped {
-    transform: rotate(0deg);
+    transform: rotate(90deg);
 }
 
 .tool-sep {
-    width: 1px;
-    height: 24px;
+    width: 24px;
+    height: 1px;
     background: rgba(255, 255, 255, 0.14);
-    margin: 0 4px;
+    margin: 2px 0;
 }
 
 /* Object tool: split button */
 .object-group {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    height: 40px;
+    width: 40px;
     border-radius: 8px;
     background: transparent;
     transition: background 0.15s ease;
@@ -867,7 +869,6 @@ button:focus-visible {
 
 .object-main,
 .object-chevron {
-    height: 40px;
     padding: 0;
     border: none;
     background: transparent;
@@ -879,12 +880,14 @@ button:focus-visible {
 
 .object-main {
     width: 40px;
-    border-radius: 8px 0 0 8px;
+    height: 40px;
+    border-radius: 8px 8px 0 0;
 }
 
 .object-chevron {
-    width: 18px;
-    border-radius: 0 8px 8px 0;
+    width: 40px;
+    height: 16px;
+    border-radius: 0 0 8px 8px;
 }
 
 .object-main:hover {
@@ -913,11 +916,10 @@ button:focus-visible {
 /* Popovers */
 .tool-popover {
     position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    bottom: calc(100% + 10px);
-    width: max(100%, 300px);
-    max-width: calc(100vw - 2rem);
+    right: calc(100% + 10px);
+    top: 0;
+    width: 300px;
+    max-width: calc(100vw - 6rem);
     box-sizing: border-box;
     display: none;
     flex-direction: column;
@@ -1427,10 +1429,10 @@ button:focus-visible {
     top: 1rem;
     right: 1rem;
     z-index: 5;
-    width: 40px;
-    height: 40px;
+    width: 48px;
+    height: 48px;
     padding: 0;
-    border-radius: 10px;
+    border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     background: #151b26;
     color: #e6e9f0;
@@ -1463,13 +1465,132 @@ button:focus-visible {
     display: block;
 }
 
-/* The button sits at the top edge, so its tooltip opens downward. */
-.focus-button.pg-tip::after {
+/* The buttons sit in the right-hand column, so their tooltips open to the left. */
+.focus-button.pg-tip::after,
+.play-button.pg-tip::after {
     bottom: auto;
-    top: calc(100% + 10px);
+    top: 50%;
     left: auto;
-    right: 0;
-    transform: none;
+    right: calc(100% + 10px);
+    transform: translateY(-50%);
+}
+
+/* Playtest: a lock on editing, with a way back. */
+.play-button {
+    position: absolute;
+    top: calc(1rem + 56px);
+    right: 1rem;
+    z-index: 5;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: #151b26;
+    color: #e6e9f0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 24px rgba(16, 24, 40, 0.22), 0 2px 6px rgba(16, 24, 40, 0.12);
+}
+
+.play-button:hover {
+    filter: brightness(1.25);
+}
+
+.play-button svg {
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.play-button .icon-play {
+    fill: currentColor;
+    stroke-width: 1.5;
+}
+
+.play-button .icon-edit {
+    fill: none;
+}
+
+.play-button .icon-edit,
+.playtest .play-button .icon-play {
+    display: none;
+}
+
+.playtest .play-button .icon-edit {
+    display: block;
+}
+
+.playtest .play-button {
+    background: #1f9d55;
+}
+
+.playtest .tool-bar {
+    display: none;
+}
+
+.playtest .sidebar {
+    display: none;
+}
+
+.playtest-pill {
+    position: absolute;
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 6px 6px 14px;
+    background: #151b26;
+    color: #f4f4f4;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    box-shadow: 0 8px 24px rgba(16, 24, 40, 0.22), 0 2px 6px rgba(16, 24, 40, 0.12);
+    font-size: 0.85rem;
+    white-space: nowrap;
+    transition: opacity 0.5s ease;
+}
+
+.playtest-pill.faded {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.playtest-pill .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #3ccf7a;
+    flex: 0 0 auto;
+}
+
+.playtest-pill strong {
+    font-weight: 600;
+}
+
+.playtest-pill .muted {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.playtest-pill button {
+    border: none;
+    border-radius: 999px;
+    padding: 0 12px;
+    height: 30px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #f4f4f4;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.playtest-pill button:hover {
+    background: rgba(255, 255, 255, 0.2);
 }
 
 .focus-mode .app-header,
@@ -1586,31 +1707,6 @@ button:focus-visible {
     }
 }
 
-/* On phones the bottom edge belongs to the tool bar (which may wrap), so the zoom
-   controls and minimap move to the top-left corner. */
-@media (max-width: 700px) {
-    .zoom-controls {
-        right: auto;
-        bottom: auto;
-        left: 1rem;
-        top: 1rem;
-    }
-
-    .minimap {
-        right: auto;
-        bottom: auto;
-        left: 1rem;
-        top: calc(1rem + 44px);
-    }
-
-    .zoom-controls .pg-tip::after {
-        left: 0;
-        right: auto;
-        bottom: auto;
-        top: calc(100% + 10px);
-    }
-}
-
 /* Drawing tool: one button whose icon follows the mode, plus a Brush / Fill / Line switch in its popover */
 .tool-split-main .mode-icon,
 .mode-switch svg {
@@ -1673,13 +1769,45 @@ button:focus-visible {
 /* Eraser: split button with its own size popover */
 .eraser-group {
     display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 2px;
+    width: 40px;
     border-radius: 8px;
 }
 
 .eraser-group .eraser-button {
-    border-radius: 8px 0 0 8px;
+    border-radius: 8px 8px 0 0;
+}
+
+.eraser-group .tool-chevron {
+    height: 16px;
+}
+
+#eraserPopover {
+    width: 220px;
+}
+
+.pop-note {
+    margin: 0;
+    font-size: 0.75rem;
+    line-height: 1.35;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.pop-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+    margin: 0 -10px;
+}
+
+/* Tooltips of the vertical tool bar open to the left, over the canvas */
+.tool-bar .pg-tip::after {
+    bottom: auto;
+    top: 50%;
+    left: auto;
+    right: calc(100% + 10px);
+    transform: translateY(-50%);
 }
 
 /* Brush size stepper inside the brush popover */
@@ -1796,4 +1924,64 @@ kbd {
 
 .pop-row[hidden] {
     display: none;
+}
+
+.playtest-pill[hidden] {
+    display: none;
+}
+
+/* Share dialog */
+.modal.share-dialog {
+    max-width: 480px;
+}
+
+.share-text {
+    margin: 0 0 0.75rem;
+    font-size: 0.85rem;
+    line-height: 1.45;
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.share-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+}
+
+.share-row .modal-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-bottom: 0;
+    font-size: 0.85rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.share-row .primary-button {
+    flex: 0 0 auto;
+    min-width: 92px;
+    min-height: 44px;
+}
+
+.share-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-top: 0.6rem;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.share-meta span:last-child {
+    text-align: right;
+}
+
+.share-button svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    margin-right: 0.5rem;
 }

@@ -13,10 +13,13 @@ Protogames lets designers sketch and iterate on board layouts quickly—no build
 - Grid types: Hexagon, Square, Triangle, Orthogonal Square
 - Board outlines: Square, Rectangle, Hexagon, Triangle, Circle
 - Painting: one drawing tool with a Brush / Fill / Line switch (and brush size, theme and colours) in its settings popover; the eraser has its own size; objects are placed one per click, ignoring the draw mode and size
-- Fill and line tools: flood-fill a connected region in one click, or drag from tile A to tile B to paint a gap-free tile path (works on hexagon, square and triangle grids; each is a single undo step and respects the eraser and object tools)
+- Fill and line tools: flood-fill a connected region in one click, or drag from tile A to tile B to paint a gap-free tile path (works on hexagon, square and triangle grids; each is a single undo step; they apply to colours only)
 - Palettes: Switchable themed color palettes (e.g., Landscape, Space) with labeled swatches
 - History: Undo/redo, autosave to localStorage
 - File ops: Save/load JSON projects; export PNG/PDF/SVG
+- Sharing: **Share Link** puts the whole board in the address (nothing is uploaded); whoever opens it gets their own copy
+- Playtest: the play button locks editing (painting, tools, side panel and editing shortcuts) so the board can be played on; pan and zoom keep working, **Esc** or the pill returns to editing
+- Layout: the tools sit in a column at the right edge, under the full screen and playtest buttons; their settings open to the left
 - Input: Mouse, touch, stylus; responsive layout
 - Navigation: wheel/pinch zoom at the pointer, pan, fit-to-screen and actual-size buttons, and an optional minimap for large boards (exports are always independent of the current zoom)
 
@@ -46,7 +49,7 @@ Painting and navigating never share a gesture, so you cannot pan by accident whi
 | Touch | one finger | **two fingers**: drag to pan, pinch to zoom (a stroke in progress is undone when the second finger lands; the finger left behind does not paint until you lift it) |
 | Stylus | pen | wheel, Space + drag, or the on-screen controls |
 
-The cluster in the bottom-right corner (top-left on phones) has zoom out / in, the zoom level (click it for **actual size**, where a typical tile is 64 px wide), **fit to screen**, and a **minimap** toggle. The minimap shows the whole board with the visible area outlined; click or drag on it to move the view. Zoom is clamped between 25% of the fitted size and 24x, and the board can never be panned completely out of sight.
+The cluster in the bottom-right corner has zoom out / in, the zoom level (click it for **actual size**, where a typical tile is 64 px wide), **fit to screen**, and a **minimap** toggle. The minimap shows the whole board with the visible area outlined; click or drag on it to move the view. Zoom is clamped between 25% of the fitted size and 24x, and the board can never be panned completely out of sight.
 
 ## Project Structure
 ```
@@ -60,6 +63,8 @@ protogames/
 │  ├─ renderer.js
 │  ├─ interactions.js
 │  ├─ fileManager.js
+│  ├─ shareLink.js       (share links: board in the address hash)
+│  ├─ playtest.js        (locks editing)
 │  ├─ exporter.js
 │  ├─ ui.js
 │  ├─ utils.js

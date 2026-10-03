@@ -113,6 +113,13 @@ const Shortcuts = (() => {
         return null;
     }
 
+    // ---- Playtest ------------------------------------------------------------------------------------------
+
+    /** While editing is locked only navigation and help shortcuts stay on. */
+    function allowedInPlaytest(binding) {
+        return binding.group === 'View' || binding.group === 'Help';
+    }
+
     // ---- Which events to leave alone --------------------------------------------------------------------
 
     /** Typing targets: shortcuts must never fire while the user is entering text. */
@@ -253,6 +260,11 @@ const Shortcuts = (() => {
         if (!binding) return;
         const action = ACTIONS[binding.id];
         if (!action) return;
+        if (AppState.getState().playtest && !allowedInPlaytest(binding)) {
+            // Still claim the key so Ctrl+S and friends do not fall through to the browser.
+            event.preventDefault();
+            return;
+        }
         // Claim the key (stops Tab moving focus, Ctrl+S saving the page, Ctrl+Y opening history...).
         event.preventDefault();
         if (event.repeat && !binding.repeat) return;
@@ -405,6 +417,7 @@ const Shortcuts = (() => {
         displayFor,
         hintFor,
         findConflicts,
+        allowedInPlaytest,
         isMacPlatform,
         init,
         applyHints,

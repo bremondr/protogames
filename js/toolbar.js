@@ -21,6 +21,7 @@ const Toolbar = (() => {
             sizeRow: $('brushSizeRow'),
             eraser: $('eraserButton'),
             eraserChevron: $('eraserChevron'),
+            eraserGroup: document.querySelector('.eraser-group'),
             eraserChevronIcon: $('eraserChevronIcon'),
             eraserPop: $('eraserPopover'),
             brushChevron: $('brushColorButton'),
@@ -72,6 +73,7 @@ const Toolbar = (() => {
             if (e.key === 'Escape' && anyPopoverOpen()) setPopovers(false, false, false);
         });
 
+        window.addEventListener('pg:playtest', () => setPopovers(false, false, false));
         bindThemePanel();
         bindFocusMode();
         window.addEventListener('pg:toolchange', sync);
@@ -111,6 +113,11 @@ const Toolbar = (() => {
         objOpen = obj;
         eraserOpen = Boolean(eraser);
         sync();
+        // The bar is a column and popovers open to its left: line each one up with its own tool.
+        [[el.brushPop, el.brushChevron], [el.objPop, el.objGroup], [el.eraserPop, el.eraserGroup]].forEach(([popover, anchor]) => {
+            const group = anchor?.closest('.tool-split, .object-group, .eraser-group') || anchor;
+            if (popover && group) popover.style.top = `${group.offsetTop}px`;
+        });
     }
 
     function onObjectTheme() {

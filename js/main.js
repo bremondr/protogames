@@ -33,6 +33,8 @@ const Main = (() => {
         FileManager.init(uiRefs);
         Exporter.init(uiRefs);
         Toolbar.init();
+        Playtest.init();
+        ShareLink.init();
         Shortcuts.init();
         ThemeEditor.init();
         ThemeManager.init().catch((error) => console.error('Theme restore failed:', error)).finally(startBoard);
@@ -44,6 +46,11 @@ const Main = (() => {
         window.addEventListener('resize', debouncedResize);
 
         const autoSaved = FileManager.loadAutoSave();
+        // A shared link wins over a saved autosave: the person opened it on purpose.
+        if (ShareLink.hasLink()) {
+            ShareLink.openFromHash();
+            return;
+        }
         FileManager.showStartupMessage();
         if (autoSaved) {
             FileManager.promptAutosaveRestore(autoSaved);
