@@ -8,20 +8,21 @@ Projects are saved as `<name>.protogames.json` and the editor also keeps one cop
 
 ### Version
 
-Every file has a top-level integer `version`. The current version is **1**.
+Every file has a top-level integer `version`. The current version is **2**.
 
 | `version` in the file | Meaning |
 |---|---|
 | missing, or the string `"1.0"` | **v0**: written before versioning existed. Migrated to v1 on load. |
-| integer `1` | current format |
+| integer `1` | migrated to v2 on load (Space/Arctic colours, see below) |
+| integer `2` | current format |
 | integer greater than the app's current version | rejected: "saved by a newer version of Protogames, update to open it" |
 | anything else (`1.5`, `-1`, `"abc"`, `null`, ...) | rejected as unreadable |
 
-### Project file (v1)
+### Project file (v2)
 
 ```jsonc
 {
-  "version": 1,
+  "version": 2,
   "projectName": "my board",
   "created": "2026-10-02T13:31:51.661Z",     // ISO time of the save
   "appState": {
@@ -82,3 +83,25 @@ Migrations are frozen history: do not edit one after it has been released, and d
 |---|---|
 | 0 | Unversioned files (`version` absent or `"1.0"`). |
 | 1 | Integer `version`. Migration fills `projectName`, `paletteId`, `isEraserActive`, `autoSaveEnabled`, tile `color` when missing and drops `object: null`. Validation became strict. |
+| 2 | The Space and Arctic palettes were redesigned. The structure is unchanged; migration remaps tile colours (and the selected colour) that no longer exist, see "v1 to v2 colour map". |
+
+### v1 to v2 colour map
+
+A tile's colour (`color`, a hex string) is its identity: it selects the texture and the label. When a palette loses a colour, tiles that used it would become flat and unlabeled, so the v1 to v2 migration maps each retired colour to its successor (case-insensitive). Colours that are still in a palette, and everything in the Landscape, Dungeon and Spaceship palettes, are untouched.
+
+| Retired colour (palette, name) | Becomes |
+|---|---|
+| `#240046` (Space, Void) | `#05040A` Void |
+| `#495057` (Space, Asteroid) | `#3A3530` Asteroid Belt |
+| `#FFD60A` (Space, Star) | `#0D1B2A` Deep Space **plus** the object `star` (only if the tile has no object) |
+| `#118AB2` (Space, Planet) | `#0D1B2A` Deep Space **plus** the object `planet` (Gas Giant; only if the tile has no object) |
+| `#06FFA5` (Space, Ice), `#90E0EF` (Space, Energy) | `#7B2CBF` Nebula |
+| `#B3E5FC` (Arctic, Ice) | `#D6E8F2` Frozen Ocean |
+| `#0288D1` (Arctic, Deep Ice), `#01579B` (Arctic, Frozen Water) | `#1F5E86` Ocean |
+| `#546E7A` (Arctic, Rock), `#37474F` (Arctic, Cave) | `#5E6B7A` Icy Peaks |
+| `#BBDEFB` (Arctic, Glacier) | `#BFE3F2` Glacier |
+| `#E0F7FA` (Arctic, Fresh Snow) | `#E4ECF5` Snow Hills |
+
+`#FFFFFF` (the old Arctic "Snow") is **not** remapped: it is also the blank tile colour and the two cannot be told apart, so such tiles stay blank.
+
+The same rule applies when a palette changes again: add a migration step that maps the retired colours, extend `tests/fixtures/` with a file in the previous format, and add the successor colours to this table. `tests/projectFormat.test.js` checks that every retired colour is really absent from the live palettes and every target colour is present.

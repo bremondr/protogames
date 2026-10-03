@@ -17,7 +17,7 @@
  * read live app config inside them.
  */
 const ProjectFormat = (() => {
-    const CURRENT_VERSION = 1;
+    const CURRENT_VERSION = 2;
 
     const GRID_TYPES = ['hexagon', 'square', 'triangle'];
     const BOARD_SHAPES = ['hexagon', 'square', 'rectangle', 'triangle', 'circle'];
@@ -82,9 +82,63 @@ const ProjectFormat = (() => {
         return next;
     }
 
+    /**
+     * v1 -> v2: the Space and Arctic palettes were redesigned, and a tile's colour is its
+     * identity (it selects the texture and label), so tiles painted with a retired colour
+     * would turn into flat, unlabeled tiles. Each retired colour is mapped to its successor.
+     *
+     *  - Star and Planet became placeable objects: the tile becomes Deep Space and gets the
+     *    matching object (unless it already has one).
+     *  - Everything else maps to the closest terrain of the new palette.
+     *  - Pure white (#ffffff) is left alone: it was Arctic "Snow" but is also the blank tile
+     *    colour, so the two cannot be told apart.
+     *
+     * The table is frozen history: it deliberately does not read the live palettes.
+     */
+    const V1_TO_V2_COLORS = {
+        // Space
+        '#240046': { color: '#05040A' }, // Void
+        '#495057': { color: '#3A3530' }, // Asteroid -> Asteroid Belt
+        '#ffd60a': { color: '#0D1B2A', object: 'star' }, // Star
+        '#118ab2': { color: '#0D1B2A', object: 'planet' }, // Planet -> Gas Giant
+        '#06ffa5': { color: '#7B2CBF' }, // Ice -> Nebula
+        '#90e0ef': { color: '#7B2CBF' }, // Energy -> Nebula
+        // Arctic
+        '#b3e5fc': { color: '#D6E8F2' }, // Ice -> Frozen Ocean
+        '#0288d1': { color: '#1F5E86' }, // Deep Ice -> Ocean
+        '#01579b': { color: '#1F5E86' }, // Frozen Water -> Ocean
+        '#546e7a': { color: '#5E6B7A' }, // Rock -> Icy Peaks
+        '#37474f': { color: '#5E6B7A' }, // Cave -> Icy Peaks
+        '#bbdefb': { color: '#BFE3F2' }, // Glacier
+        '#e0f7fa': { color: '#E4ECF5' } // Fresh Snow -> Snow Hills
+    };
+
+    function migrateV1toV2(project) {
+        const next = clone(project);
+        next.version = 2;
+        const state = isObject(next.appState) ? next.appState : null;
+        if (!state) return next;
+
+        const mapped = (color) => (typeof color === 'string' ? V1_TO_V2_COLORS[color.toLowerCase()] : undefined);
+        const selected = mapped(state.currentColor);
+        if (selected) state.currentColor = selected.color;
+
+        if (Array.isArray(state.polygons)) {
+            for (const polygon of state.polygons) {
+                if (!isObject(polygon)) continue;
+                const target = mapped(polygon.color);
+                if (!target) continue;
+                polygon.color = target.color;
+                if (target.object && !polygon.object) polygon.object = target.object;
+            }
+        }
+        return next;
+    }
+
     /** MIGRATIONS[n] upgrades a version-n project to version n + 1. */
     const MIGRATIONS = {
-        0: migrateV0toV1
+        0: migrateV0toV1,
+        1: migrateV1toV2
     };
 
     /**
