@@ -121,7 +121,7 @@ const FileManager = (() => {
                 projectName: state.currentProjectName || Config.DEFAULT_PROJECT_NAME,
                 appState: serializeAppState()
             });
-            localStorage.setItem(Config.AUTO_SAVE_KEY, JSON.stringify(payload));
+            localStorage.setItem(AutosaveSlots.ownKey(), JSON.stringify(payload));
             state.lastSaveTime = payload.timestamp;
             AppState.clearDirty();
         } catch (error) {
@@ -132,12 +132,21 @@ const FileManager = (() => {
         }
     }
 
+    /** The slot offered at start-up, so a choice in the prompt can clean it up. */
+    let offeredSlot = null;
+
+    /**
+     * Looks for work to restore: this tab's own autosave (after a reload) or the newest one
+     * left behind by a tab that is gone. Other open tabs' autosaves are never touched.
+     */
     function loadAutoSave() {
-        if (!window.localStorage) return null;
+        offeredSlot = null;
+        const slot = AutosaveSlots.takeRestorable();
+        if (!slot) return null;
         try {
-            const raw = localStorage.getItem(Config.AUTO_SAVE_KEY);
-            if (!raw) return null;
-            return ProjectFormat.parse(raw);
+            const project = ProjectFormat.parse(slot.raw);
+            offeredSlot = slot;
+            return project;
         } catch (error) {
             console.error('Could not restore the autosave.', error);
             if (error instanceof ProjectFormat.ProjectFormatError) {
@@ -146,6 +155,7 @@ const FileManager = (() => {
                     message: `${error.message} The next auto-save will replace it.`
                 };
             }
+            if (!slot.own) AutosaveSlots.remove(slot.key);
             return null;
         }
     }
@@ -173,12 +183,15 @@ const FileManager = (() => {
 
         const handleChoice = (action) => {
             modal.remove();
+            const slot = offeredSlot;
+            offeredSlot = null;
             if (action === 'load') {
+                // Restoring writes this tab's own slot; an adopted orphan is then redundant.
                 restoreState(payload, { skipNotification: true });
+                if (slot && !slot.own) AutosaveSlots.remove(slot.key);
                 UI?.showNotification('Autosave restored', 4000);
             } else {
-                // discard
-                localStorage.removeItem(Config.AUTO_SAVE_KEY);
+                if (slot) AutosaveSlots.remove(slot.key);
                 UI?.showNotification('Autosave discarded', 2500);
             }
         };

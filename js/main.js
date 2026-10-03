@@ -37,7 +37,11 @@ const Main = (() => {
         ShareLink.init();
         Shortcuts.init();
         ThemeEditor.init();
-        ThemeManager.init().catch((error) => console.error('Theme restore failed:', error)).finally(startBoard);
+        ThemeManager.init()
+            .catch((error) => console.error('Theme restore failed:', error))
+            .then(() => AutosaveSlots.claim())
+            .catch((error) => console.error('Autosave slot setup failed:', error))
+            .finally(startBoard);
     }
 
     function startBoard() {

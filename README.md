@@ -15,7 +15,7 @@ Protogames lets designers sketch and iterate on board layouts quickly—no build
 - Painting: one drawing tool with a Brush / Fill / Line switch (and brush size, theme and colours) in its settings popover; the eraser has its own size; objects are placed one per click, ignoring the draw mode and size
 - Fill and line tools: flood-fill a connected region in one click, or drag from tile A to tile B to paint a gap-free tile path (works on hexagon, square and triangle grids; each is a single undo step; they apply to colours only)
 - Palettes: Switchable themed color palettes (e.g., Landscape, Space) with labeled swatches
-- History: Undo/redo, autosave to localStorage
+- History: Undo/redo, autosave to localStorage (one slot per tab, so several tabs never overwrite each other)
 - File ops: Save/load JSON projects; export PNG/PDF/SVG
 - Sharing: **Share Link** puts the whole board in the address (nothing is uploaded); whoever opens it gets their own copy
 - Playtest: the play button locks editing (painting, tools, side panel and editing shortcuts) so the board can be played on; pan and zoom keep working, **Esc** or the pill returns to editing
