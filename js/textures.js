@@ -100,6 +100,25 @@ const Textures = (() => {
             wrap(x, y, (X, Y) => ctx.fillRect(X, Y, s, s));
         }
     }
+    // Stars of varied size/warmth; a few large ones get a soft halo and cross flare.
+    function starfield(ctx, R, count, bright) {
+        const cols = ['255,255,255', '255,244,214', '210,228,255', '255,226,190'];
+        for (let i = 0; i < count; i++) {
+            const x = R() * S, y = R() * S, k = R(), c = cols[Math.floor(R() * cols.length)];
+            const r = k < 0.75 ? 0.5 + R() * 0.4 : k < 0.95 ? 0.9 + R() * 0.5 : 1.4 + R() * 0.6;
+            const a = (0.35 + R() * 0.65) * bright;
+            wrap(x, y, (X, Y) => {
+                if (r > 1.3) {
+                    const h = ctx.createRadialGradient(X, Y, 0, X, Y, r * 5); h.addColorStop(0, 'rgba(' + c + ',' + (0.35 * a) + ')'); h.addColorStop(1, 'rgba(' + c + ',0)');
+                    ctx.fillStyle = h; ctx.fillRect(X - r * 5, Y - r * 5, r * 10, r * 10);
+                    ctx.strokeStyle = 'rgba(' + c + ',' + (0.45 * a) + ')'; ctx.lineWidth = 0.6;
+                    ctx.beginPath(); ctx.moveTo(X - r * 4, Y); ctx.lineTo(X + r * 4, Y); ctx.moveTo(X, Y - r * 4); ctx.lineTo(X, Y + r * 4); ctx.stroke();
+                }
+                ctx.fillStyle = 'rgba(' + c + ',' + a + ')';
+                ctx.beginPath(); ctx.arc(X, Y, r, 0, Math.PI * 2); ctx.fill();
+            });
+        }
+    }
     function blotches(ctx, R, hex, count, amt, rad) {
         for (let i = 0; i < count; i++) {
             const x = R() * S, y = R() * S, r = rad * (0.5 + R());
@@ -168,8 +187,9 @@ const Textures = (() => {
             }
         },
         mountain(ctx, R, hex, opts = {}) {
-            const rock = mix(hex, '#56688a', 0.4);
-            const haze = mix(rock, '#c9d6e8', 0.55);
+            const rock = opts.rockTo ? mix(hex, opts.rockTo, 0.35) : mix(hex, '#56688a', 0.4);
+            const haze = mix(rock, opts.hazeTo || '#c9d6e8', 0.55);
+            const tall = opts.tall || 1, snowBase = opts.snowline == null ? 0.5 : opts.snowline;
             ctx.fillStyle = mix(rock, '#9fb0c8', 0.45); ctx.fillRect(0, 0, S, S);
             blotches(ctx, R, haze, 12, 0.12, 30);
             speckle(ctx, R, rock, 160, 0.25, 1.5);
@@ -195,7 +215,7 @@ const Textures = (() => {
             for (let row = 0; row < 3; row++) for (let col = 0; col < 3; col++) {
                 const x = ((col + 0.2 + R() * 0.6 + (row % 2) * 0.5) * S / 3) % S;
                 const y = (row + 0.55 + R() * 0.35) * S / 3;
-                massifs.push({ x, y, w: 20 + R() * 10, h: 26 + R() * 12, px: (R() - 0.5) * 0.5 });
+                massifs.push({ x, y, w: (20 + R() * 10) / Math.sqrt(tall), h: (26 + R() * 12) * tall, px: (R() - 0.5) * 0.5 });
             }
             massifs.sort((a, b) => (a.bg === b.bg ? a.y - b.y : a.bg ? -1 : 1));
             massifs.forEach((M) => {
@@ -212,7 +232,7 @@ const Textures = (() => {
                     const src = (k % 2 ? right : left)[Math.floor(R() * ((k % 2 ? right : left).length))];
                     ribs.push(jag([src, [src[0] + (R() - 0.3) * w * 0.3, src[1] * 0.25]], w * 0.12, 2));
                 }
-                const snowline = h * (0.5 + R() * 0.12);
+                const snowline = h * (snowBase + R() * 0.12);
                 const snowEdge = jag([[-w, snowline], [0, snowline + (R() - 0.5) * 6], [w, snowline]], h * 0.3, 4);
                 wrap(M.x, M.y, (X, Y) => {
                     const P = (p) => [X + p[0], Y - p[1]];
@@ -257,10 +277,10 @@ const Textures = (() => {
                 wrap(0, 0, (dx, dy) => { ctx.beginPath(); pts.forEach(([px, py], j) => j ? ctx.lineTo(px + dx, py + dy) : ctx.moveTo(px + dx, py + dy)); ctx.stroke(); });
             }
         },
-        desert(ctx, R, hex) {
-            const sand = mix(hex, '#e3965c', 0.3);
-            const lit = mix(sand, '#f6c08a', 0.45);
-            const shadow = mix(sand, '#9b7486', 0.5);
+        desert(ctx, R, hex, opts = {}) {
+            const sand = opts.base || mix(hex, '#e3965c', 0.3);
+            const lit = opts.lit || mix(sand, '#f6c08a', 0.45);
+            const shadow = opts.shadow || mix(sand, '#9b7486', 0.5);
             ctx.fillStyle = sand; ctx.fillRect(0, 0, S, S);
             blotches(ctx, R, sand, 10, 0.1, 34);
             // overlapping rows of dunes, back to front; lit warm windward faces, cool violet slip faces
@@ -300,6 +320,11 @@ const Textures = (() => {
                 ctx.beginPath(); ctx.moveTo(X - w * 0.35, Y - prof(-w * 0.35)); for (let x = -w * 0.35; x <= px; x += 1.5) ctx.lineTo(X + x, Y - prof(x));
                 ctx.quadraticCurveTo(cx0 - w * 0.05, Y - h * 0.35, cx0 + w * 0.45, Y); ctx.stroke();
             }));
+            if (opts.snow) {
+                // wind-blown sparkle instead of scrub and debris
+                for (let i = 0; i < 90; i++) { const x = R() * S, y = R() * S; ctx.fillStyle = R() > 0.4 ? 'rgba(255,255,255,0.95)' : 'rgba(150,175,215,0.5)'; wrap(x, y, (X, Y) => ctx.fillRect(X, Y, 1.2, 1.2)); }
+                return;
+            }
             // sparse scrub bushes
             for (let i = 0; i < 4; i++) {
                 const x = R() * S, y = R() * S, sz = 3 + R() * 2.5;
@@ -313,6 +338,109 @@ const Textures = (() => {
             // scattered debris specks + grain
             for (let i = 0; i < 40; i++) { const x = R() * S, y = R() * S; ctx.fillStyle = 'rgba(70,45,35,0.45)'; wrap(x, y, (X, Y) => ctx.fillRect(X, Y, 1.4, 0.8)); }
             speckle(ctx, R, sand, 220, 0.18, 1);
+        },
+        snowhills(ctx, R, hex) { G.desert(ctx, R, hex, { snow: true, base: mix(hex, '#c9d8ea', 0.55), lit: '#ffffff', shadow: mix(hex, '#a7b9da', 0.7) }); },
+        snowymtn(ctx, R, hex) { G.mountain(ctx, R, hex, { snowline: 0.22, hazeTo: '#eef3fa' }); },
+        icypeaks(ctx, R, hex) { G.mountain(ctx, R, hex, { snowline: 0.74, tall: 1.3, rockTo: '#2f3946', hazeTo: '#b9c8da' }); },
+        seaice(ctx, R, hex) {
+            // pack ice: raised floes split by dark leads, lit from the upper left
+            const pts = [];
+            for (let gy = 0; gy < 3; gy++) for (let gx = 0; gx < 3; gx++) pts.push([(gx + 0.1 + R() * 0.8) * S / 3, (gy + 0.1 + R() * 0.8) * S / 3, (R() - 0.5) * 0.1, 1]);
+            for (let k = 0; k < 7; k++) pts.push([R() * S, R() * S, (R() - 0.5) * 0.1, 0.55 + R() * 0.3]); // small broken floes
+            const all = [];
+            pts.forEach(([x, y, v, wgt], i) => { for (const dx of [-S, 0, S]) for (const dy of [-S, 0, S]) all.push([x + dx, y + dy, v, wgt]); });
+            const ice = rgb(hex), lead = rgb('#163f5e'), leadEdge = rgb('#5d8fb0');
+            const img = ctx.createImageData(S, S), d = img.data;
+            for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+                let d1 = 1e9, d2 = 1e9, n1 = null;
+                for (const p of all) { const dd = ((p[0] - x) ** 2 + (p[1] - y) ** 2) / (p[3] * p[3]); if (dd < d1) { d2 = d1; d1 = dd; n1 = p; } else if (dd < d2) d2 = dd; }
+                const wob = Math.sin(x * 0.21 + y * 0.13) * 0.6 + Math.sin(x * 0.07 - y * 0.19) * 0.9;
+                const gap = Math.sqrt(d2) - Math.sqrt(d1) + wob;
+                const i = (y * S + x) * 4;
+                let col;
+                if (gap < 1.8) col = lead;
+                else if (gap < 2.9) col = leadEdge;
+                else {
+                    const dirx = x - n1[0], diry = y - n1[1], toward = (dirx + diry) / (Math.abs(dirx) + Math.abs(diry) + 1e-6);
+                    let k = n1[2];
+                    if (gap < 5.5) k += toward > 0 ? -0.18 : 0.12; // shaded lower-right rims, bright upper-left rims
+                    col = ice.map((c) => Math.max(0, Math.min(255, k >= 0 ? c + (255 - c) * k : c * (1 + k))));
+                }
+                d[i] = col[0]; d[i + 1] = col[1]; d[i + 2] = col[2]; d[i + 3] = 255;
+            }
+            ctx.putImageData(img, 0, 0);
+            // pressure ridges + snow dust
+            ctx.lineCap = 'round';
+            for (let i = 0; i < 5; i++) {
+                const x = R() * S, y = R() * S, l = 10 + R() * 14, a = R() * Math.PI;
+                wrap(x, y, (X, Y) => {
+                    ctx.strokeStyle = 'rgba(120,150,175,0.55)'; ctx.lineWidth = 1.6;
+                    ctx.beginPath(); ctx.moveTo(X, Y + 1); ctx.lineTo(X + Math.cos(a) * l, Y + Math.sin(a) * l + 1); ctx.stroke();
+                    ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 1.1;
+                    ctx.beginPath(); ctx.moveTo(X, Y); ctx.lineTo(X + Math.cos(a) * l, Y + Math.sin(a) * l); ctx.stroke();
+                });
+            }
+            speckle(ctx, R, '#ffffff', 120, 0, 1.2);
+        },
+        glacier(ctx, R, hex) {
+            const g = ctx.createLinearGradient(0, 0, S, S);
+            g.addColorStop(0, shade(hex, 0.35)); g.addColorStop(0.5, hex); g.addColorStop(1, shade(hex, 0.2));
+            ctx.fillStyle = g; ctx.fillRect(0, 0, S, S);
+            blotches(ctx, R, '#ffffff', 10, 0, 28);
+            // flow bands
+            ctx.lineWidth = 1;
+            for (let row = 0; row < 6; row++) {
+                const y0 = row * (S / 6) + R() * 6, amp = 3 + R() * 3, ph = R() * 6.28;
+                ctx.strokeStyle = 'rgba(120,175,205,0.35)';
+                ctx.beginPath(); for (let x = 0; x <= S; x += 2) { const y = y0 + Math.sin((x / S) * Math.PI * 2 + ph) * amp; x ? ctx.lineTo(x, y) : ctx.moveTo(x, y); } ctx.stroke();
+            }
+            // crevasse fields: a few groups of near-parallel cuts, bright upper lip, deep blue inner wall
+            for (let f = 0; f < 4; f++) {
+                const fx = R() * S, fy = R() * S, a = (R() - 0.5) * 0.5, n = 3 + Math.floor(R() * 3);
+                for (let i = 0; i < n; i++) {
+                    const l = 10 + R() * 12, w = 1.6 + R() * 1.6, ox = (R() - 0.5) * 8, oy = i * 7 + (R() - 0.5) * 2, bend = (R() - 0.5) * 4;
+                    wrap(fx, fy, (X, Y) => {
+                        ctx.save(); ctx.translate(X + ox, Y + oy); ctx.rotate(a);
+                        ctx.beginPath(); ctx.moveTo(-l, bend); ctx.quadraticCurveTo(0, -w, l, -bend); ctx.quadraticCurveTo(0, w * 1.3, -l, bend); ctx.closePath();
+                        const cg = ctx.createLinearGradient(0, -w, 0, w * 1.3); cg.addColorStop(0, '#0c4570'); cg.addColorStop(0.6, '#2f86b8'); cg.addColorStop(1, '#8fd0ec');
+                        ctx.fillStyle = cg; ctx.fill();
+                        ctx.beginPath(); ctx.moveTo(-l, bend); ctx.quadraticCurveTo(0, -w, l, -bend); ctx.strokeStyle = 'rgba(30,80,120,0.55)'; ctx.lineWidth = 0.7; ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(-l * 0.92, bend + 0.7); ctx.quadraticCurveTo(0, w * 1.3 + 0.7, l * 0.92, -bend + 0.7); ctx.strokeStyle = 'rgba(255,255,255,0.95)'; ctx.lineWidth = 1; ctx.stroke();
+                        ctx.restore();
+                    });
+                }
+            }
+            speckle(ctx, R, '#ffffff', 90, 0, 1.2);
+        },
+        icebergs(ctx, R, hex) {
+            G.water(ctx, R, hex);
+            const bergs = [];
+            for (let i = 0; i < 3; i++) bergs.push({ x: (i + 0.2 + R() * 0.6) * S / 3, y: 26 + R() * (S - 34), w: 13 + R() * 9, h: 12 + R() * 12, tab: R() < 0.45 });
+            bergs.sort((a, b) => a.y - b.y);
+            bergs.forEach((b) => {
+                // silhouette as (x, height) from left waterline to right waterline
+                const w = b.w, h = b.h;
+                const top = b.tab
+                    ? [[-w, 0], [-w * 0.92, h * 0.7], [-w * 0.6, h * 0.74], [w * 0.4, h * 0.72], [w * 0.88, h * 0.66], [w, 0]]
+                    : [[-w, 0], [-w * 0.7, h * 0.35], [-w * 0.35, h * 0.55], [-w * 0.1, h * (1.05 + R() * 0.2)], [w * 0.15, h * 0.7], [w * 0.4, h * 0.8], [w * 0.7, h * 0.3], [w, 0]];
+                const ridge = b.tab ? w * 0.15 : -w * 0.1;
+                wrap(b.x, b.y, (X, Y) => {
+                    const P = ([px, py]) => [X + px, Y - py];
+                    ctx.beginPath(); ctx.ellipse(X + 2, Y + h * 0.16, w * 1.2, h * 0.28, 0, 0, Math.PI * 2); ctx.fillStyle = 'rgba(110,205,220,0.5)'; ctx.fill();
+                    const body = () => { ctx.beginPath(); top.forEach((p, k) => (k ? ctx.lineTo(...P(p)) : ctx.moveTo(...P(p)))); ctx.closePath(); };
+                    body(); ctx.fillStyle = '#f6fafd'; ctx.fill();
+                    ctx.save(); body(); ctx.clip();
+                    // shaded right face from the ridge down
+                    ctx.beginPath(); ctx.moveTo(X + ridge, Y - h * 1.4); ctx.lineTo(X + ridge + w * 0.18, Y + 1); ctx.lineTo(X + w + 2, Y + 1); ctx.lineTo(X + w + 2, Y - h * 1.4); ctx.closePath();
+                    ctx.fillStyle = 'rgba(105,155,195,0.6)'; ctx.fill();
+                    if (b.tab) { ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.fillRect(X - w, Y - h * 0.78, w * 2, h * 0.12); for (let s = 1; s < 4; s++) { ctx.fillStyle = 'rgba(150,190,215,0.35)'; ctx.fillRect(X - w, Y - h * 0.62 + s * h * 0.14, w * 2, 0.8); } }
+                    ctx.fillStyle = 'rgba(140,200,225,0.55)'; ctx.fillRect(X - w, Y - h * 0.14, w * 2, h * 0.14);
+                    ctx.restore();
+                    body(); outline(ctx, 0.7);
+                    ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = 1; ctx.lineCap = 'round';
+                    ctx.beginPath(); ctx.moveTo(X - w * 1.3, Y + 1.5); ctx.lineTo(X - w * 0.7, Y + 1.5); ctx.moveTo(X + w * 0.75, Y + 2.2); ctx.lineTo(X + w * 1.35, Y + 2.2); ctx.stroke();
+                });
+            });
         },
         snow(ctx, R, hex) {
             ctx.fillStyle = hex; ctx.fillRect(0, 0, S, S);
@@ -405,6 +533,66 @@ const Textures = (() => {
                 const x = R() * S, y = R() * S, s = R() < 0.1 ? 2 : 1;
                 ctx.fillStyle = `rgba(255,255,255,${0.4 + R() * 0.6})`;
                 wrap(x, y, (X, Y) => ctx.fillRect(X, Y, s, s));
+            }
+        },
+        deepspace(ctx, R, hex) {
+            ctx.fillStyle = hex; ctx.fillRect(0, 0, S, S);
+            // faint dust bands
+            for (let i = 0; i < 5; i++) {
+                const x = R() * S, y = R() * S, r = 30 + R() * 30;
+                wrap(x, y, (X, Y) => { const g = ctx.createRadialGradient(X, Y, 0, X, Y, r); g.addColorStop(0, shade(hex, 0.12, 0.5)); g.addColorStop(1, shade(hex, 0.12, 0)); ctx.fillStyle = g; ctx.fillRect(X - r, Y - r, r * 2, r * 2); });
+            }
+            starfield(ctx, R, 70, 1);
+        },
+        nebula(ctx, R, hex) {
+            ctx.fillStyle = shade(hex, -0.55); ctx.fillRect(0, 0, S, S);
+            const tints = [hex, mix(hex, '#ff5fa2', 0.45), mix(hex, '#4cc9f0', 0.4), shade(hex, 0.25)];
+            for (let i = 0; i < 16; i++) {
+                const x = R() * S, y = R() * S, r = 18 + R() * 34, col = tints[i % tints.length], a = 0.25 + R() * 0.3;
+                wrap(x, y, (X, Y) => { const g = ctx.createRadialGradient(X, Y, 0, X, Y, r); g.addColorStop(0, shade(col, 0.1, a)); g.addColorStop(0.6, shade(col, 0, a * 0.4)); g.addColorStop(1, shade(col, 0, 0)); ctx.fillStyle = g; ctx.fillRect(X - r, Y - r, r * 2, r * 2); });
+            }
+            // bright wisps (blurred so they read as gas, not strokes)
+            ctx.save(); ctx.filter = 'blur(3px)';
+            ctx.lineCap = 'round';
+            for (let i = 0; i < 6; i++) {
+                const x = R() * S, y = R() * S, len = 20 + R() * 30, ang = R() * Math.PI, bend = (R() - 0.5) * 24;
+                wrap(x, y, (X, Y) => {
+                    ctx.strokeStyle = shade(hex, 0.55, 0.22); ctx.lineWidth = 6 + R() * 6;
+                    ctx.beginPath(); ctx.moveTo(X, Y); ctx.quadraticCurveTo(X + Math.cos(ang) * len / 2 - Math.sin(ang) * bend, Y + Math.sin(ang) * len / 2 + Math.cos(ang) * bend, X + Math.cos(ang) * len, Y + Math.sin(ang) * len); ctx.stroke();
+                });
+            }
+            ctx.restore();
+            starfield(ctx, R, 40, 0.9);
+        },
+        void(ctx, R) {
+            ctx.fillStyle = '#030306'; ctx.fillRect(0, 0, S, S);
+            starfield(ctx, R, 5, 0.55);
+        },
+        belt(ctx, R) {
+            ctx.fillStyle = '#0b0f1a'; ctx.fillRect(0, 0, S, S);
+            starfield(ctx, R, 22, 0.6);
+            // fine dust haze
+            for (let i = 0; i < 6; i++) {
+                const x = R() * S, y = R() * S, r = 22 + R() * 22;
+                wrap(x, y, (X, Y) => { const g = ctx.createRadialGradient(X, Y, 0, X, Y, r); g.addColorStop(0, 'rgba(150,130,110,0.12)'); g.addColorStop(1, 'rgba(150,130,110,0)'); ctx.fillStyle = g; ctx.fillRect(X - r, Y - r, r * 2, r * 2); });
+            }
+            const rock = (X, Y, r, rot, n, jit) => {
+                ctx.save(); ctx.translate(X, Y); ctx.rotate(rot);
+                ctx.beginPath();
+                for (let k = 0; k < n; k++) { const ang = (k / n) * Math.PI * 2, rr = r * jit[k]; const px = Math.cos(ang) * rr, py = Math.sin(ang) * rr * 0.82; k ? ctx.lineTo(px, py) : ctx.moveTo(px, py); }
+                ctx.closePath();
+                const g = ctx.createRadialGradient(-r * 0.4, -r * 0.4, r * 0.1, 0, 0, r * 1.1);
+                g.addColorStop(0, '#9c9286'); g.addColorStop(0.6, '#625b53'); g.addColorStop(1, '#2f2b27');
+                ctx.fillStyle = g; ctx.fill();
+                ctx.strokeStyle = 'rgba(10,8,6,0.6)'; ctx.lineWidth = 0.7; ctx.stroke();
+                if (r > 4) { ctx.beginPath(); ctx.arc(r * 0.2, r * 0.15, r * 0.25, 0, Math.PI * 2); ctx.fillStyle = 'rgba(30,26,22,0.5)'; ctx.fill(); }
+                ctx.restore();
+            };
+            for (let i = 0; i < 26; i++) {
+                const x = R() * S, y = R() * S, k = R();
+                const r = k < 0.6 ? 1.2 + R() * 1.6 : k < 0.9 ? 3 + R() * 2.5 : 6 + R() * 3;
+                const rot = R() * Math.PI * 2, n = 7, jit = Array.from({ length: n }, () => 0.75 + R() * 0.4);
+                wrap(x, y, (X, Y) => rock(X, Y, r, rot, n, jit));
             }
         },
         glow(ctx, R, hex) {
@@ -534,10 +722,11 @@ const Textures = (() => {
     function generatorFor(label) {
         const l = label || '';
         const pick = [
-            [/forest/, 'forest'], [/grass|life support/, 'grass'], [/snow/, 'snow'], [/glacier|deep ice|^ice$|frozen/, 'ice'],
+            [/asteroid belt/, 'belt'], [/frozen ocean|sea ice|pack ice/, 'seaice'], [/iceberg/, 'icebergs'], [/glacier/, 'glacier'],
+            [/snowy mountain/, 'snowymtn'], [/snow hill|snowfield|snow dune/, 'snowhills'], [/icy peak|rocky peak/, 'icypeaks'], [/ocean/, 'water'], [/forest/, 'forest'], [/grass|life support/, 'grass'], [/snow/, 'snow'], [/glacier|deep ice|^ice$|frozen/, 'ice'],
             [/water|planet/, 'water'], [/mountain/, 'mountain'], [/desert|sand/, 'desert'], [/village/, 'village'],
             [/volcan/, 'volcanic'], [/lava|engine/, 'lava'], [/wall/, 'bricks'], [/stone floor|corridor|storage/, 'flagstone'],
-            [/door/, 'planks'], [/rock|cave|asteroid|hull/, 'rock'], [/deep space|void|nebula/, 'stars'],
+            [/door/, 'planks'], [/rock|cave|asteroid|hull/, 'rock'], [/deep space/, 'deepspace'], [/nebula/, 'nebula'], [/void/, 'void'],
             [/star|treasure|energy|secret|control/, 'glow'], [/trap|danger|airlock/, 'hazard']
         ];
         const hit = pick.find(([re]) => re.test(l));
