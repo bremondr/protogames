@@ -106,6 +106,18 @@ A tile's colour (`color`, a hex string) is its identity: it selects the texture 
 
 The same rule applies when a palette changes again: add a migration step that maps the retired colours, extend `tests/fixtures/` with a file in the previous format, and add the successor colours to this table. `tests/projectFormat.test.js` checks that every retired colour is really absent from the live palettes and every target colour is present.
 
+## Autosave storage
+
+localStorage is shared by every tab of the site, so each tab keeps its own autosave in `protogames_autosave:<tab id>` and never writes another tab's slot. The stored payload is the usual project object (see "Project file format"); only the key differs, so this needed no format version bump.
+
+- The tab id is kept in `sessionStorage` (it survives a reload, not a new tab) and the tab holds a Web Lock `protogames-tab:<id>` while it is open; that is how other tabs tell a live slot from an orphan.
+- On start-up a tab offers its own slot (after a reload), otherwise the newest orphan: the slot of a tab that crashed or was closed. Adopting an orphan moves it into the tab's own slot. Slots of tabs that are still open are never offered or deleted.
+- The single key older versions used (`protogames_autosave`) is treated as an orphan and adopted once.
+- Orphans that are unreadable, older than 7 days or beyond the newest 5 are deleted.
+- Without Web Locks (an insecure page, an old browser) other tabs' slots are all treated as live: they are left alone, but a crashed tab's work cannot be recovered.
+
+The choice is the pure function `AutosaveSlots.choose` (`tests/autosaveSlots.test.js`).
+
 ## Share link format
 
 A share link carries a whole board in the address hash (`#b=<payload>`), so nothing is uploaded. It is not a project file, but it holds saved data, so it is versioned too and goes through the same migrations.
