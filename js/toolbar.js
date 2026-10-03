@@ -1,7 +1,7 @@
 /**
  * PROTOGAMES TOOLBAR
  * --------------------------------------------------------------
- * Floating tool bar over the canvas (brush, objects, eraser, undo/redo/clear)
+ * Floating tool bar over the canvas (drawing tool, objects, eraser, undo/redo/clear)
  * and the Themes panel (tile themes / item sets import). It mirrors AppState
  * into the DOM and routes clicks to Interactions / ThemeManager.
  */
@@ -10,14 +10,19 @@ const Toolbar = (() => {
     let el = {};
     let brushOpen = false;
     let objOpen = false;
+    let eraserOpen = false;
     let objTheme = 'medieval';
 
     function init() {
         el = {
             bar: $('toolBar'),
             brush: $('brushButton'),
-            fill: $('fillButton'),
-            line: $('lineButton'),
+            modeButtons: Array.from(document.querySelectorAll('#brushPopover .mode-switch [data-mode]')),
+            sizeRow: $('brushSizeRow'),
+            eraser: $('eraserButton'),
+            eraserChevron: $('eraserChevron'),
+            eraserChevronIcon: $('eraserChevronIcon'),
+            eraserPop: $('eraserPopover'),
             brushChevron: $('brushColorButton'),
             brushColorDot: $('brushColorDot'),
             brushChevronIcon: $('brushChevronIcon'),
@@ -38,31 +43,33 @@ const Toolbar = (() => {
             itemInput: $('itemThemeInput')
         };
 
-        el.brush?.addEventListener('click', selectBrush);
+        el.brush?.addEventListener('click', () => Interactions.selectColorTool());
         $('brushSmaller')?.addEventListener('click', () => Interactions.changeBrushSize(-1));
         $('brushLarger')?.addEventListener('click', () => Interactions.changeBrushSize(1));
+        $('eraserSmaller')?.addEventListener('click', () => Interactions.changeEraserSize(-1));
+        $('eraserLarger')?.addEventListener('click', () => Interactions.changeEraserSize(1));
         window.addEventListener('pg:brushsize', syncBrushSize);
-        el.fill?.addEventListener('click', () => Interactions.setDrawMode('fill'));
-        el.line?.addEventListener('click', () => Interactions.setDrawMode('line'));
-        el.brushChevron?.addEventListener('click', () => setPopovers(!brushOpen, false));
+        el.modeButtons.forEach((b) => b.addEventListener('click', () => Interactions.setDrawMode(b.dataset.mode)));
+        el.brushChevron?.addEventListener('click', () => setPopovers(!brushOpen, false, false));
+        el.eraserChevron?.addEventListener('click', () => setPopovers(false, false, !eraserOpen));
         el.paletteGrid?.addEventListener('click', (e) => {
-            if (e.target.closest('.palette-swatch')) setTimeout(() => setPopovers(false, objOpen), 120);
+            if (e.target.closest('.palette-swatch')) setTimeout(() => setPopovers(false, objOpen, eraserOpen), 120);
         });
         el.objButton?.addEventListener('click', () => Interactions.selectObjectTool());
-        el.objChevron?.addEventListener('click', () => setPopovers(false, !objOpen));
+        el.objChevron?.addEventListener('click', () => setPopovers(false, !objOpen, false));
         el.objThemeSelect?.addEventListener('change', onObjectTheme);
         el.objGrid?.addEventListener('click', (e) => {
             const btn = e.target.closest('[data-object]');
             if (!btn) return;
             Interactions.selectObjectTool(btn.dataset.object);
-            setPopovers(brushOpen, false);
+            setPopovers(brushOpen, false, eraserOpen);
         });
 
         document.addEventListener('pointerdown', (e) => {
-            if ((brushOpen || objOpen) && el.bar && !el.bar.contains(e.target)) setPopovers(false, false);
+            if (anyPopoverOpen() && el.bar && !el.bar.contains(e.target)) setPopovers(false, false, false);
         });
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && (brushOpen || objOpen)) setPopovers(false, false);
+            if (e.key === 'Escape' && anyPopoverOpen()) setPopovers(false, false, false);
         });
 
         bindThemePanel();
@@ -75,33 +82,34 @@ const Toolbar = (() => {
         renderThemes();
     }
 
-    /** Shows the brush size and disables the stepper buttons at the limits. */
-    function syncBrushSize() {
-        const size = AppState.getState().brushSize;
-        const value = $('brushSizeValue');
+    /** Shows a size and disables its stepper buttons at the limits. */
+    function showSize(valueId, smallerId, largerId, size) {
+        const value = $(valueId);
         if (value) value.textContent = String(size);
-        const smaller = $('brushSmaller');
-        const larger = $('brushLarger');
+        const smaller = $(smallerId);
+        const larger = $(largerId);
         if (smaller) smaller.disabled = size <= Config.BRUSH_SIZE_MIN;
         if (larger) larger.disabled = size >= Config.BRUSH_SIZE_MAX;
     }
 
+    /** The brush and the eraser each show their own size. */
+    function syncBrushSize() {
+        showSize('brushSizeValue', 'brushSmaller', 'brushLarger', AppState.getState().brushSize);
+        showSize('eraserSizeValue', 'eraserSmaller', 'eraserLarger', Interactions.getEraserSize());
+    }
+
     function toolName() {
-        const s = AppState.getState();
-        return s.isObjectToolActive ? 'object' : s.isEraserActive ? 'eraser' : 'brush';
+        return ToolOps.activeTool(AppState.getState());
     }
 
-    function selectBrush() {
-        Interactions.setDrawMode('brush');
-        const btns = Array.from(el.paletteGrid?.querySelectorAll('.palette-swatch') || []);
-        const color = (AppState.getState().currentColor || '').toLowerCase();
-        const match = btns.find((b) => (b.dataset.color || '').toLowerCase() === color) || btns[0];
-        match?.click();
+    function anyPopoverOpen() {
+        return brushOpen || objOpen || eraserOpen;
     }
 
-    function setPopovers(brush, obj) {
+    function setPopovers(brush, obj, eraser) {
         brushOpen = brush;
         objOpen = obj;
+        eraserOpen = Boolean(eraser);
         sync();
     }
 
@@ -121,16 +129,22 @@ const Toolbar = (() => {
         const color = s.currentColor;
         syncBrushSize();
 
-        // Brush is highlighted only when painting terrain colour with the plain brush; fill and
-        // line are highlighted by mode and combine with whichever paint source (colour, object, eraser) is active.
+        // The drawing tool is highlighted while painting with a colour; its icon and the switch in
+        // the popover follow the draw mode. The eraser and the object tool ignore the mode.
         const mode = s.drawMode;
-        const brushActive = tool === 'brush' && mode === 'brush';
+        const brushActive = tool === 'brush';
         el.brush.classList.toggle('active', brushActive);
         el.brush.setAttribute('aria-pressed', String(brushActive));
-        el.fill?.classList.toggle('active', mode === 'fill');
-        el.fill?.setAttribute('aria-pressed', String(mode === 'fill'));
-        el.line?.classList.toggle('active', mode === 'line');
-        el.line?.setAttribute('aria-pressed', String(mode === 'line'));
+        el.brush.dataset.mode = mode;
+        const modeLabel = { brush: 'Brush', fill: 'Fill', line: 'Line' }[mode];
+        el.brush.setAttribute('aria-label', modeLabel);
+        el.brush.dataset.tip = modeLabel;
+        el.modeButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
+        if (el.sizeRow) el.sizeRow.hidden = mode !== 'brush';
+        el.eraserChevron?.classList.toggle('open', eraserOpen);
+        el.eraserChevron?.setAttribute('aria-expanded', String(eraserOpen));
+        el.eraserChevronIcon?.classList.toggle('flipped', eraserOpen);
+        el.eraserPop?.classList.toggle('open', eraserOpen);
         el.brushIconFill?.setAttribute('fill', color);
         el.brushChevron.classList.toggle('open', brushOpen);
         el.brushChevron.setAttribute('aria-expanded', String(brushOpen));
@@ -199,7 +213,7 @@ const Toolbar = (() => {
             button.setAttribute('aria-label', label);
             button.dataset.tip = label;
         }
-        setPopovers(false, false);
+        setPopovers(false, false, false);
         try {
             if (on && document.documentElement.requestFullscreen && !document.fullscreenElement) {
                 document.documentElement.requestFullscreen().catch(() => {});
@@ -217,7 +231,7 @@ const Toolbar = (() => {
             if (!document.fullscreenElement) setFocusMode(false);
         });
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && document.body.classList.contains('focus-mode') && !brushOpen && !objOpen) setFocusMode(false);
+            if (e.key === 'Escape' && document.body.classList.contains('focus-mode') && !anyPopoverOpen()) setFocusMode(false);
         });
     }
 
@@ -230,7 +244,7 @@ const Toolbar = (() => {
             el[input]?.addEventListener('change', (e) => importThemes(kind, e.target));
         });
         [['tiles', 'tileNew', 'tileExport', 'tileExportSelect'], ['items', 'itemNew', 'itemExport', 'itemExportSelect']].forEach(([kind, create, exportBtn, select]) => {
-            $(create)?.addEventListener('click', () => { setPopovers(false, false); ThemeEditor.open(kind); });
+            $(create)?.addEventListener('click', () => { setPopovers(false, false, false); ThemeEditor.open(kind); });
             $(exportBtn)?.addEventListener('click', () => { const id = $(select)?.value; if (id) ThemeManager.exportTheme(kind, id); });
         });
         [el.tileList, el.itemList].forEach((list) => list?.addEventListener('click', (e) => {
@@ -311,5 +325,5 @@ const Toolbar = (() => {
         sync();
     }
 
-    return { init, sync, selectBrush };
+    return { init, sync };
 })();

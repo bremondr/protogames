@@ -211,29 +211,32 @@
                 <svg class="icon-exit" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3v3a2 2 0 0 1-2 2H3"></path><path d="M21 8h-3a2 2 0 0 1-2-2V3"></path><path d="M3 16h3a2 2 0 0 1 2 2v3"></path><path d="M16 21v-3a2 2 0 0 1 2-2h3"></path></svg>
             </button>
 
-            <!-- Floating tool bar: brush, objects, eraser, undo/redo, clear -->
+            <!-- Floating tool bar: drawing tool (brush/fill/line), objects, eraser, undo/redo, clear -->
             <div id="toolBar" class="tool-bar" role="toolbar" aria-label="Board tools">
                 <div class="tool-split">
-                    <button type="button" id="brushButton" data-shortcut="tool-brush" class="tool-button tool-split-main pg-tip" data-tip="Brush" aria-label="Brush" aria-pressed="true">
-                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"></path><path id="brushIconFill" d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"></path></svg>
+                    <button type="button" id="brushButton" class="tool-button tool-split-main pg-tip" data-mode="brush" data-tip="Drawing tool" aria-label="Drawing tool" aria-pressed="true">
+                        <svg class="mode-icon mode-brush" viewBox="0 0 24 24" aria-hidden="true"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"></path><path id="brushIconFill" d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"></path></svg>
+                        <svg class="mode-icon mode-fill" viewBox="0 0 24 24" aria-hidden="true"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"></path><path d="m5 2 5 5"></path><path d="M2 13h15"></path><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"></path></svg>
+                        <svg class="mode-icon mode-line" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="19" r="2"></circle><circle cx="19" cy="5" r="2"></circle><path d="M6.4 17.6 17.6 6.4"></path></svg>
                     </button>
-                    <button type="button" id="brushColorButton" class="tool-chevron pg-tip" data-tip="Brush color" aria-label="Choose brush color" aria-expanded="false">
+                    <button type="button" id="brushColorButton" class="tool-chevron pg-tip" data-tip="Drawing settings" aria-label="Drawing tool settings" aria-expanded="false">
                         <span id="brushColorDot" class="color-dot" aria-hidden="true"></span>
                         <svg id="brushChevronIcon" class="chevron-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m18 15-6-6-6 6"></path></svg>
                     </button>
                 </div>
-                <button type="button" id="fillButton" data-shortcut="tool-fill" class="tool-button pg-tip" data-tip="Fill" aria-label="Fill" aria-pressed="false">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"></path><path d="m5 2 5 5"></path><path d="M2 13h15"></path><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"></path></svg>
-                </button>
-                <button type="button" id="lineButton" data-shortcut="tool-line" class="tool-button pg-tip" data-tip="Line" aria-label="Line" aria-pressed="false">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="19" r="2"></circle><circle cx="19" cy="5" r="2"></circle><path d="M6.4 17.6 17.6 6.4"></path></svg>
-                </button>
-                <div id="brushPopover" class="tool-popover pg-pop" role="dialog" aria-label="Brush colors">
-                    <label class="pop-row">
-                        <span class="pop-title">Theme</span>
-                        <select id="paletteSelect" aria-label="Select color palette"></select>
-                    </label>
-                    <div class="pop-row">
+                <div id="brushPopover" class="tool-popover pg-pop" role="dialog" aria-label="Drawing tool settings">
+                    <div class="mode-switch" role="group" aria-label="Drawing mode">
+                        <button type="button" data-mode="brush" data-shortcut="tool-brush" aria-pressed="true">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.06 11.9 8.07-8.06a2.85 2.85 0 1 1 4.03 4.03l-8.06 8.08"></path><path d="M7.07 14.94c-1.66 0-3 1.35-3 3.02 0 1.33-2.5 1.52-2 2.02 1.08 1.1 2.49 2.02 4 2.02 2.2 0 4-1.8 4-4.04a3.01 3.01 0 0 0-3-3.02z"></path></svg>Brush
+                        </button>
+                        <button type="button" data-mode="fill" data-shortcut="tool-fill" aria-pressed="false">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m19 11-8-8-8.6 8.6a2 2 0 0 0 0 2.8l5.2 5.2c.8.8 2 .8 2.8 0L19 11Z"></path><path d="m5 2 5 5"></path><path d="M2 13h15"></path><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4Z"></path></svg>Fill
+                        </button>
+                        <button type="button" data-mode="line" data-shortcut="tool-line" aria-pressed="false">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="19" r="2"></circle><circle cx="19" cy="5" r="2"></circle><path d="M6.4 17.6 17.6 6.4"></path></svg>Line
+                        </button>
+                    </div>
+                    <div class="pop-row" id="brushSizeRow">
                         <span class="pop-title" id="brushSizeLabel">Brush size</span>
                         <div class="size-stepper" role="group" aria-labelledby="brushSizeLabel">
                             <button type="button" id="brushSmaller" data-shortcut="brush-smaller" aria-label="Smaller brush">&minus;</button>
@@ -241,6 +244,10 @@
                             <button type="button" id="brushLarger" data-shortcut="brush-larger" aria-label="Larger brush">+</button>
                         </div>
                     </div>
+                    <label class="pop-row">
+                        <span class="pop-title">Theme</span>
+                        <select id="paletteSelect" aria-label="Select color palette"></select>
+                    </label>
                     <div class="palette-grid" role="list" aria-live="polite"></div>
                 </div>
 
@@ -260,9 +267,24 @@
                     <div id="objectGrid" class="object-grid" role="list"></div>
                 </div>
 
-                <button type="button" id="eraserButton" data-shortcut="tool-eraser" class="eraser-button pg-tip" data-tip="Eraser" aria-pressed="false" aria-label="Eraser">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 21-4.3-4.3a1 1 0 0 1 0-1.4l10-10a1 1 0 0 1 1.4 0l5.6 5.6a1 1 0 0 1 0 1.4L11 21"></path><path d="M22 21H7"></path><path d="m5 11 9 9"></path></svg>
-                </button>
+                <div class="eraser-group">
+                    <button type="button" id="eraserButton" data-shortcut="tool-eraser" class="eraser-button pg-tip" data-tip="Eraser" aria-pressed="false" aria-label="Eraser">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 21-4.3-4.3a1 1 0 0 1 0-1.4l10-10a1 1 0 0 1 1.4 0l5.6 5.6a1 1 0 0 1 0 1.4L11 21"></path><path d="M22 21H7"></path><path d="m5 11 9 9"></path></svg>
+                    </button>
+                    <button type="button" id="eraserChevron" class="tool-chevron pg-tip" data-tip="Eraser size" aria-label="Eraser size" aria-expanded="false">
+                        <svg id="eraserChevronIcon" class="chevron-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m18 15-6-6-6 6"></path></svg>
+                    </button>
+                </div>
+                <div id="eraserPopover" class="tool-popover pg-pop" role="dialog" aria-label="Eraser size">
+                    <div class="pop-row">
+                        <span class="pop-title" id="eraserSizeLabel">Eraser size</span>
+                        <div class="size-stepper" role="group" aria-labelledby="eraserSizeLabel">
+                            <button type="button" id="eraserSmaller" aria-label="Smaller eraser">&minus;</button>
+                            <output id="eraserSizeValue" aria-live="polite">1</output>
+                            <button type="button" id="eraserLarger" aria-label="Larger eraser">+</button>
+                        </div>
+                    </div>
+                </div>
                 <span class="tool-sep" aria-hidden="true"></span>
                 <button type="button" class="tool-button pg-tip" data-tip="Undo" data-action="undo" data-shortcut="undo" aria-label="Undo">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"></path><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"></path></svg>

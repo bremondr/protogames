@@ -12,7 +12,7 @@ Protogames lets designers sketch and iterate on board layouts quickly—no build
 ## Key Features
 - Grid types: Hexagon, Square, Triangle, Orthogonal Square
 - Board outlines: Square, Rectangle, Hexagon, Triangle, Circle
-- Painting: Click or brush-drag to color tiles; eraser button resets tiles to the default color
+- Painting: one drawing tool with a Brush / Fill / Line switch (and brush size, theme and colours) in its settings popover; the eraser has its own size; objects are placed one per click, ignoring the draw mode and size
 - Fill and line tools: flood-fill a connected region in one click, or drag from tile A to tile B to paint a gap-free tile path (works on hexagon, square and triangle grids; each is a single undo step and respects the eraser and object tools)
 - Palettes: Switchable themed color palettes (e.g., Landscape, Space) with labeled swatches
 - History: Undo/redo, autosave to localStorage
@@ -28,7 +28,7 @@ Press **?** (or use the keyboard button in the bottom-right corner) for the full
 | Undo / Redo | Ctrl+Z / Ctrl+Shift+Z or Ctrl+Y |
 | Brush / Fill / Line | B / G / L |
 | Eraser on/off | E |
-| Smaller / larger brush (1-7) | [ / ] |
+| Smaller / larger brush or eraser (1-7) | [ / ] |
 | Pick swatch | 1 - 9, or Tab / Shift+Tab to cycle |
 | Zoom in / out / fit | + / - / 0 |
 | Pan | Space + drag |
