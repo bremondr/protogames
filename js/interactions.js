@@ -10,9 +10,13 @@ const Interactions = (() => {
     // Ensures move events are processed at most ~60fps for smooth brushing.
     const MOVE_THROTTLE_MS = 16;
     let lastMoveTimestamp = 0;
+    // The eraser remembers its own size; brushSize in AppState belongs to the colour brush.
+    const ERASER_SIZE_KEY = 'protogames_eraser_size';
+    let eraserSize = Config.BRUSH_SIZE_MIN;
 
     function init(uiRefs) {
         ui = uiRefs;
+        loadEraserSize();
         bindPointerEvents();
         bindPaletteEvents();
         bindBoardControls();
@@ -117,7 +121,15 @@ const Interactions = (() => {
 
     /** Lets the toolbar (and anything else) react to tool/color changes. */
     function notifyToolChange() {
+        refreshCursor();
+        refreshHover();
         window.dispatchEvent(new CustomEvent('pg:toolchange'));
+    }
+
+    /** Crosshair while a click does something other than paint one footprint (fill, line). */
+    function refreshCursor() {
+        const canvas = AppState.getState().canvas;
+        if (canvas) canvas.style.cursor = ToolOps.effectiveMode(AppState.getState()) === 'brush' ? '' : 'crosshair';
     }
 
     /**
@@ -126,21 +138,23 @@ const Interactions = (() => {
      */
     function paintAt(polygon, isStrokeStart) {
         const state = AppState.getState();
-        if (state.brushSize <= 1) {
+        const size = ToolOps.effectiveSize(state, eraserSize);
+        if (size <= 1) {
             applyToolToPolygon(polygon, isStrokeStart);
             return;
         }
         const { adjacency } = AppState.getTopology();
-        for (const id of ToolOps.brushTiles(adjacency, polygon.id, state.brushSize)) {
+        for (const id of ToolOps.brushTiles(adjacency, polygon.id, size)) {
             applyToolToPolygon(state.polygons[adjacency.index.get(id)], isStrokeStart);
         }
     }
 
-    /** The tiles to outline for the pointer tile: the brush footprint in brush mode, otherwise the tile. */
+    /** The tiles to outline for the pointer tile: the brush or eraser footprint, otherwise the tile. */
     function hoverFootprint(polygon) {
         const state = AppState.getState();
-        if (state.drawMode !== 'brush' || state.brushSize <= 1) return [polygon.id];
-        return ToolOps.brushTiles(AppState.getTopology().adjacency, polygon.id, state.brushSize);
+        const size = ToolOps.effectiveSize(state, eraserSize);
+        if (ToolOps.effectiveMode(state) !== 'brush' || size <= 1) return [polygon.id];
+        return ToolOps.brushTiles(AppState.getTopology().adjacency, polygon.id, size);
     }
 
     /**
@@ -333,11 +347,15 @@ const Interactions = (() => {
         if (polygon) AppState.setHoverPolygonId(polygon.id, hoverFootprint(polygon));
     }
 
+    function announceSize(size) {
+        window.dispatchEvent(new CustomEvent('pg:brushsize', { detail: { size } }));
+    }
+
     /** Sets the brush size (clamped) and refreshes the outline under the pointer. Returns the new size. */
     function setBrushSize(size) {
         const value = AppState.setBrushSize(size);
         refreshHover();
-        window.dispatchEvent(new CustomEvent('pg:brushsize', { detail: { size: value } }));
+        announceSize(value);
         Renderer.renderBoard();
         return value;
     }
@@ -346,13 +364,55 @@ const Interactions = (() => {
         return setBrushSize(AppState.getState().brushSize + delta);
     }
 
-    /** Switches between brush, fill and line (the paint source is unchanged). */
+    function clampSize(size) {
+        const wanted = Math.round(Number(size));
+        if (!Number.isFinite(wanted)) return eraserSize;
+        return Math.min(Config.BRUSH_SIZE_MAX, Math.max(Config.BRUSH_SIZE_MIN, wanted));
+    }
+
+    function loadEraserSize() {
+        let stored = null;
+        try { stored = localStorage.getItem(ERASER_SIZE_KEY); } catch (error) { /* storage unavailable */ }
+        if (stored !== null) eraserSize = clampSize(stored);
+    }
+
+    function getEraserSize() {
+        return eraserSize;
+    }
+
+    /** Sets the eraser's own size (clamped, remembered across sessions). Returns the new size. */
+    function setEraserSize(size) {
+        eraserSize = clampSize(size);
+        try { localStorage.setItem(ERASER_SIZE_KEY, String(eraserSize)); } catch (error) { /* storage unavailable */ }
+        refreshHover();
+        announceSize(eraserSize);
+        Renderer.renderBoard();
+        return eraserSize;
+    }
+
+    function changeEraserSize(delta) {
+        return setEraserSize(eraserSize + delta);
+    }
+
+    /**
+     * Resizes whichever tool is active ([ and ] keys): the brush, or the eraser. An object
+     * is always placed one tile at a time, so there is nothing to resize. Returns { tool, size }.
+     */
+    function changeActiveSize(delta) {
+        const tool = ToolOps.activeTool(AppState.getState());
+        if (tool === 'eraser') return { tool, size: changeEraserSize(delta) };
+        if (tool === 'object') return { tool, size: 1 };
+        return { tool, size: changeBrushSize(delta) };
+    }
+
+    /**
+     * Switches between brush, fill and line. Choosing a mode means painting with a colour,
+     * so an active eraser or object tool hands back to the current colour.
+     */
     function setDrawMode(mode) {
         AppState.setDrawMode(mode);
-        refreshHover();
-        const canvas = AppState.getState().canvas;
-        if (canvas) canvas.style.cursor = mode === 'brush' ? '' : 'crosshair';
-        notifyToolChange();
+        if (ToolOps.activeTool(AppState.getState()) !== 'brush') selectColorTool();
+        else notifyToolChange();
         Renderer.renderBoard();
     }
 
@@ -369,11 +429,12 @@ const Interactions = (() => {
         const state = AppState.getState();
         const polygon = tileAt(point);
 
-        if (state.drawMode === 'fill') {
+        const mode = ToolOps.effectiveMode(state);
+        if (mode === 'fill') {
             if (polygon) applyFill(polygon);
             return;
         }
-        if (state.drawMode === 'line') {
+        if (mode === 'line') {
             if (!polygon) return;
             AppState.setLineStart(polygon.id);
             // Keep receiving moves/up even if the pointer leaves the canvas mid-line.
@@ -410,6 +471,8 @@ const Interactions = (() => {
         }
 
         if (state.isDrawing) {
+            // An object is placed (or removed) by a click, never dragged across tiles.
+            if (state.isObjectToolActive) return;
             const now = performance.now();
             if (now - lastMoveTimestamp < MOVE_THROTTLE_MS) {
                 return;
@@ -570,6 +633,10 @@ const Interactions = (() => {
         setDrawMode,
         setBrushSize,
         changeBrushSize,
+        getEraserSize,
+        setEraserSize,
+        changeEraserSize,
+        changeActiveSize,
         applyFill,
         finishLine,
         cancelLine,

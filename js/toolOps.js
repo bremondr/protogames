@@ -90,5 +90,30 @@ const ToolOps = (() => {
         return { kind: 'color', color: state.currentColor };
     }
 
-    return { planFill, planLine, applyToTiles, brushTiles, sourceFromState, wouldChange };
+    /**
+     * Which tool is active: 'object', 'eraser' or 'brush' (painting with a colour).
+     * Object wins, as in sourceFromState.
+     */
+    function activeTool(state) {
+        if (state.isObjectToolActive) return 'object';
+        if (state.isEraserActive) return 'eraser';
+        return 'brush';
+    }
+
+    /**
+     * The draw mode that actually applies. Fill and line only make sense for colours:
+     * the eraser always works as a sized brush and an object is placed one click at a time.
+     */
+    function effectiveMode(state) {
+        return activeTool(state) === 'brush' ? state.drawMode : 'brush';
+    }
+
+    /** Brush size that applies: the eraser has its own size, an object is always one tile. */
+    function effectiveSize(state, eraserSize) {
+        const tool = activeTool(state);
+        if (tool === 'object') return 1;
+        return tool === 'eraser' ? eraserSize : state.brushSize;
+    }
+
+    return { planFill, planLine, applyToTiles, brushTiles, sourceFromState, activeTool, effectiveMode, effectiveSize, wouldChange };
 })();

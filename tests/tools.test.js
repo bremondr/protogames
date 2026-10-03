@@ -349,3 +349,24 @@ test('painting a footprint changes exactly those tiles', () => {
     assert.equal(ToolOps.applyToTiles(b.polygons, b.adjacency, tiles, color('#c0ffee')), tiles.length);
     assert.equal(b.polygons.filter((p) => p.color === '#c0ffee').length, tiles.length);
 });
+
+// ---- Which tool, mode and size apply ----------------------------------------------------
+
+test('the eraser and the object tool ignore the fill and line draw modes', () => {
+    const base = { drawMode: 'fill', brushSize: 3, isEraserActive: false, isObjectToolActive: false };
+    assert.equal(ToolOps.effectiveMode(base), 'fill');
+    assert.equal(ToolOps.effectiveMode({ ...base, drawMode: 'line' }), 'line');
+    assert.equal(ToolOps.effectiveMode({ ...base, isEraserActive: true }), 'brush');
+    assert.equal(ToolOps.effectiveMode({ ...base, isObjectToolActive: true }), 'brush');
+    assert.equal(ToolOps.effectiveMode({ ...base, isObjectToolActive: true, isEraserActive: true }), 'brush');
+});
+
+test('the eraser uses its own size, an object is always one tile, the brush keeps its size', () => {
+    const base = { drawMode: 'brush', brushSize: 3, isEraserActive: false, isObjectToolActive: false };
+    assert.equal(ToolOps.activeTool(base), 'brush');
+    assert.equal(ToolOps.effectiveSize(base, 5), 3);
+    assert.equal(ToolOps.activeTool({ ...base, isEraserActive: true }), 'eraser');
+    assert.equal(ToolOps.effectiveSize({ ...base, isEraserActive: true }, 5), 5);
+    assert.equal(ToolOps.activeTool({ ...base, isObjectToolActive: true }), 'object');
+    assert.equal(ToolOps.effectiveSize({ ...base, isObjectToolActive: true }, 5), 1);
+});
