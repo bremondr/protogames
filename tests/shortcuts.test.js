@@ -233,3 +233,11 @@ test('displayFor lists every alternative and hintFor only the first', () => {
     assert.equal(S.hintFor(redo, true), '⇧⌘Z');
     assert.equal(S.hintFor(S.BINDINGS.find((b) => b.id === 'tool-fill'), false), 'G');
 });
+
+test('in playtest mode only navigation and help shortcuts stay on', () => {
+    const allowed = S.BINDINGS.filter((b) => !b.documentation && S.allowedInPlaytest(b)).map((b) => b.id).sort();
+    assert.deepEqual(plain(allowed), ['help', 'zoom-fit', 'zoom-in', 'zoom-out']);
+    for (const id of ['undo', 'redo', 'tool-brush', 'tool-fill', 'tool-line', 'tool-eraser', 'brush-smaller', 'brush-larger', 'swatch-1', 'swatch-next', 'save']) {
+        assert.equal(S.allowedInPlaytest(S.BINDINGS.find((b) => b.id === id)), false, `${id} is locked`);
+    }
+});

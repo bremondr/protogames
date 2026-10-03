@@ -425,8 +425,9 @@ const Interactions = (() => {
      */
     function handlePointerDown(event) {
         event.preventDefault();
-        const point = getWorldPoint(event);
         const state = AppState.getState();
+        if (state.playtest) return;
+        const point = getWorldPoint(event);
         const polygon = tileAt(point);
 
         const mode = ToolOps.effectiveMode(state);
@@ -458,6 +459,7 @@ const Interactions = (() => {
      */
     function handlePointerMove(event) {
         const state = AppState.getState();
+        if (state.playtest) return;
         const point = getWorldPoint(event);
 
         if (state.lineStartId) {

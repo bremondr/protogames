@@ -28,6 +28,8 @@ const AppState = (() => {
          * The paint source (colour, eraser or object) is chosen separately.
          */
         drawMode: 'brush',
+        /** Playtest mode: editing is locked (painting, tools and editing shortcuts are off); pan and zoom still work. */
+        playtest: false,
         /** Pan/zoom: screen = world * scale + (x, y). Reset whenever a new board is set. */
         view: { scale: 1, x: 0, y: 0 },
         /** Line tool: tile the line started on, and the tiles currently previewed. */
@@ -151,6 +153,10 @@ const AppState = (() => {
 
     function resetView() {
         state.view = ViewMath.identity();
+    }
+
+    function setPlaytest(on) {
+        state.playtest = Boolean(on);
     }
 
     const DRAW_MODES = ['brush', 'fill', 'line'];
@@ -333,6 +339,7 @@ const AppState = (() => {
         setObjectToolActive,
         setCurrentObject,
         setDrawMode,
+        setPlaytest,
         setBrushSize,
         setView,
         resetView,

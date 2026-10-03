@@ -105,3 +105,27 @@ A tile's colour (`color`, a hex string) is its identity: it selects the texture 
 `#FFFFFF` (the old Arctic "Snow") is **not** remapped: it is also the blank tile colour and the two cannot be told apart, so such tiles stay blank.
 
 The same rule applies when a palette changes again: add a migration step that maps the retired colours, extend `tests/fixtures/` with a file in the previous format, and add the successor colours to this table. `tests/projectFormat.test.js` checks that every retired colour is really absent from the live palettes and every target colour is present.
+
+## Share link format
+
+A share link carries a whole board in the address hash (`#b=<payload>`), so nothing is uploaded. It is not a project file, but it holds saved data, so it is versioned too and goes through the same migrations.
+
+The payload is JSON, deflate-compressed (`deflate-raw`) and written as base64url:
+
+| Key | Meaning |
+|---|---|
+| `v` | Link version (currently **1**). A higher number is rejected as "made by a newer version". |
+| `f` | **Project file format** the colours belong to. On opening, the link is turned into a project of this version and passed through `ProjectFormat.parse`, so a link made before a palette change migrates exactly like a saved file. |
+| `n` | Project name |
+| `c` | Board settings (`boardConfig`); every size must be an integer from 1 to 100 |
+| `p` | Palette id |
+| `k` | Distinct tile colours (`#rrggbb`) |
+| `t` | One entry per tile, in generated-board order: index into `k`, base 36, dot separated |
+| `ob` | Distinct object ids |
+| `o` | Tiles that hold an object: `tileIndex:objectIndex` pairs (base 36), dot separated |
+
+Tile geometry is not stored: the board is regenerated from `c`, which fixes the tile order, so `t` must have exactly one entry per generated tile. Anything unexpected (wrong version, bad colour, out-of-range index, size mismatch) is refused with a message instead of opening a damaged board.
+
+Links are not capped, but the dialog warns about length: a note above 2,000 characters and a stronger one above 8,000 (rules of thumb for chat and email apps), always with a "Download project file instead" button. The link stays copyable at every size.
+
+When the link format changes, bump `v` (and keep reading the old one), or, if only the project format changed, nothing is needed here: `f` already routes old links through the project migrations. `tests/shareLink.test.js` covers both.
