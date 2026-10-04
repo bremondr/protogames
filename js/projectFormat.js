@@ -17,10 +17,10 @@
  * read live app config inside them.
  */
 const ProjectFormat = (() => {
-    const CURRENT_VERSION = 2;
+    const CURRENT_VERSION = 3;
 
     const GRID_TYPES = ['hexagon', 'square', 'triangle'];
-    const BOARD_SHAPES = ['hexagon', 'square', 'rectangle', 'triangle', 'circle'];
+    const BOARD_SHAPES = ['hexagon', 'square', 'rectangle', 'triangle', 'circle', 'infinite'];
 
     /** Raised for any file we cannot (or must not) load. `message` is user-readable. */
     class ProjectFormatError extends Error {
@@ -135,10 +135,22 @@ const ProjectFormat = (() => {
         return next;
     }
 
+    /**
+     * v2 -> v3: the board shape "infinite" was added. Nothing in an existing project changes;
+     * the bump makes an older app say "saved by a newer version" instead of a confusing
+     * "unknown board shape" when it meets an infinite board.
+     */
+    function migrateV2toV3(project) {
+        const next = clone(project);
+        next.version = 3;
+        return next;
+    }
+
     /** MIGRATIONS[n] upgrades a version-n project to version n + 1. */
     const MIGRATIONS = {
         0: migrateV0toV1,
-        1: migrateV1toV2
+        1: migrateV1toV2,
+        2: migrateV2toV3
     };
 
     /**
