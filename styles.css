@@ -2023,3 +2023,24 @@ kbd {
 #viewModeToggle[aria-pressed="true"] .icon-flat {
     display: block;
 }
+
+/* Theme editor: "Start from" an existing theme */
+.theme-editor-base {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 0.75rem;
+}
+
+.theme-editor-base[hidden] {
+    display: none;
+}
+
+.theme-editor-base .theme-editor-name {
+    margin-bottom: 0;
+}
+
+.theme-editor-base select {
+    width: 100%;
+    min-height: 40px;
+}
