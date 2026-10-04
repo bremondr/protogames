@@ -32,7 +32,7 @@ const packOf = (polygons, formatVersion = ProjectFormat.CURRENT_VERSION) =>
 test('pack keeps each distinct colour and object once and unpack restores the board', () => {
     const polygons = painted();
     const data = packOf(polygons);
-    assert.equal(data.v, ShareLink.LINK_VERSION);
+    assert.equal(data.v, 1, 'links of fixed boards stay version 1 so older apps can open them');
     assert.equal(data.f, ProjectFormat.CURRENT_VERSION);
     assert.deepEqual(data.ob, ['castle', 'tower']);
     assert.equal(data.k.length, new Set(polygons.map((p) => p.color.toLowerCase())).size, 'colours are case-insensitive');
@@ -70,8 +70,9 @@ test('unpack refuses links it cannot trust', () => {
         mutate(data);
         assert.throws(() => ShareLink.unpack(data, blankBoard()), pattern);
     };
-    reject((d) => { d.v = 2; }, /newer version/);
+    reject((d) => { d.v = ShareLink.LINK_VERSION + 1; }, /newer version/);
     reject((d) => { d.v = 0; }, /Unrecognised/);
+    reject((d) => { d.v = 1.5; }, /Unrecognised/);
     reject((d) => { delete d.f; }, /Unrecognised/);
     reject((d) => { d.k = ['red']; }, /invalid colours/);
     reject((d) => { d.k = ['#fff', 5]; }, /invalid colours/);
@@ -131,4 +132,31 @@ test('link size levels: fine up to 2000 characters, long up to 8000, then very l
     assert.equal(ShareLink.sizeLevel(ShareLink.VERY_LONG_LINK), 'long');
     assert.equal(ShareLink.sizeLevel(ShareLink.VERY_LONG_LINK + 1), 'veryLong');
     assert.ok(ShareLink.LONG_LINK < ShareLink.VERY_LONG_LINK);
+});
+
+// ---- Infinite boards ----------------------------------------------------------------------------
+
+test('an infinite board link names its tiles and is version 2', () => {
+    const config = { ...CONFIG, boardShape: 'infinite' };
+    const tiles = ['inf_hp_0_0', 'inf_hp_1_0', 'inf_hp_-4_9'].map((id, i) => ({ id, color: i === 1 ? '#1976D2' : '#7CB342', ...(i === 2 ? { object: 'castle' } : {}) }));
+    const data = plain(ShareLink.pack({ projectName: 'Endless', boardConfig: config, paletteId: 'landscape', polygons: tiles, formatVersion: ProjectFormat.CURRENT_VERSION }));
+    assert.equal(data.v, 2);
+    assert.equal(data.i, 'inf_hp_0_0.inf_hp_1_0.inf_hp_-4_9');
+    // The receiver rebuilds the tiles from the ids and unpacks onto them as for any board.
+    const rebuilt = data.i.split('.').map((id) => ({ id, vertices: [], color: '#ffffff' }));
+    const project = plain(ShareLink.unpack(data, rebuilt));
+    assert.deepEqual(project.appState.polygons.map((p) => [p.id, p.color.toLowerCase(), p.object]), [
+        ['inf_hp_0_0', '#7cb342', undefined], ['inf_hp_1_0', '#1976d2', undefined], ['inf_hp_-4_9', '#7cb342', 'castle']
+    ]);
+});
+
+test('a fixed board link does not carry tile ids', () => {
+    assert.equal(packOf(painted()).i, undefined);
+});
+
+test('an infinite link can be compressed and decoded like any other', async () => {
+    const config = { ...CONFIG, boardShape: 'infinite' };
+    const tiles = Array.from({ length: 50 }, (_, i) => ({ id: `inf_s_${i}_${-i}`, color: '#7CB342' }));
+    const data = plain(ShareLink.pack({ projectName: '', boardConfig: config, paletteId: 'landscape', polygons: tiles, formatVersion: 3 }));
+    assert.deepEqual(plain(await ShareLink.decode(await ShareLink.encode(data))), data);
 });

@@ -13,8 +13,11 @@
  * Node; the dialog and the compression need the browser.
  */
 const ShareLink = (() => {
-    /** Version of the link payload (not the project file format). */
-    const LINK_VERSION = 1;
+    /**
+     * Version of the link payload (not the project file format). 2 added infinite boards; links of
+     * other boards are still written as version 1 so older apps can open them.
+     */
+    const LINK_VERSION = 2;
     const MAX_TILES = 20000;
     const MAX_DIMENSION = 100;
     const HASH_PATTERN = /[#&]b=([A-Za-z0-9_-]+)/;
@@ -52,8 +55,9 @@ const ShareLink = (() => {
             }
             placed.push(`${index.toString(36)}:${objectIndex.get(polygon.object).toString(36)}`);
         });
+        const infinite = Boolean(boardConfig && boardConfig.boardShape === 'infinite');
         return {
-            v: LINK_VERSION,
+            v: infinite ? 2 : 1,
             f: formatVersion,
             n: projectName || '',
             c: boardConfig,
@@ -61,7 +65,8 @@ const ShareLink = (() => {
             k: colors,
             t: tiles.join('.'),
             ob: objects,
-            o: placed.join('.')
+            o: placed.join('.'),
+            ...(boardConfig && boardConfig.boardShape === 'infinite' ? { i: polygons.map((p) => p.id).join('.') } : {})
         };
     }
 
@@ -86,7 +91,8 @@ const ShareLink = (() => {
      */
     function unpack(data, polygons, { defaultProjectName = 'Untitled' } = {}) {
         if (!data || typeof data !== 'object') fail('Unrecognised link.');
-        if (data.v !== LINK_VERSION) fail(data.v > LINK_VERSION ? 'This link was made by a newer version of Protogames.' : 'Unrecognised link.');
+        if (data.v > LINK_VERSION) fail('This link was made by a newer version of Protogames.');
+        if (!Number.isInteger(data.v) || data.v < 1) fail('Unrecognised link.');
         if (!Number.isInteger(data.f) || data.f < 0) fail('Unrecognised link.');
         if (!Array.isArray(data.k) || !data.k.every((c) => typeof c === 'string' && HEX_COLOR.test(c))) fail('The link has invalid colours.');
         if (typeof data.t !== 'string') fail('The link has no tiles.');
@@ -191,7 +197,7 @@ const ShareLink = (() => {
             projectName: state.currentProjectName || '',
             boardConfig: state.boardConfig,
             paletteId: state.currentPaletteId,
-            polygons: state.polygons,
+            polygons: Infinite.isActive() ? Infinite.paintedTiles(state.polygons) : state.polygons,
             formatVersion: ProjectFormat.CURRENT_VERSION
         });
     }
@@ -260,7 +266,10 @@ const ShareLink = (() => {
             const data = await decode(payload);
             if (!data || typeof data !== 'object') fail('Unrecognised link.');
             const config = boardConfigFrom(data.c);
-            const polygons = Geometry.generateGrid(config, AppState.getState().canvas, null);
+            // An infinite board has no fixed tile list: its tiles are named in the link and rebuilt from their ids.
+            const polygons = config.boardShape === 'infinite'
+                ? String(data.i || '').split('.').filter(Boolean).map((id) => Infinite.fromId(id)).filter(Boolean)
+                : Geometry.generateGrid(config, AppState.getState().canvas, null);
             if (polygons.length > MAX_TILES) fail('The board in the link is too large.');
             const project = ProjectFormat.parse(unpack(data, polygons, { defaultProjectName: Config.DEFAULT_PROJECT_NAME }));
             document.querySelectorAll('.modal-backdrop:not(.hidden)').forEach((modal) => modal.remove());
