@@ -1,0 +1,87 @@
+name: Deploy site
+
+# Production is main, published at the root of the GitHub Pages site. Every open pull request from this
+# repository is published as a preview under /preview/pr-<number>/. Each run rebuilds the whole site from
+# git (see scripts/build-site.js), so a preview disappears by itself when its pull request is closed.
+#
+# pull_request_target is used on purpose: the workflow that runs is always the one on main, and the
+# pull request's code is only ever copied out of git as files, never executed. Pull requests from forks
+# are skipped, because everything on the site shares one origin.
+
+on:
+  push:
+    branches: [main]
+  pull_request_target:
+    types: [opened, reopened, synchronize, ready_for_review, closed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  pull-requests: write
+
+# The latest run wins: every run builds all versions, so an older one is never needed.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      # Do not publish a broken production build (pull request events only add previews to a main that was already tested).
+      - name: Run unit tests
+        if: github.event_name != 'pull_request_target'
+        run: npm test
+
+      - name: Collect open pull requests from this repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr list --state open --limit 30 --json number,title,isDraft,isCrossRepository \
+            --jq '[.[] | select(.isCrossRepository | not) | {number, title, isDraft, ref: ("refs/previews/pr-" + (.number | tostring))}]' > previews.json
+          for number in $(jq -r '.[].number' previews.json); do
+            git fetch --no-tags --depth=1 origin "pull/${number}/head:refs/previews/pr-${number}" || echo "::warning::Could not fetch pull request ${number}; it is left out."
+          done
+
+      - name: Build the site
+        run: node scripts/build-site.js --out _site --main HEAD --previews previews.json --repo "${{ github.repository }}"
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
+
+      - name: Comment the preview link on the pull request
+        if: github.event_name == 'pull_request_target' && github.event.action != 'closed'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const marker = '<!-- protogames-preview -->';
+            const base = '${{ steps.deployment.outputs.page_url }}';
+            const url = `${base}preview/pr-${context.issue.number}/`;
+            const sha = context.payload.pull_request.head.sha.slice(0, 7);
+            const body = `${marker}\n**Preview:** ${url}\n\nBuilt from \`${sha}\`. It keeps its own saved data, separate from production. The preview is removed when this pull request is closed.`;
+            const { owner, repo } = context.repo;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: context.issue.number });
+            const existing = comments.find((c) => c.body && c.body.startsWith(marker));
+            if (existing) await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+            else await github.rest.issues.createComment({ owner, repo, issue_number: context.issue.number, body });

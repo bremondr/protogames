@@ -51,6 +51,9 @@ Painting and navigating never share a gesture, so you cannot pan by accident whi
 
 The cluster in the bottom-right corner has zoom out / in, the zoom level (click it for **actual size**, where a typical tile is 64 px wide), **fit to screen**, and a **minimap** toggle. The minimap shows the whole board with the visible area outlined; click or drag on it to move the view. Zoom is clamped between 25% of the fitted size and 24x, and the board can never be panned completely out of sight.
 
+## Deployment and previews
+`main` is published as the production site; every open pull request from this repository is published as a preview under `/preview/pr-<number>/`, with its own saved data and a badge, and the link is commented on the pull request. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
 ## Project Structure
 ```
 protogames/
@@ -69,8 +72,10 @@ protogames/
 │  ├─ ui.js
 │  ├─ utils.js
 │  └─ main.js
+├─ scripts/              (build-site.js: assembles production + previews for Pages)
 └─ docs/
-   └─ SPECIFICATION.md
+   ├─ SPECIFICATION.md
+   └─ DEPLOYMENT.md
 ```
 
 ## Notable Recent Changes
