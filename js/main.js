@@ -35,6 +35,7 @@ const Main = (() => {
         Toolbar.init();
         Playtest.init();
         ShareLink.init();
+        PrintDialog.init();
         Shortcuts.init();
         ThemeEditor.init();
         ThemeManager.init()

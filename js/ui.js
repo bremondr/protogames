@@ -41,7 +41,6 @@ const UI = (() => {
         elements.loadButton = document.getElementById('loadProjectBtn');
         elements.loadInput = document.getElementById('loadProject');
         elements.exportPNGBtn = document.getElementById('exportPNGBtn');
-        elements.exportPDFBtn = document.getElementById('exportPDFBtn');
         elements.exportSVGBtn = document.getElementById('exportSVGBtn');
         elements.autoSaveToggle = document.getElementById('autoSaveToggle');
         elements.notificationBar = document.getElementById('notificationBar');

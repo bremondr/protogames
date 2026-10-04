@@ -1,8 +1,9 @@
 /**
  * PROTOGAMES EXPORTER
  * --------------------------------------------------------------
- * Provides download helpers for PNG, SVG, and PDF representations
- * of the current board. Buttons are wired during initialization.
+ * Provides download helpers for PNG and SVG representations of the
+ * current board. Buttons are wired during initialization. PDF output
+ * (real-world scale, paged) lives in print.js and printDialog.js.
  */
 const Exporter = (() => {
     let ui = null;
@@ -11,7 +12,6 @@ const Exporter = (() => {
         ui = uiRefs;
         ui?.exportPNGBtn?.addEventListener('click', exportToPNG);
         ui?.exportSVGBtn?.addEventListener('click', exportToSVG);
-        ui?.exportPDFBtn?.addEventListener('click', exportToPDF);
     }
 
     function exportToPNG() {
@@ -60,39 +60,9 @@ const Exporter = (() => {
         UI?.showNotification('SVG exported', 3000);
     }
 
-    function exportToPDF() {
-        const state = AppState.getState();
-        if (!state.canvas || !state.polygons.length) {
-            alert('Generate a board before exporting.');
-            return;
-        }
-        // Painted at the identity view on a separate canvas, so exports ignore the current zoom/pan.
-        const dataUrl = Renderer.createExportCanvas().toDataURL('image/png');
-        const base = state.currentProjectName || Config.DEFAULT_PROJECT_NAME;
-        const win = window.open('', '_blank');
-        if (!win) {
-            alert('Please allow pop-ups to export to PDF.');
-            return;
-        }
-        win.document.write(`
-            <!DOCTYPE html>
-            <html>
-            <head><title>${base}</title></head>
-            <body style="margin:0;display:flex;align-items:center;justify-content:center;background:#f5f5f5;">
-                <img src="${dataUrl}" style="max-width:100%;height:auto;" alt="Protogames board snapshot">
-            </body>
-            </html>
-        `);
-        win.document.close();
-        win.focus();
-        win.onload = () => win.print();
-        UI?.showNotification('PDF export ready (use browser print dialog)', 4000);
-    }
-
     return {
         init,
         exportToPNG,
-        exportToSVG,
-        exportToPDF
+        exportToSVG
     };
 })();
