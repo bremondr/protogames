@@ -16,7 +16,8 @@ Protogames lets designers sketch and iterate on board layouts quickly—no build
 - Fill and line tools: flood-fill a connected region in one click, or drag from tile A to tile B to paint a gap-free tile path (works on hexagon, square and triangle grids; each is a single undo step; they apply to colours only)
 - Palettes: Switchable themed color palettes (e.g., Landscape, Space) with labeled swatches
 - History: Undo/redo, autosave to localStorage (one slot per tab, so several tabs never overwrite each other)
-- File ops: Save/load JSON projects; export PNG/PDF/SVG
+- File ops: Save/load JSON projects; export PNG and SVG
+- Print: **Print…** makes a PDF at a real-world tile size (in mm): split across A4 / Letter / A3 home-printer pages with overlap, page labels and assembly hints, or one large sheet (fit to board, A3–A0) with crop marks; objects on the board, as cut-out tokens, or both; optional legend of the terrains and objects used; a live preview shows how the board sits on the paper. Settings are remembered per browser.
 - Sharing: **Share Link** puts the whole board in the address (nothing is uploaded); whoever opens it gets their own copy
 - Playtest: the play button locks editing (painting, tools, side panel and editing shortcuts) so the board can be played on; pan and zoom keep working, **Esc** or the pill returns to editing
 - Layout: the tools sit in a column at the right edge, under the full screen and playtest buttons; their settings open to the left
@@ -70,6 +71,8 @@ protogames/
 │  ├─ shareLink.js       (share links: board in the address hash)
 │  ├─ playtest.js        (locks editing)
 │  ├─ infinite.js        (infinite canvas board shape)
+│  ├─ print.js           (print layout at real-world scale + PDF writer)
+│  ├─ printDialog.js     (the Print… dialog)
 │  ├─ exporter.js
 │  ├─ ui.js
 │  ├─ utils.js
@@ -91,7 +94,7 @@ protogames/
 1. Open `index.html` in a modern browser.
 2. Choose board shape, grid type, and parameters in the sidebar; click **Generate Board**.
 3. Pick a palette theme, select a color (or click **Eraser**), then click or drag on tiles. Switch the tool to **Fill** to repaint a whole connected region of one colour, or **Line** to drag out a straight path of tiles (Esc cancels a line in progress).
-4. Save projects as `.protogames.json`; export PNG/PDF/SVG as needed.
+4. Save projects as `.protogames.json`; export PNG/SVG, or print a PDF at real-world scale, as needed.
 
 ## Development Notes
 - Stack: Vanilla JS + HTML5 Canvas; no build tooling required.
