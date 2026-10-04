@@ -2013,3 +2013,13 @@ kbd {
     width: 100%;
     min-height: 44px;
 }
+
+/* Colours-only toggle: the icon follows the state (half-filled disc = colours only) */
+#viewModeToggle .icon-flat,
+#viewModeToggle[aria-pressed="true"] .icon-textured {
+    display: none;
+}
+
+#viewModeToggle[aria-pressed="true"] .icon-flat {
+    display: block;
+}

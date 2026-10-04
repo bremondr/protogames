@@ -21,6 +21,7 @@ Protogames lets designers sketch and iterate on board layouts quickly—no build
 - Playtest: the play button locks editing (painting, tools, side panel and editing shortcuts) so the board can be played on; pan and zoom keep working, **Esc** or the pill returns to editing
 - Layout: the tools sit in a column at the right edge, under the full screen and playtest buttons; their settings open to the left
 - Input: Mouse, touch, stylus; responsive layout
+- View: a button in the zoom cluster switches between textured tiles and plain colours (remembered; exports follow the current view)
 - Navigation: wheel/pinch zoom at the pointer, pan, fit-to-screen and actual-size buttons, and an optional minimap for large boards (exports are always independent of the current zoom)
 
 ## Keyboard shortcuts
