@@ -30,7 +30,10 @@ const ThemeEditor = (() => {
             save: $('themeEditorSave'),
             cancel: $('themeEditorCancel'),
             close: $('themeEditorClose'),
-            file: $('themeEditorFile')
+            file: $('themeEditorFile'),
+            baseField: $('themeEditorBaseField'),
+            base: $('themeEditorBase'),
+            baseHint: $('themeEditorBaseHint')
         };
         if (!el.root) return;
 
@@ -39,6 +42,7 @@ const ThemeEditor = (() => {
         el.root.addEventListener('pointerdown', (e) => { if (e.target === el.root) close(); });
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && editor) close(); });
         el.name.addEventListener('input', () => { editor.name = el.name.value; setError(''); });
+        el.base.addEventListener('change', () => setBase(el.base.value));
         el.add.addEventListener('click', addRow);
         el.save.addEventListener('click', save);
         el.file.addEventListener('change', onFile);
@@ -63,7 +67,7 @@ const ThemeEditor = (() => {
             : kind === 'tiles'
                 ? [{ label: 'Plains', hex: '#a7c46a' }, { label: 'Forest', hex: '#2f6b3a' }, { label: 'Water', hex: '#2f7fd1' }].map((r) => ({ ...newRow(kind, r), orig: null }))
                 : [newRow(kind)];
-        editor = { kind, id: existing ? id : null, name: existing ? existing.name : '', rows, saving: false };
+        editor = { kind, id: existing ? id : null, name: existing ? existing.name : '', rows, blankRows: rows, base: '', autoName: '', saving: false };
         lastFocus = document.activeElement;
 
         const tiles = kind === 'tiles';
@@ -76,9 +80,71 @@ const ThemeEditor = (() => {
         el.save.textContent = editor.id ? 'Save changes' : 'Create';
         el.save.disabled = false;
         setError('');
+        renderBaseChoice();
         renderRows();
         el.root.classList.remove('hidden');
         el.name.focus();
+    }
+
+    // ---- Start from an existing theme -------------------------------------------------------------
+
+    /** Themes a new one can copy: the built-in and imported ones. */
+    function baseList(kind) {
+        return kind === 'tiles'
+            ? Config.getAllPalettes().map((p) => ({ id: p.id, name: p.name }))
+            : Objects.themes().map((t) => ({ id: t.id, name: t.name }));
+    }
+
+    /** Editable copies of a theme's terrains or items (textures become images, so everything can be changed). */
+    function baseRows(kind, baseId) {
+        const own = ThemeManager.get(kind, baseId);
+        if (kind === 'tiles') {
+            const source = own ? own.tiles : (Config.getPaletteById(baseId) || {}).colors || [];
+            return source.map((t) => ({
+                ...newRow(kind, { label: t.label, hex: t.hex, image: t.image || Textures.dataUrlFor(t.hex) || null }),
+                orig: null
+            }));
+        }
+        const source = own ? own.items : Objects.list(baseId).map((o) => ({ label: o.label, image: Objects.dataUrlFor(o.id) }));
+        return source.filter((item) => item.image).map((item) => ({ ...newRow(kind, { label: item.label, image: item.image }), id: null }));
+    }
+
+    /** The "Start from" choice only exists for a new theme; an edit changes the theme itself. */
+    function renderBaseChoice() {
+        const tiles = editor.kind === 'tiles';
+        el.baseField.hidden = Boolean(editor.id);
+        if (editor.id) return;
+        el.base.innerHTML = '';
+        const blank = document.createElement('option');
+        blank.value = '';
+        blank.textContent = tiles ? 'Blank — default terrains' : 'Blank set';
+        el.base.appendChild(blank);
+        baseList(editor.kind).forEach((b) => {
+            const option = document.createElement('option');
+            option.value = b.id;
+            option.textContent = b.name;
+            el.base.appendChild(option);
+        });
+        el.base.value = '';
+        el.baseHint.textContent = tiles
+            ? 'Copies its terrain names, colors and patterns; you can change everything before saving. The original stays as it is.'
+            : 'Copies its items and names; you can change everything before saving. The original stays as it is.';
+    }
+
+    function setBase(baseId) {
+        if (!editor || editor.id) return;
+        const base = baseList(editor.kind).find((b) => b.id === baseId);
+        // A name the person typed is kept; one we suggested ("Space copy") follows the choice.
+        const followsChoice = !editor.name.trim() || editor.name === editor.autoName;
+        editor.autoName = base ? `${base.name} copy` : '';
+        editor.rows = base ? baseRows(editor.kind, baseId) : editor.blankRows.map((r) => ({ ...r, key: ++rowKey }));
+        editor.base = baseId;
+        if (followsChoice) {
+            editor.name = editor.autoName;
+            el.name.value = editor.name;
+        }
+        setError('');
+        renderRows();
     }
 
     function close() {
