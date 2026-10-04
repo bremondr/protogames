@@ -194,7 +194,11 @@ const Renderer = (() => {
         const out = document.createElement('canvas');
         out.width = canvas.width;
         out.height = canvas.height;
-        paint(out.getContext('2d'), { polygons, width: out.width, height: out.height });
+        // An infinite board has no outline to fit: frame what was drawn.
+        const scene = typeof Infinite !== 'undefined' && Infinite.isActive() ? Infinite.exportScene(out.width, out.height) : null;
+        paint(out.getContext('2d'), scene
+            ? { polygons: scene.polygons, width: out.width, height: out.height, view: scene.view }
+            : { polygons, width: out.width, height: out.height });
         return out;
     }
 

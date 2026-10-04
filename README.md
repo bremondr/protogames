@@ -11,7 +11,7 @@ Protogames lets designers sketch and iterate on board layouts quickly—no build
 
 ## Key Features
 - Grid types: Hexagon, Square, Triangle, Orthogonal Square
-- Board outlines: Square, Rectangle, Hexagon, Triangle, Circle
+- Board outlines: Square, Rectangle, Hexagon, Triangle, Circle, and an **Infinite canvas** (prototype): an endless hex / square / triangle lattice that you pan across; only drawn tiles are saved and shared
 - Painting: one drawing tool with a Brush / Fill / Line switch (and brush size, theme and colours) in its settings popover; the eraser has its own size; objects are placed one per click, ignoring the draw mode and size
 - Fill and line tools: flood-fill a connected region in one click, or drag from tile A to tile B to paint a gap-free tile path (works on hexagon, square and triangle grids; each is a single undo step; they apply to colours only)
 - Palettes: Switchable themed color palettes (e.g., Landscape, Space) with labeled swatches
@@ -66,6 +66,7 @@ protogames/
 │  ├─ fileManager.js
 │  ├─ shareLink.js       (share links: board in the address hash)
 │  ├─ playtest.js        (locks editing)
+│  ├─ infinite.js        (infinite canvas board shape)
 │  ├─ exporter.js
 │  ├─ ui.js
 │  ├─ utils.js
