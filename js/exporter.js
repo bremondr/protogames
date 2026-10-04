@@ -33,8 +33,18 @@ const Exporter = (() => {
             alert('Generate a board before exporting.');
             return;
         }
-        const { width, height } = state.canvas;
-        const paths = state.polygons
+        let { width, height } = state.canvas;
+        let polygons = state.polygons;
+        let viewBox = `0 0 ${width} ${height}`;
+        if (Infinite.isActive()) {
+            // Frame what was drawn on an infinite board.
+            const scene = Infinite.exportScene(width, height);
+            polygons = scene.polygons;
+            width = Math.ceil(scene.bounds.maxX - scene.bounds.minX);
+            height = Math.ceil(scene.bounds.maxY - scene.bounds.minY);
+            viewBox = `${scene.bounds.minX.toFixed(2)} ${scene.bounds.minY.toFixed(2)} ${width} ${height}`;
+        }
+        const paths = polygons
             .map((polygon) => {
                 const commands = polygon.vertices
                     .map((vertex, index) => `${index === 0 ? 'M' : 'L'} ${vertex.x.toFixed(2)} ${vertex.y.toFixed(2)}`)
@@ -43,7 +53,7 @@ const Exporter = (() => {
                 return `<path d="${commands} Z" fill="${fill}" stroke="${Config.GRID_STROKE}" stroke-width="1" />`;
             })
             .join('');
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}">${paths}</svg>`;
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="${width}" height="${height}">${paths}</svg>`;
         const blob = new Blob([svg], { type: 'image/svg+xml' });
         const base = state.currentProjectName || Config.DEFAULT_PROJECT_NAME;
         Utils.triggerBlobDownload(blob, `${Utils.sanitizeFileName(base)}.svg`);

@@ -105,7 +105,8 @@ const FileManager = (() => {
             paletteId: state.currentPaletteId,
             isEraserActive: state.isEraserActive,
             autoSaveEnabled: state.autoSaveEnabled,
-            polygons: Utils.clonePolygons(state.polygons)
+            // An infinite board is regenerated around the view; only the painted tiles need saving.
+            polygons: Utils.clonePolygons(Infinite.isActive() ? Infinite.paintedTiles(state.polygons) : state.polygons)
         };
     }
 
@@ -374,6 +375,8 @@ const FileManager = (() => {
             setupAutoSave();
         }
         AppState.setPolygons(Utils.clonePolygons(statePayload.polygons || []));
+        // An infinite board has no fixed outline to frame: show what was drawn instead of the origin.
+        if (Infinite.isActive()) AppState.resetView();
         AppState.setProjectName(payload.projectName || Config.DEFAULT_PROJECT_NAME);
 
         UI?.updateBoardControls(AppState.getState().boardConfig);

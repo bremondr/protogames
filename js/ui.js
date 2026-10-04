@@ -273,7 +273,7 @@ const UI = (() => {
 
         elements.radiusField?.classList.toggle('hidden', !showRadius);
         elements.sizeField?.classList.toggle('hidden', !showSize);
-        elements.rectangularFields?.classList.toggle('hidden', showRadius || showSize || boardShape === 'square');
+        elements.rectangularFields?.classList.toggle('hidden', showRadius || showSize || boardShape === 'square' || boardShape === 'infinite');
         elements.triangleOrientationField?.classList.toggle('hidden', !showTriangleOrientation);
 
         if (elements.radiusLabel) {

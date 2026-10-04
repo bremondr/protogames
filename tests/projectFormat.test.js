@@ -307,7 +307,7 @@ test('a v1 file loads through parse() and every colour is a current palette colo
     for (const polygon of loaded.appState.polygons) assert.ok(palette.has(polygon.color), `${polygon.color} is not a current colour`);
 });
 
-test('a v0 file migrates through both steps in order', () => {
+test('a v0 file migrates through every step in order', () => {
     const legacy = legacyProject();
     legacy.appState.currentColor = '#FFD60A';
     legacy.appState.polygons[0].color = '#118AB2';
@@ -327,4 +327,35 @@ test('the retired colours are gone from the live palettes (the migration table m
     for (const hex of ['#05040a', '#3a3530', '#1f5e86', '#d6e8f2', '#bfe3f2', '#e4ecf5', '#5e6b7a']) {
         assert.ok(live.has(hex), `${hex} (a migration target) must be in a live palette`);
     }
+});
+
+// ---- v2 -> v3: the infinite board shape ----------------------------------------------------------
+
+const v2Project = () => fixture('v2-space-arctic.protogames.json');
+
+test('v2 to v3 changes nothing but the version number', () => {
+    const source = v2Project();
+    const migrated = plain(PF.MIGRATIONS[2](source));
+    assert.equal(migrated.version, 3);
+    const expected = JSON.parse(JSON.stringify(source));
+    expected.version = 3;
+    assert.deepEqual(migrated, expected);
+    assert.equal(source.version, 2, 'the input is not mutated');
+});
+
+test('a v2 file loads through parse() as a current project', () => {
+    const loaded = plain(PF.parse(JSON.stringify(v2Project())));
+    assert.equal(loaded.version, PF.CURRENT_VERSION);
+    assert.equal(loaded.appState.polygons.length, v2Project().appState.polygons.length);
+});
+
+test('the infinite board shape is valid, and a file that uses it needs the current version', () => {
+    const project = plain(PF.parse(JSON.stringify(v2Project())));
+    project.appState.boardConfig.boardShape = 'infinite';
+    assert.doesNotThrow(() => PF.validate(project));
+    project.appState.boardConfig.boardShape = 'spiral';
+    assert.throws(() => PF.validate(project), /unknown board shape/);
+    // An app that predates version 3 refuses it as "newer", which is the point of the bump.
+    const future = { ...plain(PF.parse(JSON.stringify(v2Project()))), version: PF.CURRENT_VERSION + 1 };
+    assert.throws(() => PF.parse(JSON.stringify(future)), (error) => error.code === 'newer-version');
 });
