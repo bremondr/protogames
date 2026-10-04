@@ -22,6 +22,8 @@ const Config = (() => {
     const BRUSH_SIZE_MAX = 7;
     /** localStorage key for the minimap on/off preference. */
     const MINIMAP_KEY = 'protogames_minimap';
+    /** localStorage key for the colours-only view preference. */
+    const COLOR_VIEW_KEY = 'protogames_color_view';
     const HISTORY_LIMIT = 50;
     /**
      * Baseline tile color used for blank/erased cells.
@@ -176,6 +178,7 @@ const Config = (() => {
         ZOOM_MAX,
         ACTUAL_TILE_PX,
         MINIMAP_KEY,
+        COLOR_VIEW_KEY,
         BRUSH_SIZE_MIN,
         BRUSH_SIZE_MAX,
         HISTORY_LIMIT,

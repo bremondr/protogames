@@ -395,6 +395,29 @@ const ViewControls = (() => {
         setMinimapEnabled(!minimapEnabled);
     }
 
+    // ---- Colours-only view ------------------------------------------------------------------
+
+    /** Textures on/off. The board, the brush dot and exports all follow the view. */
+    function setColorView(on) {
+        Textures.setFlat(on);
+        try { localStorage.setItem(Config.COLOR_VIEW_KEY, on ? 'on' : 'off'); } catch (error) { /* storage unavailable */ }
+        const button = elements.viewModeToggle;
+        if (button) {
+            const label = on ? 'Show textures' : 'Show colors only';
+            button.setAttribute('aria-pressed', String(on));
+            button.setAttribute('aria-label', label);
+            button.dataset.tip = label;
+        }
+        Renderer.renderBoard();
+        window.dispatchEvent(new CustomEvent('pg:toolchange'));
+    }
+
+    function loadColorViewPreference() {
+        let stored = null;
+        try { stored = localStorage.getItem(Config.COLOR_VIEW_KEY); } catch (error) { /* storage unavailable */ }
+        setColorView(stored === 'on');
+    }
+
     function loadMinimapPreference() {
         let stored = null;
         try { stored = localStorage.getItem(Config.MINIMAP_KEY); } catch (error) { /* storage unavailable */ }
@@ -408,7 +431,7 @@ const ViewControls = (() => {
     function init() {
         canvas = document.getElementById('gameCanvas');
         if (!canvas) return;
-        for (const id of ['zoomOut', 'zoomIn', 'zoomLabel', 'zoomFit', 'minimapToggle', 'minimap', 'minimapCanvas']) {
+        for (const id of ['zoomOut', 'zoomIn', 'zoomLabel', 'zoomFit', 'minimapToggle', 'viewModeToggle', 'minimap', 'minimapCanvas']) {
             elements[id] = document.getElementById(id);
         }
 
@@ -428,9 +451,11 @@ const ViewControls = (() => {
         elements.zoomLabel?.addEventListener('click', actualSize);
         elements.zoomFit?.addEventListener('click', fit);
         elements.minimapToggle?.addEventListener('click', toggleMinimap);
+        elements.viewModeToggle?.addEventListener('click', () => setColorView(!Textures.isFlat()));
 
         bindMinimap();
         loadMinimapPreference();
+        loadColorViewPreference();
         Renderer.onRender(() => {
             if (minimapEnabled && minimapSignature !== contentSignature()) scheduleMinimapRebuild();
             updateControls();

@@ -758,7 +758,13 @@ const Textures = (() => {
         return entry;
     }
 
+    // Colours-only view: terrain textures and single-tile features are switched off, flat colours stay.
+    let flatView = false;
+    function setFlat(on) { flatView = Boolean(on); }
+    function isFlat() { return flatView; }
+
     function patternFor(ctx, hex) {
+        if (flatView) return null;
         const t = tileFor(hex);
         if (!t) return null;
         let p = t.patterns.get(ctx);
@@ -791,6 +797,7 @@ const Textures = (() => {
     }
     const objUrls = new Map();
     function urlFor(hex) {
+        if (flatView) return null;
         if (objUrls.has(String(hex).toLowerCase())) return objUrls.get(String(hex).toLowerCase());
         const d = dataUrlFor(hex);
         const u = d ? toObjectUrl(d) : null;
@@ -801,6 +808,7 @@ const Textures = (() => {
 
     /** Draws a centered single-tile feature clipped to the polygon. Call after the base fill path is set. */
     function drawFeature(ctx, hex, polygon) {
+        if (flatView) return false;
         const t = tileFor(hex);
         if (!t || !t.feature || !polygon?.vertices?.length) return false;
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, cx = 0, cy = 0;
@@ -814,5 +822,5 @@ const Textures = (() => {
         return true;
     }
 
-    return { registerImage, unregister, resetLabels, patternFor, dataUrlFor, urlFor, isFeature, drawFeature, TILE_SIZE: S };
+    return { registerImage, unregister, resetLabels, patternFor, dataUrlFor, urlFor, isFeature, drawFeature, setFlat, isFlat, TILE_SIZE: S };
 })();
