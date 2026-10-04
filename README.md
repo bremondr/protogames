@@ -132,4 +132,4 @@ All shortcuts live in `BINDINGS` in `js/shortcuts.js` (id, label, group, keys). 
 - Improved visual feedback
 
 ## Status
-Active development — MVP. Last updated: November 2025.
+Active development. Last updated: October 2026.
