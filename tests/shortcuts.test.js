@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { loadApp, plain } = require('./support/load');
 
-const app = loadApp(['js/shortcuts.js']);
+const app = loadApp(['js/focusUtils.js', 'js/shortcuts.js']);
 const S = app.run('Shortcuts');
 
 /** A KeyboardEvent stand-in. `mods` is any of 'ctrl', 'meta', 'shift', 'alt'. */
@@ -240,4 +240,40 @@ test('in playtest mode only navigation and help shortcuts stay on', () => {
     for (const id of ['undo', 'redo', 'tool-brush', 'tool-fill', 'tool-line', 'tool-eraser', 'brush-smaller', 'brush-larger', 'swatch-1', 'swatch-next', 'save']) {
         assert.equal(S.allowedInPlaytest(S.BINDINGS.find((b) => b.id === id)), false, `${id} is locked`);
     }
+});
+
+// ---- Tab and focus (audit H6, M12) ----------------------------------------------------------------
+
+test('Tab cycles swatches only while the canvas has focus', () => {
+    const canvas = { tagName: 'CANVAS' };
+    assert.equal(S.isFocusNeutral(canvas, canvas), true);
+    assert.equal(S.isFocusNeutral({ tagName: 'BODY' }, canvas), false);
+    assert.equal(S.isFocusNeutral(null, canvas), false);
+    assert.equal(S.isFocusNeutral({ tagName: 'BUTTON' }, canvas), false);
+    assert.equal(S.isFocusNeutral(canvas, null), false);
+    assert.equal(idFor(ev('Tab'), false, { focusNeutral: S.isFocusNeutral(canvas, canvas) }), 'swatch-next');
+    assert.equal(idFor(ev('Tab', ['shift']), false, { focusNeutral: S.isFocusNeutral({ tagName: 'BODY' }, canvas) }), null);
+});
+
+test('shortcuts and pan-with-Space share one typing-target rule', () => {
+    const F = app.run('FocusUtils');
+    for (const target of [{ tagName: 'INPUT', type: 'text' }, { tagName: 'TEXTAREA' }, { tagName: 'SELECT' }, { tagName: 'DIV', isContentEditable: true },
+        { tagName: 'BUTTON' }, { tagName: 'INPUT', type: 'checkbox' }, { tagName: 'BODY' }, null]) {
+        assert.equal(F.isTypingTarget(target), S.isTypingTarget(target));
+    }
+    // A clicked button is not a typing target, so Space can pan after pressing Undo.
+    assert.equal(F.isTypingTarget({ tagName: 'BUTTON' }), false);
+});
+
+test('Tab wraps inside a dialog and pulls stray focus back in', () => {
+    const F = app.run('FocusUtils');
+    const [a, b, c, outside] = ['a', 'b', 'c', 'x'].map((id) => ({ id }));
+    const items = [a, b, c];
+    assert.equal(F.wrapTarget(items, c, false), a);
+    assert.equal(F.wrapTarget(items, a, true), c);
+    assert.equal(F.wrapTarget(items, b, false), null);
+    assert.equal(F.wrapTarget(items, b, true), null);
+    assert.equal(F.wrapTarget(items, outside, false), a);
+    assert.equal(F.wrapTarget(items, outside, true), c);
+    assert.equal(F.wrapTarget([], outside, false), null);
 });
