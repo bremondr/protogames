@@ -29,3 +29,47 @@ test('in the colours-only view no texture, feature or swatch image is produced',
         Textures.setFlat(false);
     }
 });
+
+/** Generates a texture on a recording fake canvas and returns the colour stops and line widths it used. */
+function recordTexture(hex) {
+    const stops = [];
+    const widths = [];
+    const ctx = new Proxy({}, {
+        get(target, prop) {
+            if (prop === 'createRadialGradient') return () => ({ addColorStop: (at, color) => stops.push(`${at}:${color}`) });
+            return typeof target[prop] === 'undefined' ? () => {} : target[prop];
+        },
+        set(target, prop, value) {
+            if (prop === 'lineWidth') widths.push(value);
+            target[prop] = value;
+            return true;
+        }
+    });
+    const recorder = loadApp(['js/config.js', 'js/textures.js'], {
+        document: { createElement: () => ({ width: 0, height: 0, getContext: () => ctx, toDataURL: () => 'data:,' }) }
+    });
+    recorder.run('Textures').dataUrlFor(hex);
+    return { stops, widths };
+}
+
+const hexOf = (pattern) => {
+    for (const palette of app.run('Config').COLOR_PALETTES) {
+        const color = palette.colors.find((c) => pattern.test(c.label.toLowerCase()));
+        if (color) return color.hex;
+    }
+    throw new Error(`no palette colour for ${pattern}`);
+};
+
+test('textures tile seamlessly: every shape is drawn identically at all 9 wrapped positions', () => {
+    // A shape crossing the tile edge is drawn 9 times (shifted by -S, 0, +S in x and y). If each copy
+    // picks its own random colour or width the copies differ and the tile shows seams when repeated.
+    for (const pattern of [/forest/, /nebula/]) {
+        const { stops, widths } = recordTexture(hexOf(pattern));
+        assert.ok(stops.length > 0, `${pattern} draws gradients`);
+        for (const list of [stops, widths]) {
+            const counts = new Map();
+            list.forEach((v) => counts.set(v, (counts.get(v) || 0) + 1));
+            for (const [value, count] of counts) assert.equal(count % 9, 0, `${pattern}: ${value} is drawn ${count} times`);
+        }
+    }
+});

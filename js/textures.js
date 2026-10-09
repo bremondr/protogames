@@ -122,9 +122,11 @@ const Textures = (() => {
     function blotches(ctx, R, hex, count, amt, rad) {
         for (let i = 0; i < count; i++) {
             const x = R() * S, y = R() * S, r = rad * (0.5 + R());
+            // Drawn once, outside the callback: every wrapped copy must be identical or the tile gets seams.
+            const centre = shade(hex, (R() - 0.5) * 2 * amt, 0.5);
             const g = (X, Y) => {
                 const grad = ctx.createRadialGradient(X, Y, 0, X, Y, r);
-                grad.addColorStop(0, shade(hex, (R() - 0.5) * 2 * amt, 0.5));
+                grad.addColorStop(0, centre);
                 grad.addColorStop(1, shade(hex, 0, 0));
                 ctx.fillStyle = grad;
                 ctx.fillRect(X - r, Y - r, r * 2, r * 2);
@@ -555,9 +557,9 @@ const Textures = (() => {
             ctx.save(); ctx.filter = 'blur(3px)';
             ctx.lineCap = 'round';
             for (let i = 0; i < 6; i++) {
-                const x = R() * S, y = R() * S, len = 20 + R() * 30, ang = R() * Math.PI, bend = (R() - 0.5) * 24;
+                const x = R() * S, y = R() * S, len = 20 + R() * 30, ang = R() * Math.PI, bend = (R() - 0.5) * 24, lw = 6 + R() * 6;
                 wrap(x, y, (X, Y) => {
-                    ctx.strokeStyle = shade(hex, 0.55, 0.22); ctx.lineWidth = 6 + R() * 6;
+                    ctx.strokeStyle = shade(hex, 0.55, 0.22); ctx.lineWidth = lw;
                     ctx.beginPath(); ctx.moveTo(X, Y); ctx.quadraticCurveTo(X + Math.cos(ang) * len / 2 - Math.sin(ang) * bend, Y + Math.sin(ang) * len / 2 + Math.cos(ang) * bend, X + Math.cos(ang) * len, Y + Math.sin(ang) * len); ctx.stroke();
                 });
             }
