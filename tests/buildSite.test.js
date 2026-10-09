@@ -202,3 +202,28 @@ test('a pull request whose ref cannot be read is skipped instead of failing the 
         fs.rmSync(out, { recursive: true, force: true });
     }
 });
+
+test('a pull request that cannot become a preview is skipped and never aborts the build', () => {
+    const out = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-site-'));
+    const warn = console.warn;
+    try {
+        console.warn = () => {};
+        const run = (args, input) => execFileSync('git', args, { cwd: ROOT, input }).toString().trim();
+        const head = run(['rev-parse', 'HEAD']);
+        // Unreferenced commits: one without index.html, one whose index.html has no <head>.
+        const commitOf = (tree) => run(['commit-tree', tree, '-m', 'test']);
+        const noIndex = commitOf(run(['mktree'], ''));
+        const blob = run(['hash-object', '-w', '--stdin'], '<p>no head here</p>');
+        const noHead = commitOf(run(['mktree'], `100644 blob ${blob}\tindex.html\n`));
+        const summary = Site.build({ out, main: head, previews: [{ number: 1, ref: noIndex }, { number: 2, ref: noHead }, { number: 3, ref: head }] });
+        assert.deepEqual(summary.previews.map((p) => p.name), ['pr-3']);
+        assert.deepEqual(summary.skipped, [1, 2]);
+        assert.ok(fs.existsSync(path.join(out, 'index.html')), 'production is still published');
+        assert.ok(!fs.existsSync(path.join(out, 'preview', 'pr-1')) && !fs.existsSync(path.join(out, 'preview', 'pr-2')));
+        const list = fs.readFileSync(path.join(out, 'preview', 'index.html'), 'utf8');
+        assert.ok(list.includes('pr-3') && !list.includes('pr-1/') && !list.includes('pr-2/'));
+    } finally {
+        console.warn = warn;
+        fs.rmSync(out, { recursive: true, force: true });
+    }
+});
