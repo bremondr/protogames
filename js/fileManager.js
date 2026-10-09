@@ -168,6 +168,37 @@ const FileManager = (() => {
         }
     }
 
+    let modalCount = 0;
+
+    /**
+     * Makes a freshly built backdrop a proper modal dialog: role and label, Tab kept inside, focus
+     * moved in (to `initialFocus`, else the first control), Escape routed to `onEscape`. Returns a
+     * function that removes the backdrop and puts focus back where it was.
+     */
+    function presentModal(backdrop, { initialFocus, onEscape, role = 'dialog' } = {}) {
+        const opener = document.activeElement;
+        const dialog = backdrop.querySelector('.modal');
+        const heading = backdrop.querySelector('h3');
+        dialog.setAttribute('role', role);
+        dialog.setAttribute('aria-modal', 'true');
+        if (heading) {
+            heading.id = heading.id || `fileManagerModalTitle${++modalCount}`;
+            dialog.setAttribute('aria-labelledby', heading.id);
+        }
+        document.body.appendChild(backdrop);
+        FocusUtils.trapTab(backdrop);
+        backdrop.addEventListener('keydown', (event) => {
+            if (event.key !== 'Escape' || !onEscape) return;
+            event.preventDefault(); // so playtest/popover Escape handlers leave their own state alone
+            onEscape();
+        });
+        (initialFocus || FocusUtils.tabbables(backdrop)[0])?.focus();
+        return () => {
+            backdrop.remove();
+            if (opener && opener.isConnected && opener.focus) opener.focus();
+        };
+    }
+
     /**
      * Presents a clear autosave prompt with load/discard actions.
      *
@@ -187,10 +218,14 @@ const FileManager = (() => {
                 </div>
             </div>
         `;
-        document.body.appendChild(modal);
+        const closeModal = presentModal(modal, {
+            initialFocus: modal.querySelector('[data-action="load"]'),
+            // Escape must not throw away work, so it takes the safe choice.
+            onEscape: () => handleChoice('load')
+        });
 
-        const handleChoice = (action) => {
-            modal.remove();
+        function handleChoice(action) {
+            closeModal();
             const slot = offeredSlot;
             offeredSlot = null;
             if (action === 'load') {
@@ -202,7 +237,7 @@ const FileManager = (() => {
                 if (slot) AutosaveSlots.remove(slot.key);
                 UI?.showNotification('Autosave discarded', 2500);
             }
-        };
+        }
 
         modal.addEventListener('click', (event) => {
             const button = event.target.closest('button[data-action]');
@@ -236,16 +271,11 @@ const FileManager = (() => {
         modal.querySelector('h3').textContent = title;
         const input = modal.querySelector('input');
         input.value = defaultValue;
-        document.body.appendChild(modal);
-        input.focus();
+        const close = presentModal(modal, { initialFocus: input, onEscape: () => close() });
         input.select();
 
-        const close = () => modal.remove();
         modal.addEventListener('click', (event) => {
             if (event.target === modal || event.target.closest('[data-action="cancel"]')) close();
-        });
-        modal.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape') close();
         });
         modal.querySelector('form').addEventListener('submit', (event) => {
             event.preventDefault();
@@ -260,7 +290,7 @@ const FileManager = (() => {
         const modal = document.createElement('div');
         modal.className = 'modal-backdrop';
         modal.innerHTML = `
-            <div class="modal" role="alertdialog" aria-modal="true">
+            <div class="modal">
                 <h3></h3>
                 <p></p>
                 <div class="modal-actions">
@@ -270,14 +300,9 @@ const FileManager = (() => {
         `;
         modal.querySelector('h3').textContent = title;
         modal.querySelector('p').textContent = message;
-        document.body.appendChild(modal);
-        modal.querySelector('[data-action="ok"]').focus();
-        const close = () => modal.remove();
+        const close = presentModal(modal, { initialFocus: modal.querySelector('[data-action="ok"]'), onEscape: () => close(), role: 'alertdialog' });
         modal.addEventListener('click', (event) => {
             if (event.target === modal || event.target.closest('[data-action="ok"]')) close();
-        });
-        modal.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape') close();
         });
     }
 
@@ -306,19 +331,15 @@ const FileManager = (() => {
         `;
         modal.querySelector('p').textContent = message;
         modal.querySelector('[data-action="confirm"]').textContent = confirmLabel;
-        document.body.appendChild(modal);
-        modal.querySelector('[data-action="confirm"]').focus();
-        const decide = (confirmed) => {
-            modal.remove();
+        const closeModal = presentModal(modal, { initialFocus: modal.querySelector('[data-action="confirm"]'), onEscape: () => decide(false) });
+        function decide(confirmed) {
+            closeModal();
             if (confirmed) onConfirm(); else if (onCancel) onCancel();
-        };
+        }
         modal.addEventListener('click', (event) => {
             const button = event.target.closest('button[data-action]');
             if (!button && event.target !== modal) return;
             decide(button?.dataset.action === 'confirm');
-        });
-        modal.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape') decide(false);
         });
     }
 

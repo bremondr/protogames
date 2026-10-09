@@ -16,7 +16,7 @@ function makeElement() {
         removed: false,
         classList: { add() {}, remove() {} },
         addEventListener(type, fn) { element.listeners[type] = fn; },
-        querySelector: () => ({ focus() {}, select() {}, textContent: '', value: '', addEventListener() {} }),
+        querySelector: () => ({ focus() {}, select() {}, setAttribute() {}, textContent: '', value: '', addEventListener() {} }),
         remove() { element.removed = true; }
     };
     return element;
@@ -31,7 +31,7 @@ function fresh({ storage = makeStorage() } = {}) {
         body: { appendChild() {} },
         getElementById: () => null
     };
-    const app = loadApp(['js/config.js', 'js/utils.js', 'js/projectFormat.js', 'js/viewMath.js', 'js/state.js', 'js/fileManager.js'], {
+    const app = loadApp(['js/config.js', 'js/utils.js', 'js/projectFormat.js', 'js/viewMath.js', 'js/state.js', 'js/focusUtils.js', 'js/fileManager.js'], {
         document,
         localStorage: storage,
         CustomEvent: class {},
