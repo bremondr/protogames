@@ -68,10 +68,11 @@ test('a Content-Security-Policy limits scripts to this site and the analytics sc
     }
 });
 
-test('the page has a favicon, and it is a file that exists', () => {
-    const match = /<link rel="icon"[^>]*href="([^"]+)"/.exec(html);
-    assert.ok(match, 'index.html has a <link rel="icon">');
-    assert.ok(fs.existsSync(path.resolve(__dirname, '..', decodeURIComponent(match[1]))), `${match[1]} exists`);
+test('the page has favicons (small .ico and the logo png), and they are files that exist', () => {
+    const hrefs = [...html.matchAll(/<link rel="icon"[^>]*href="([^"]+)"/g)].map((m) => m[1]);
+    assert.ok(hrefs.some((h) => h.endsWith('.ico')), 'a .ico favicon');
+    assert.ok(hrefs.some((h) => h.endsWith('.png')), 'a .png favicon');
+    for (const href of hrefs) assert.ok(fs.existsSync(path.resolve(__dirname, '..', decodeURIComponent(href))), `${href} exists`);
 });
 
 test('the main regions of the page are direct children of the right containers', () => {
