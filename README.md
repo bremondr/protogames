@@ -10,20 +10,20 @@ Protogames lets designers sketch and iterate on board layouts quickly—no build
 **Status:** MVP development
 
 ## Key Features
-- Grid types: Hexagon, Square, Triangle, Orthogonal Square
+- Grid types: Hexagon, Square, Triangle
 - Board outlines: Square, Rectangle, Hexagon, Triangle, Circle, and an **Infinite canvas** (prototype): an endless hex / square / triangle lattice that you pan across; only drawn tiles are saved and shared
 - Painting: one drawing tool with a Brush / Fill / Line switch (and brush size, theme and colours) in its settings popover; the eraser has its own size; objects are placed one per click, ignoring the draw mode and size
 - Fill and line tools: flood-fill a connected region in one click, or drag from tile A to tile B to paint a gap-free tile path (works on hexagon, square and triangle grids; each is a single undo step; they apply to colours only)
 - Palettes: Switchable themed color palettes (e.g., Landscape, Space) with labeled swatches
 - History: Undo/redo, autosave to localStorage (one slot per tab, so several tabs never overwrite each other)
-- File ops: Save/load JSON projects; export PNG and SVG
+- File ops: Save/load JSON projects; export PNG and SVG (SVG is a flat-colour outline of the tiles: no textures or objects)
 - Print: **Print…** makes a PDF at a real-world tile size (in mm): split across A4 / Letter / A3 home-printer pages with overlap, page labels and assembly hints, or one large sheet (fit to board, A3–A0) with crop marks; objects on the board, as cut-out tokens, or both; optional legend of the terrains and objects used; a live preview shows how the board sits on the paper. Settings are remembered per browser.
 - Sharing: **Share Link** puts the whole board in the address (nothing is uploaded); whoever opens it gets their own copy
 - Playtest: the play button locks editing (painting, tools, side panel and editing shortcuts) so the board can be played on; pan and zoom keep working, **Esc** or the pill returns to editing
 - Layout: the tools sit in a column at the right edge, under the full screen and playtest buttons; their settings open to the left
 - Input: Mouse, touch, stylus; responsive layout
-- View: a button in the zoom cluster switches between textured tiles and plain colours (remembered; exports follow the current view)
-- Navigation: wheel/pinch zoom at the pointer, pan, fit-to-screen and actual-size buttons, and an optional minimap for large boards (exports are always independent of the current zoom)
+- View: a button in the zoom cluster switches between textured tiles and plain colours (remembered; PNG export follows it and the Print dialog starts from it; SVG export always draws flat colours without textures or objects)
+- Navigation: wheel/pinch zoom at the pointer, pan, fit-to-screen and actual-size buttons, and an optional minimap for large boards (exports are always independent of the current zoom and pan)
 
 ## Keyboard shortcuts
 Press **?** (or use the keyboard button in the bottom-right corner) for the full list. On macOS use Cmd instead of Ctrl. Shortcuts are paused while you type in a field or a dialog is open.
@@ -61,26 +61,45 @@ The cluster in the bottom-right corner has zoom out / in, the zoom level (click 
 protogames/
 ├─ index.html
 ├─ styles.css
+├─ package.json
 ├─ js/
-│  ├─ config.js
-│  ├─ state.js
-│  ├─ geometry/          (helpers.js, hex.js, triangle.js, square.js) + geometry.js (aggregator)
+│  ├─ config.js          (constants, palettes, defaults)
+│  ├─ state.js           (application state, undo/redo)
+│  ├─ geometry/          (helpers.js, hex.js, triangle.js, square.js, neighbors.js) + geometry.js (aggregator)
+│  ├─ viewMath.js        (pure zoom/pan maths)
+│  ├─ viewControls.js    (zoom, pan, fit, minimap, texture toggle)
 │  ├─ renderer.js
+│  ├─ textures.js        (procedural tile textures)
+│  ├─ objects.js         (placeable map objects)
 │  ├─ interactions.js
-│  ├─ fileManager.js
+│  ├─ toolOps.js         (fill and line tool logic)
+│  ├─ toolbar.js         (the tool column and its settings popovers)
+│  ├─ shortcuts.js       (keyboard bindings)
+│  ├─ projectFormat.js   (project file format: versions, migrations, validation)
+│  ├─ autosaveSlots.js   (per-tab autosave slots)
+│  ├─ fileManager.js     (save/load, autosave)
 │  ├─ shareLink.js       (share links: board in the address hash)
 │  ├─ playtest.js        (locks editing)
 │  ├─ infinite.js        (infinite canvas board shape)
+│  ├─ themeManager.js    (custom tile themes and item sets)
+│  ├─ themeEditor.js     (theme editor dialog)
 │  ├─ print.js           (print layout at real-world scale + PDF writer)
 │  ├─ printDialog.js     (the Print… dialog)
-│  ├─ exporter.js
+│  ├─ exporter.js        (PNG and SVG export)
 │  ├─ ui.js
 │  ├─ utils.js
 │  └─ main.js
+├─ tests/                (node:test suites, fixtures/ of old file formats, support/load.js)
+├─ dev/                  (geometry-gallery.html, geometry-checks.js)
+├─ showcases/            (example .protogames.json projects)
+├─ images/               (logo and tile-shape illustrations)
 ├─ scripts/              (build-site.js: assembles production + previews for Pages)
+├─ .github/workflows/    (test.yml, pages.yml)
 └─ docs/
-   ├─ SPECIFICATION.md
-   └─ DEPLOYMENT.md
+   ├─ SPECIFICATION.md   (file, autosave and share-link formats)
+   ├─ DEPLOYMENT.md
+   ├─ TILE_GENERATION_EXPLANATION.md
+   └─ Protogames - Development Specification Document.md  (original PRD, historical)
 ```
 
 ## Notable Recent Changes
@@ -110,7 +129,7 @@ npm test
 ```
 Runs the Node test runner over `tests/**/*.test.js`. The app's browser scripts are plain IIFE files, so `tests/support/load.js` evaluates them in an isolated `vm` context instead of needing a bundler or a DOM.
 
-The geometry tests (`tests/geometry.test.js`, `tests/neighbors.test.js`) cover every board shape x tile shape x orientation combination: expected tile counts, no duplicate or overlapping tiles, correct bounds, centring inside the drawable area, hit-testing and tile adjacency (symmetric, correct neighbour counts). Every fixed shape bug has a regression test. When you fix a geometry bug, add a case there.
+The geometry tests (`tests/geometry.test.js`, `tests/neighbors.test.js`) cover every fixed board shape (hexagon, square, rectangle, triangle, circle; the infinite canvas is tested in `tests/infinite.test.js`) x tile shape x orientation combination: expected tile counts, no duplicate or overlapping tiles, correct bounds, centring inside the drawable area, hit-testing and tile adjacency (symmetric, correct neighbour counts). Every fixed shape bug has a regression test. When you fix a geometry bug, add a case there.
 
 ### Geometry gallery
 `dev/geometry-gallery.html` renders every combination as a thumbnail, runs the same checks as the tests, and marks failing combinations in red and unsupported ones as dashed "invalid" cards with the reason. Serve the repository root with any static server and open the page:
@@ -132,4 +151,4 @@ All shortcuts live in `BINDINGS` in `js/shortcuts.js` (id, label, group, keys). 
 - Improved visual feedback
 
 ## Status
-Active development — MVP. Last updated: November 2025.
+Active development — MVP. Last updated: October 2026.
