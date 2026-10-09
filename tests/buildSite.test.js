@@ -171,7 +171,7 @@ test('a site build puts production at the root and previews under /preview/<name
         const production = fs.readFileSync(path.join(out, 'index.html'), 'utf8');
         const preview = fs.readFileSync(path.join(out, 'preview', 'pr-66', 'index.html'), 'utf8');
         assert.ok(!production.includes('preview-runtime'), 'production is the app exactly as committed');
-        assert.ok(preview.includes('preview-runtime.js') && !preview.includes('simpleanalytics'));
+        assert.ok(preview.includes('preview-runtime.js') && !/<script[^>]*simpleanalytics/.test(preview), 'no analytics script (the CSP meta still names its host, which is harmless)');
         assert.ok(fs.existsSync(path.join(out, 'js', 'config.js')) && fs.existsSync(path.join(out, 'preview', 'pr-66', 'js', 'config.js')));
         assert.ok(fs.existsSync(path.join(out, 'preview', 'pr-66', 'preview-runtime.js')));
         assert.ok(!fs.existsSync(path.join(out, 'preview-runtime.js')), 'the runtime is not in production');
