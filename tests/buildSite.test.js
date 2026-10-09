@@ -208,7 +208,9 @@ test('a pull request that cannot become a preview is skipped and never aborts th
     const warn = console.warn;
     try {
         console.warn = () => {};
-        const run = (args, input) => execFileSync('git', args, { cwd: ROOT, input }).toString().trim();
+        // commit-tree needs an author and a committer; CI runners have none configured
+        const identity = { GIT_AUTHOR_NAME: 'test', GIT_AUTHOR_EMAIL: 'test@example.com', GIT_COMMITTER_NAME: 'test', GIT_COMMITTER_EMAIL: 'test@example.com' };
+        const run = (args, input) => execFileSync('git', args, { cwd: ROOT, input, env: { ...process.env, ...identity } }).toString().trim();
         const head = run(['rev-parse', 'HEAD']);
         // Unreferenced commits: one without index.html, one whose index.html has no <head>.
         const commitOf = (tree) => run(['commit-tree', tree, '-m', 'test']);
