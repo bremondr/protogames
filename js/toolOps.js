@@ -115,5 +115,28 @@ const ToolOps = (() => {
         return tool === 'eraser' ? eraserSize : state.brushSize;
     }
 
-    return { planFill, planLine, applyToTiles, brushTiles, sourceFromState, activeTool, effectiveMode, effectiveSize, wouldChange };
+    /**
+     * Points to probe for a brush drag that moved from `from` through `targets` (the pointer
+     * positions since the last probe, oldest first). Consecutive positions further than `step`
+     * apart get evenly spaced points in between, so a fast drag cannot skip over tiles.
+     * `from` itself is not repeated; the last target is always the last point.
+     */
+    function strokePoints(from, targets, step) {
+        const MAX_PER_SEGMENT = 200;
+        const out = [];
+        let prev = from;
+        for (const target of targets) {
+            const distance = prev ? Math.hypot(target.x - prev.x, target.y - prev.y) : 0;
+            const parts = step > 0 ? Math.min(MAX_PER_SEGMENT, Math.ceil(distance / step)) : 1;
+            for (let i = 1; i < parts; i++) {
+                const k = i / parts;
+                out.push({ x: prev.x + (target.x - prev.x) * k, y: prev.y + (target.y - prev.y) * k });
+            }
+            out.push({ x: target.x, y: target.y });
+            prev = target;
+        }
+        return out;
+    }
+
+    return { planFill, planLine, applyToTiles, brushTiles, sourceFromState, activeTool, effectiveMode, effectiveSize, wouldChange, strokePoints };
 })();

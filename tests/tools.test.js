@@ -370,3 +370,22 @@ test('the eraser uses its own size, an object is always one tile, the brush keep
     assert.equal(ToolOps.activeTool({ ...base, isObjectToolActive: true }), 'object');
     assert.equal(ToolOps.effectiveSize({ ...base, isObjectToolActive: true }, 5), 1);
 });
+
+test('strokePoints fills in the path between two far apart pointer positions', () => {
+    const points = plain(ToolOps.strokePoints({ x: 0, y: 0 }, [{ x: 100, y: 0 }], 25));
+    assert.deepEqual(points, [{ x: 25, y: 0 }, { x: 50, y: 0 }, { x: 75, y: 0 }, { x: 100, y: 0 }]);
+    for (let i = 1; i < points.length; i++) assert.ok(points[i].x - points[i - 1].x <= 25 + 1e-9);
+});
+
+test('strokePoints follows every coalesced position and keeps short moves as they are', () => {
+    const targets = [{ x: 10, y: 0 }, { x: 10, y: 40 }];
+    assert.deepEqual(plain(ToolOps.strokePoints({ x: 0, y: 0 }, targets, 50)), targets);
+    assert.deepEqual(plain(ToolOps.strokePoints({ x: 0, y: 0 }, targets, 20)).slice(-1), [{ x: 10, y: 40 }]);
+    assert.equal(ToolOps.strokePoints({ x: 0, y: 0 }, targets, 20).length, 1 + 2);
+});
+
+test('strokePoints copes with no start, a zero step and a huge jump', () => {
+    assert.deepEqual(plain(ToolOps.strokePoints(null, [{ x: 5, y: 5 }], 10)), [{ x: 5, y: 5 }]);
+    assert.deepEqual(plain(ToolOps.strokePoints({ x: 0, y: 0 }, [{ x: 5, y: 5 }], 0)), [{ x: 5, y: 5 }]);
+    assert.ok(ToolOps.strokePoints({ x: 0, y: 0 }, [{ x: 1e9, y: 0 }], 1).length <= 200);
+});

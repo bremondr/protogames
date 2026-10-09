@@ -10,6 +10,8 @@ const Interactions = (() => {
     // Ensures move events are processed at most ~60fps for smooth brushing.
     const MOVE_THROTTLE_MS = 16;
     let lastMoveTimestamp = 0;
+    // Where the brush last probed, so a fast drag can fill in the tiles between two events.
+    let strokePoint = null;
     // The eraser remembers its own size; brushSize in AppState belongs to the colour brush.
     const ERASER_SIZE_KEY = 'protogames_eraser_size';
     let eraserSize = Config.BRUSH_SIZE_MIN;
@@ -475,6 +477,7 @@ const Interactions = (() => {
 
         AppState.setDrawingActive(true, polygon?.id || null);
         strokeChanged = false;
+        strokePoint = point;
         if (polygon) {
             strokeChanged = paintAt(polygon, true);
             Renderer.renderBoard();
@@ -510,12 +513,21 @@ const Interactions = (() => {
                 return;
             }
             lastMoveTimestamp = now;
-            const polygon = tileAt(point);
-            if (polygon && polygon.id !== state.lastColoredPolygonId) {
+            // The throttle and the browser's own event batching drop positions; the coalesced events and
+            // the path since the last probe say which tiles the pointer really crossed.
+            const batch = typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents() : [];
+            const targets = (batch.length ? batch : [event]).map(getWorldPoint);
+            const step = ViewMath.typicalTileSize(state.polygons) / 2;
+            let painted = false;
+            for (const probe of ToolOps.strokePoints(strokePoint, targets, step)) {
+                const polygon = tileAt(probe);
+                if (!polygon || polygon.id === state.lastColoredPolygonId) continue;
                 if (paintAt(polygon, false)) strokeChanged = true;
                 AppState.setLastColoredPolygonId(polygon.id);
-                Renderer.renderBoard();
+                painted = true;
             }
+            strokePoint = targets[targets.length - 1];
+            if (painted) Renderer.renderBoard();
             return;
         }
 
