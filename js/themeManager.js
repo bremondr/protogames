@@ -84,7 +84,6 @@ const ThemeManager = (() => {
     function refreshPaletteSelect() {
         const s = AppState.getState();
         UI.initializePaletteSelector(s.currentPaletteId);
-        AppState.setAvailablePalettes(Config.getAllPalettes());
     }
     function emit() { window.dispatchEvent(new CustomEvent('pg:themeschange')); }
 

@@ -79,9 +79,8 @@ test('the main regions of the page are direct children of the right containers',
 });
 
 test('every element id the scripts look up by getElementById or a local $ helper exists in index.html', () => {
-    // shortcutHelp is created by shortcuts.js when the overlay opens. autoSaveToggle is kept only for code
-    // that tolerates its absence (the checkbox is commented out); drop it when that code is removed.
-    const allowed = new Set(['shortcutHelp', 'autoSaveToggle']);
+    // shortcutHelp is created by shortcuts.js when the overlay opens.
+    const allowed = new Set(['shortcutHelp']);
     const jsDir = path.resolve(__dirname, '..', 'js');
     const pageIds = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
     const missing = [];

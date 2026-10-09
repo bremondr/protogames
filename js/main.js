@@ -18,7 +18,6 @@ const Main = (() => {
         UI.init();
         const uiRefs = UI.getElements();
         UI.initializePaletteSelector(Config.DEFAULT_PALETTE_ID);
-        AppState.setAvailablePalettes(Config.getAllPalettes());
         const defaultPalette = Config.getDefaultPalette();
         const paletteRender = UI.renderColorPalette(defaultPalette.id, defaultPalette.colors[0]?.hex);
         AppState.setCurrentPaletteId(paletteRender.paletteId);
@@ -66,13 +65,11 @@ const Main = (() => {
         }
 
         Interactions.generateBoard(AppState.getState().boardConfig, { skipDirtyFlag: true });
-        UI.updateCanvasMessage(AppState.getState().polygons.length);
     }
 
     document.addEventListener('DOMContentLoaded', initializeApp);
 
     return {
-        initializeApp,
         startBoard
     };
 })();

@@ -104,8 +104,6 @@ const ViewControls = (() => {
         return size ? Math.round(((state().view.scale * size) / Config.ACTUAL_TILE_PX) * 100) : 100;
     }
 
-    const isSpaceDown = () => spaceDown;
-
     // ---- Wheel ------------------------------------------------------------------------
 
     function onWheel(event) {
@@ -474,7 +472,6 @@ const ViewControls = (() => {
         fit,
         actualSize,
         toggleMinimap,
-        zoomPercent,
-        isSpaceDown
+        zoomPercent
     };
 })();

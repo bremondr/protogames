@@ -592,28 +592,6 @@ const Interactions = (() => {
     }
 
     /**
-     * Applies a color to a polygon with optional history/dirty tracking.
-     *
-     * @param {Object} polygon - Polygon to update.
-     * @param {string} color - Hex color string.
-     * @param {Object} [options] - Behavior flags.
-     * @param {boolean} [options.recordHistory=true] - Whether to snapshot history.
-     * @param {boolean} [options.markDirty=true] - Whether to mark state dirty/autosave.
-     */
-    function applyColorToPolygon(polygon, color, options = {}) {
-        const { recordHistory = true, markDirty = true } = options;
-        if (!polygon || polygon.color === color) return;
-        polygon.color = color;
-        if (recordHistory) {
-            AppState.recordHistory();
-        }
-        if (markDirty) {
-            AppState.markDirty();
-            FileManager.autoSaveToLocalStorage(true);
-        }
-    }
-
-    /**
      * Generates a new polygon set using the supplied configuration.
      *
      * @param {Object} config - Board settings (grid, size, orientation).
@@ -631,7 +609,6 @@ const Interactions = (() => {
         AppState.setPolygons(polygons);
         AppState.updateBoardConfig(config);
         Renderer.renderBoard();
-        UI?.updateCanvasMessage(polygons.length);
 
         if (!options.preserveHistory) {
             AppState.resetHistory();

@@ -177,5 +177,5 @@ const AutosaveSlots = (() => {
         try { localStorage.removeItem(key); } catch (error) { /* storage unavailable */ }
     }
 
-    return { LEGACY_KEY, PREFIX, LEGACY_ID, MAX_AGE_MS, MAX_ORPHANS, choose, claim, ownKey, takeRestorable, remove };
+    return { choose, claim, ownKey, takeRestorable, remove };
 })();

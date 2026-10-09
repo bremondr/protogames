@@ -1,5 +1,5 @@
 /**
- * Square and diamond grid builders.
+ * Square grid builder.
  */
 (function (global) {
     const helpers = global.GeometryHelpers;
@@ -8,8 +8,7 @@
         shouldIncludePolygon,
         createBoardMetrics,
         normalizeBoardDimensions,
-        createSquareVertices,
-        createDiamondVertices
+        createSquareVertices
     } = helpers;
 
     function buildSquareGrid(config, canvas, colorMap) {

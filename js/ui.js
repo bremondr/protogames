@@ -11,7 +11,6 @@ const UI = (() => {
 
     function init() {
         elements.canvas = document.getElementById('gameCanvas');
-        elements.canvasPlaceholder = document.querySelector('.canvas-placeholder');
         elements.paletteGrid = document.querySelector('.palette-grid');
         elements.paletteSelect = document.getElementById('paletteSelect');
         elements.eraserButton = document.getElementById('eraserButton');
@@ -42,7 +41,6 @@ const UI = (() => {
         elements.loadInput = document.getElementById('loadProject');
         elements.exportPNGBtn = document.getElementById('exportPNGBtn');
         elements.exportSVGBtn = document.getElementById('exportSVGBtn');
-        elements.autoSaveToggle = document.getElementById('autoSaveToggle');
         elements.notificationBar = document.getElementById('notificationBar');
 
         elements.boardShapeSelect?.addEventListener('change', () => {
@@ -50,17 +48,6 @@ const UI = (() => {
             applyGridTypeRestrictions();
         });
         elements.gridTypeSelect?.addEventListener('change', applyGridTypeVisibility);
-        elements.autoSaveToggle?.addEventListener('change', () => {
-            const enabled = elements.autoSaveToggle.checked;
-            AppState.setAutoSaveEnabled(enabled);
-            FileManager.setupAutoSave();
-        });
-
-        // Sync toggle with state on init.
-        if (elements.autoSaveToggle) {
-            elements.autoSaveToggle.checked = AppState.getState().autoSaveEnabled;
-        }
-
         applyBoardShapeVisibility();
         applyGridTypeRestrictions();
         applyGridTypeVisibility();
@@ -157,13 +144,6 @@ const UI = (() => {
         notificationTimerId = window.setTimeout(() => {
             elements.notificationBar.classList.remove('show');
         }, duration);
-    }
-
-    function updateCanvasMessage(count) {
-        if (!elements.canvasPlaceholder) return;
-        elements.canvasPlaceholder.textContent = count
-            ? 'Tap or click a tile to paint it. Use the palette to change colors.'
-            : 'Configure a board and click Generate Board to begin.';
     }
 
     // Share links refuse boards over 100 tiles a side (ShareLink.MAX_DIMENSION); a hex radius of 50 is already 7.5k tiles.
@@ -355,7 +335,6 @@ const UI = (() => {
         init,
         getElements,
         showNotification,
-        updateCanvasMessage,
         getBoardConfig,
         updateBoardControls,
         setPaletteSelection,

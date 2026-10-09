@@ -13,7 +13,6 @@ const AppState = (() => {
         boardConfig: { ...Config.DEFAULT_BOARD_CONFIG },
         currentColor: Config.getDefaultPalette().colors[0].hex,
         currentPaletteId: Config.DEFAULT_PALETTE_ID,
-        availablePalettes: [],
         /**
          * When true, painting uses the eraser and resets tiles to the default
          * blank color instead of applying a swatch color.
@@ -48,7 +47,6 @@ const AppState = (() => {
         history: [],
         historyIndex: -1,
         currentProjectName: null,
-        lastSaveTime: null,
         isDirty: false,
         /**
          * Indicates whether the user currently has a pointer pressed down
@@ -116,15 +114,6 @@ const AppState = (() => {
             if (config && config[key] !== undefined) next[key] = config[key];
         }
         state.boardConfig = next;
-    }
-
-    /**
-     * Updates the list of palettes made available to the UI.
-     *
-     * @param {Array<Object>} palettes - Palette definitions.
-     */
-    function setAvailablePalettes(palettes) {
-        state.availablePalettes = Array.isArray(palettes) ? palettes.slice() : [];
     }
 
     /**
@@ -380,7 +369,6 @@ const AppState = (() => {
         setPolygons,
         updateBoardConfig,
         setBoardConfig,
-        setAvailablePalettes,
         setCurrentColor,
         setEraserActive,
         setObjectToolActive,

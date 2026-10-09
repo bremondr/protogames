@@ -219,16 +219,6 @@
         ];
     }
 
-    function createDiamondVertices(center, size) {
-        const half = size / 2;
-        return [
-            { x: center.x, y: center.y - half },
-            { x: center.x + half, y: center.y },
-            { x: center.x, y: center.y + half },
-            { x: center.x - half, y: center.y }
-        ];
-    }
-
     function createTriangleVertices(origin, size, pointingUp) {
         const height = (Math.sqrt(3) / 2) * size;
         if (pointingUp) {
@@ -301,7 +291,6 @@
         normalizeBoardDimensions,
         createHexVertices,
         createSquareVertices,
-        createDiamondVertices,
         createTriangleVertices,
         isPointInPolygon,
         findPolygonAtPoint

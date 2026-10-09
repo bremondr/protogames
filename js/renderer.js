@@ -55,16 +55,6 @@ const Renderer = (() => {
     }
 
     /**
-     * Clears the drawing area.
-     */
-    function clearCanvas() {
-        const { ctx, canvas } = AppState.getState();
-        if (!ctx || !canvas) return;
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
-
-    /**
      * Paints a scene onto any 2D context.
      *
      * @param {CanvasRenderingContext2D} ctx
@@ -250,7 +240,6 @@ const Renderer = (() => {
     return {
         initializeCanvas,
         resizeCanvas,
-        clearCanvas,
         paint,
         renderBoard,
         requestRender,

@@ -124,7 +124,6 @@ const FileManager = (() => {
                 appState: serializeAppState()
             });
             localStorage.setItem(AutosaveSlots.ownKey(), JSON.stringify(payload));
-            state.lastSaveTime = payload.timestamp;
             AppState.clearDirty();
             quotaWarned = false;
         } catch (error) {
@@ -175,7 +174,7 @@ const FileManager = (() => {
      * @param {Object} payload - Autosave payload.
      */
     function promptAutosaveRestore(payload) {
-        const timestamp = payload.timestamp ? new Date(payload.timestamp).toLocaleString() : 'a previous session';
+        const timestamp = Utils.formatTimestamp(payload.timestamp) || 'a previous session';
         const modal = document.createElement('div');
         modal.className = 'modal-backdrop';
         modal.innerHTML = `
@@ -341,7 +340,6 @@ const FileManager = (() => {
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
         const filename = `${Utils.sanitizeFileName(payload.projectName)}.protogames.json`;
         Utils.triggerBlobDownload(blob, filename);
-        AppState.getState().lastSaveTime = Date.now();
         AppState.clearDirty();
         autoSaveToLocalStorage(true);
         UI?.showNotification('Project saved', 3500);
@@ -397,9 +395,6 @@ const FileManager = (() => {
         window.dispatchEvent(new CustomEvent('pg:toolchange'));
         if (typeof statePayload.autoSaveEnabled === 'boolean') {
             AppState.setAutoSaveEnabled(statePayload.autoSaveEnabled);
-            if (ui?.autoSaveToggle) {
-                ui.autoSaveToggle.checked = statePayload.autoSaveEnabled;
-            }
             setupAutoSave();
         }
         AppState.setPolygons(polygons);
@@ -409,7 +404,6 @@ const FileManager = (() => {
 
         UI?.updateBoardControls(AppState.getState().boardConfig);
         Renderer.renderBoard();
-        UI?.updateCanvasMessage(AppState.getState().polygons.length);
 
         AppState.resetHistory();
         AppState.recordHistory();

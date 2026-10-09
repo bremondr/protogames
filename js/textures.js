@@ -225,7 +225,6 @@ const Textures = (() => {
                 // ridge as (x, height); main summit stays highest
                 let left = jag([[-w, 0], [pkx - w * 0.45, h * (0.45 + R() * 0.2)], [pkx, h]], h * 0.35, 3);
                 let right = jag([[pkx, h], [pkx + w * 0.4, h * (0.5 + R() * 0.2)], [w, 0]], h * 0.35, 3);
-                const clampH = (p, i, arr) => [p[0], (i === 0 && p === arr[0] && p[1] === 0) ? 0 : Math.max(0, Math.min(p[1], h * 0.93))];
                 left = left.map((p, i) => i === left.length - 1 ? [pkx, h] : (i === 0 ? [-w, 0] : [p[0], Math.max(0, Math.min(p[1], h * 0.93))]));
                 right = right.map((p, i) => i === 0 ? [pkx, h] : (i === right.length - 1 ? [w, 0] : [p[0], Math.max(0, Math.min(p[1], h * 0.93))]));
                 const spine = jag([[pkx, h], [pkx + w * 0.12, h * 0.5], [pkx + w * 0.3, 0]], w * 0.18, 2).map((p) => [p[0], Math.max(0, p[1])]);
@@ -747,7 +746,7 @@ const Textures = (() => {
         const ctx = canvas.getContext('2d');
         const R = rng(hashStr(key + label));
         const kind = generatorFor(label);
-        G[kind](ctx, R, hex, { snowcap: /mountain/.test(label) });
+        G[kind](ctx, R, hex);
         let feature = null;
         const fk = featureKind(label);
         if (fk) {
@@ -831,5 +830,5 @@ const Textures = (() => {
         return true;
     }
 
-    return { registerImage, unregister, resetLabels, patternFor, dataUrlFor, urlFor, isFeature, drawFeature, setFlat, isFlat, TILE_SIZE: S };
+    return { registerImage, unregister, resetLabels, patternFor, dataUrlFor, urlFor, isFeature, drawFeature, setFlat, isFlat };
 })();
