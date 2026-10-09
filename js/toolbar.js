@@ -69,13 +69,24 @@ const Toolbar = (() => {
         document.addEventListener('pointerdown', (e) => {
             if (anyPopoverOpen() && el.bar && !el.bar.contains(e.target)) setPopovers(false, false, false);
         });
+        // One Escape closes only the topmost layer: dialogs and the help overlay own it first
+        // (capture phase, so a dialog closing on this same key press still counts as open),
+        // then a tool popover, then full screen.
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && anyPopoverOpen()) setPopovers(false, false, false);
-        });
+            if (e.key !== 'Escape' || FocusUtils.layerOpen()) return;
+            // preventDefault marks the key as used, so playtest does not also leave on it.
+            if (anyPopoverOpen()) { setPopovers(false, false, false); e.preventDefault(); }
+            else if (document.body.classList.contains('focus-mode')) { setFocusMode(false); e.preventDefault(); }
+        }, true);
 
         window.addEventListener('pg:playtest', () => setPopovers(false, false, false));
         bindThemePanel();
         bindFocusMode();
+        // The aria-modal dialogs keep Tab inside and hand focus back when they close.
+        ['printDialog', 'shareDialog', 'themeEditor'].forEach((id) => {
+            FocusUtils.trapTab($(id));
+            FocusUtils.restoreFocusOnHide($(id));
+        });
         window.addEventListener('pg:toolchange', sync);
         window.addEventListener('pg:themeschange', renderThemes);
         // Swatches are re-rendered on palette change; keep the brush color dot current.
@@ -196,7 +207,6 @@ const Toolbar = (() => {
             btn.type = 'button';
             btn.className = 'object-item' + (o.id === current ? ' selected' : '');
             btn.dataset.object = o.id;
-            btn.setAttribute('role', 'listitem');
             btn.setAttribute('aria-pressed', String(o.id === current));
             const url = Objects.urlFor(o.id);
             btn.innerHTML = '<span class="object-thumb"><span class="object-img" aria-hidden="true"></span></span><span class="object-label"></span>';
@@ -236,9 +246,6 @@ const Toolbar = (() => {
         $('focusButton')?.addEventListener('click', () => setFocusMode(!document.body.classList.contains('focus-mode')));
         document.addEventListener('fullscreenchange', () => {
             if (!document.fullscreenElement) setFocusMode(false);
-        });
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && document.body.classList.contains('focus-mode') && !anyPopoverOpen()) setFocusMode(false);
         });
     }
 
