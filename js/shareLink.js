@@ -280,8 +280,29 @@ const ShareLink = (() => {
             console.error('Share link error:', error);
             UI.showNotification(`Could not open the shared link: ${error.message}`, 5000);
         }
-        try { history.replaceState(null, '', location.pathname + location.search); } catch (error) { /* sandboxed frame */ }
+        forgetHash();
         return true;
+    }
+
+    function forgetHash() {
+        try { history.replaceState(null, '', location.pathname + location.search); } catch (error) { /* sandboxed frame */ }
+    }
+
+    /**
+     * A link pasted into an already open tab changes only the hash. Like opening a file or a
+     * showcase, it must not silently replace work the person could lose.
+     */
+    function onHashChange() {
+        if (!hashPayload(location.hash)) return;
+        if (!FileManager.hasUserWork()) {
+            openFromHash();
+            return;
+        }
+        FileManager.confirmReplace(() => openFromHash(), {
+            message: 'Opening this shared link will replace your current board.',
+            confirmLabel: 'Open link',
+            onCancel: forgetHash
+        });
     }
 
     function init() {
@@ -296,7 +317,7 @@ const ShareLink = (() => {
             if (event.key === 'Escape' && backdrop && !backdrop.classList.contains('hidden')) closeDialog();
         });
         // A link pasted into an already open tab changes only the hash.
-        window.addEventListener('hashchange', () => { if (hashPayload(location.hash)) openFromHash(); });
+        window.addEventListener('hashchange', onHashChange);
     }
 
     return {
@@ -315,6 +336,7 @@ const ShareLink = (() => {
         decode,
         hasLink: () => hashPayload(typeof location !== 'undefined' ? location.hash : '') !== null,
         openFromHash,
+        onHashChange,
         init
     };
 })();

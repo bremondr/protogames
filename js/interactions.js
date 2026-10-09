@@ -139,14 +139,13 @@ const Interactions = (() => {
     function paintAt(polygon, isStrokeStart) {
         const state = AppState.getState();
         const size = ToolOps.effectiveSize(state, eraserSize);
-        if (size <= 1) {
-            applyToolToPolygon(polygon, isStrokeStart);
-            return;
-        }
+        if (size <= 1) return applyToolToPolygon(polygon, isStrokeStart);
         const { adjacency } = AppState.getTopology();
+        let changed = false;
         for (const id of ToolOps.brushTiles(adjacency, polygon.id, size)) {
-            applyToolToPolygon(state.polygons[adjacency.index.get(id)], isStrokeStart);
+            if (applyToolToPolygon(state.polygons[adjacency.index.get(id)], isStrokeStart)) changed = true;
         }
+        return changed;
     }
 
     /** The tiles to outline for the pointer tile: the brush or eraser footprint, otherwise the tile. */
@@ -186,8 +185,18 @@ const Interactions = (() => {
     function handleBoardGeneration() {
         const config = UI?.getBoardConfig();
         if (!config) return;
-        generateBoard(config);
-        UI?.showNotification('Board generated');
+        const generate = () => {
+            generateBoard(config);
+            UI?.showNotification('Board generated');
+        };
+        if (!FileManager.hasUserWork()) {
+            generate();
+            return;
+        }
+        FileManager.confirmReplace(generate, {
+            message: 'Generating a new board will replace your painted board and clear the undo history.',
+            confirmLabel: 'Generate'
+        });
     }
 
     function handleUndo() {
@@ -255,6 +264,11 @@ const Interactions = (() => {
         return changed;
     }
 
+    // A fill lands on pointerdown; this is set while that step could still be taken back (a pinch starts).
+    let fillPending = false;
+    // Whether the stroke in progress painted anything, so a click that changes nothing leaves no undo step.
+    let strokeChanged = false;
+
     /** The tiles a line from the start tile to `polygon` passes through (for preview and commit). */
     function linePathTo(polygon) {
         const state = AppState.getState();
@@ -282,12 +296,25 @@ const Interactions = (() => {
      */
     function cancelStroke() {
         const state = AppState.getState();
+        if (fillPending) {
+            // The fill was committed on pointerdown; take that step back as if it never happened.
+            fillPending = false;
+            const snapshot = AppState.discardLastStep();
+            if (snapshot) {
+                AppState.restoreSnapshot(snapshot);
+                Renderer.renderBoard();
+                AppState.markDirty();
+                FileManager.autoSaveToLocalStorage(true);
+            }
+            return;
+        }
         if (state.lineStartId) {
             cancelLine();
             return;
         }
         if (!state.isDrawing) return;
         AppState.setDrawingActive(false);
+        strokeChanged = false;
         const snapshot = state.history[state.historyIndex];
         if (snapshot) AppState.restoreSnapshot(snapshot);
         Renderer.renderBoard();
@@ -424,6 +451,8 @@ const Interactions = (() => {
      * @param {PointerEvent} event - Pointer down event.
      */
     function handlePointerDown(event) {
+        // Only the primary button paints; a right-click must reach the browser's context menu untouched.
+        if (event.button > 0) return;
         event.preventDefault();
         const state = AppState.getState();
         if (state.playtest) return;
@@ -432,7 +461,7 @@ const Interactions = (() => {
 
         const mode = ToolOps.effectiveMode(state);
         if (mode === 'fill') {
-            if (polygon) applyFill(polygon);
+            fillPending = Boolean(polygon && applyFill(polygon));
             return;
         }
         if (mode === 'line') {
@@ -445,8 +474,9 @@ const Interactions = (() => {
         }
 
         AppState.setDrawingActive(true, polygon?.id || null);
+        strokeChanged = false;
         if (polygon) {
-            paintAt(polygon, true);
+            strokeChanged = paintAt(polygon, true);
             Renderer.renderBoard();
         }
     }
@@ -482,7 +512,7 @@ const Interactions = (() => {
             lastMoveTimestamp = now;
             const polygon = tileAt(point);
             if (polygon && polygon.id !== state.lastColoredPolygonId) {
-                paintAt(polygon, false);
+                if (paintAt(polygon, false)) strokeChanged = true;
                 AppState.setLastColoredPolygonId(polygon.id);
                 Renderer.renderBoard();
             }
@@ -504,19 +534,25 @@ const Interactions = (() => {
      */
     function handlePointerUp(event) {
         const state = AppState.getState();
+        fillPending = false;
         if (state.lineStartId) {
             finishLine(tileAt(getWorldPoint(event)));
             return;
         }
         if (!state.isDrawing) return;
-        const didColor = Boolean(state.lastColoredPolygonId);
-        AppState.setDrawingActive(false);
-        if (didColor) {
-            AppState.recordHistory();
-            AppState.markDirty();
-            FileManager.autoSaveToLocalStorage(true);
-        }
+        endStroke();
         Renderer.renderBoard();
+    }
+
+    /** Ends a brush stroke; it becomes an undo step only if it changed a tile. */
+    function endStroke() {
+        const changed = strokeChanged;
+        strokeChanged = false;
+        AppState.setDrawingActive(false);
+        if (!changed) return;
+        AppState.recordHistory();
+        AppState.markDirty();
+        FileManager.autoSaveToLocalStorage(true);
     }
 
     /**
@@ -524,19 +560,12 @@ const Interactions = (() => {
      */
     function handlePointerCancel() {
         const state = AppState.getState();
+        fillPending = false;
         if (state.lineStartId) {
             cancelLine();
             return;
         }
-        if (state.isDrawing) {
-            const didColor = Boolean(state.lastColoredPolygonId);
-            AppState.setDrawingActive(false);
-            if (didColor) {
-                AppState.recordHistory();
-                AppState.markDirty();
-                FileManager.autoSaveToLocalStorage(true);
-            }
-        }
+        if (state.isDrawing) endStroke();
         if (state.hoverPolygonId) {
             AppState.setHoverPolygonId(null);
         }

@@ -283,29 +283,35 @@ const FileManager = (() => {
     }
 
     /** In-page replacement for window.confirm when loading over an existing board. */
-    function confirmReplace(onConfirm) {
+    function confirmReplace(onConfirm, options = {}) {
+        const { message = 'Loading a project will replace your current board.', confirmLabel = 'Load', onCancel } = options;
         const modal = document.createElement('div');
         modal.className = 'modal-backdrop';
         modal.innerHTML = `
             <div class="modal">
                 <h3>Replace current board?</h3>
-                <p>Loading a project will replace your current board.</p>
+                <p></p>
                 <div class="modal-actions">
                     <button type="button" class="secondary-button" data-action="cancel">Cancel</button>
-                    <button type="button" class="primary-button" data-action="confirm">Load</button>
+                    <button type="button" class="primary-button" data-action="confirm"></button>
                 </div>
             </div>
         `;
+        modal.querySelector('p').textContent = message;
+        modal.querySelector('[data-action="confirm"]').textContent = confirmLabel;
         document.body.appendChild(modal);
         modal.querySelector('[data-action="confirm"]').focus();
+        const decide = (confirmed) => {
+            modal.remove();
+            if (confirmed) onConfirm(); else if (onCancel) onCancel();
+        };
         modal.addEventListener('click', (event) => {
             const button = event.target.closest('button[data-action]');
             if (!button && event.target !== modal) return;
-            modal.remove();
-            if (button?.dataset.action === 'confirm') onConfirm();
+            decide(button?.dataset.action === 'confirm');
         });
         modal.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape') modal.remove();
+            if (event.key === 'Escape') decide(false);
         });
     }
 
@@ -339,12 +345,7 @@ const FileManager = (() => {
         const reader = new FileReader();
         reader.onload = (loadEvent) => {
             try {
-                const payload = ProjectFormat.parse(loadEvent.target.result);
-                if (AppState.getState().polygons.length) {
-                    confirmReplace(() => restoreState(payload));
-                    return;
-                }
-                restoreState(payload);
+                openProject(ProjectFormat.parse(loadEvent.target.result));
             } catch (error) {
                 console.error('Load error:', error);
                 showMessage('Could not open this file', error.message || 'Unable to load project file.');
@@ -353,6 +354,22 @@ const FileManager = (() => {
             }
         };
         reader.readAsText(file);
+    }
+
+    /**
+     * Shows a parsed project, asking first when it would replace work. The restore runs from the
+     * confirmation too, so a failure there is reported instead of vanishing into a click handler.
+     */
+    function openProject(payload) {
+        const open = () => {
+            try {
+                restoreState(payload);
+            } catch (error) {
+                console.error('Load error:', error);
+                showMessage('Could not open this file', error.message || 'Unable to load project file.');
+            }
+        };
+        if (hasUserWork()) confirmReplace(open); else open();
     }
 
     function restoreState(payload, options = {}) {
@@ -399,6 +416,9 @@ const FileManager = (() => {
         autoSaveToLocalStorage,
         loadAutoSave,
         restoreState,
+        openProject,
+        hasUserWork,
+        confirmReplace,
         saveProjectFile,
         promptAutosaveRestore,
         showStartupMessage

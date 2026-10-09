@@ -147,6 +147,7 @@ const ThemeManager = (() => {
         const idx = list.findIndex((x) => x.id === replaceId);
         if (idx < 0) return addParsed(kind, data);
         detach(kind, replaceId);
+        let recolored = 0;
         if (kind === 'tiles') {
             const used = usedHexes();
             const tiles = data.tiles.map((tl) => ({ label: tl.label, hex: uniqueHex(tl.hex, used), image: tl.image || null, orig: tl.orig }));
@@ -154,7 +155,8 @@ const ThemeManager = (() => {
             const theme = { id: replaceId, name: data.name, tiles: tiles.map(({ orig, ...rest }) => rest) };
             await applyTileTheme(theme);
             list[idx] = theme;
-            AppState.getState().polygons.forEach((p) => { const n = remap.get(String(p.color).toLowerCase()); if (n) p.color = n; });
+            // Recolour the undo steps too, or undo / resize would bring back colours no palette has any more.
+            recolored = AppState.remapColors(remap);
             const s = AppState.getState();
             const n = remap.get(String(s.currentColor).toLowerCase()); if (n) AppState.setCurrentColor(n);
             refreshPaletteSelect();
@@ -170,6 +172,7 @@ const ThemeManager = (() => {
             list[idx] = set;
         }
         Renderer.renderBoard();
+        if (recolored) { AppState.markDirty(); FileManager.autoSaveToLocalStorage(true); }
         const saved = persist();
         emit();
         return { name: data.name, count: (data.tiles || data.items).length, saved };
