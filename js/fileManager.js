@@ -115,9 +115,10 @@ const FileManager = (() => {
         if (!state.autoSaveEnabled) return;
         if (!state.polygons.length) return;
         if (!force && !state.isDirty) return;
-        if (!window.localStorage) return;
 
         try {
+            // Inside the try: with storage blocked, even reading window.localStorage throws.
+            if (!window.localStorage) return;
             const payload = ProjectFormat.createAutosave({
                 projectName: state.currentProjectName || Config.DEFAULT_PROJECT_NAME,
                 appState: serializeAppState()
@@ -125,13 +126,18 @@ const FileManager = (() => {
             localStorage.setItem(AutosaveSlots.ownKey(), JSON.stringify(payload));
             state.lastSaveTime = payload.timestamp;
             AppState.clearDirty();
+            quotaWarned = false;
         } catch (error) {
-            if (error.name === 'QuotaExceededError') {
-                alert('Auto-save failed: Browser storage quota exceeded.');
+            // Every stroke and the 30 s timer retry the save, so the warning is shown once until a save works again.
+            if (error && error.name === 'QuotaExceededError' && !quotaWarned) {
+                quotaWarned = true;
+                UI?.showNotification('Auto-save failed: browser storage is full. Save the project to a file so you do not lose work.', 8000);
             }
             console.error('Auto-save error:', error);
         }
     }
+
+    let quotaWarned = false;
 
     /** The slot offered at start-up, so a choice in the prompt can clean it up. */
     let offeredSlot = null;
@@ -156,7 +162,9 @@ const FileManager = (() => {
                     message: `${error.message} The next auto-save will replace it.`
                 };
             }
-            if (!slot.own) AutosaveSlots.remove(slot.key);
+            // A newer version's autosave is not damaged, this (older, cached) copy of the app just cannot read it.
+            const unreadableHere = error instanceof ProjectFormat.ProjectFormatError && error.code === 'newer-version';
+            if (!slot.own && !unreadableHere) AutosaveSlots.remove(slot.key);
             return null;
         }
     }
@@ -374,7 +382,10 @@ const FileManager = (() => {
 
     function restoreState(payload, options = {}) {
         const statePayload = payload.appState;
-        AppState.updateBoardConfig(statePayload.boardConfig);
+        // Cloned before anything is changed, so a problem here cannot leave a half-loaded board.
+        const polygons = Utils.clonePolygons(statePayload.polygons || []);
+        // Replaces the settings: keys the file lacks fall back to defaults instead of the previous board's values.
+        AppState.setBoardConfig(statePayload.boardConfig);
         const paletteId = statePayload.paletteId || Config.DEFAULT_PALETTE_ID;
         const palette = Config.getPaletteById(paletteId) || Config.getDefaultPalette();
         const resolved = UI.renderColorPalette(palette.id, statePayload.currentColor || AppState.getState().currentColor);
@@ -391,7 +402,7 @@ const FileManager = (() => {
             }
             setupAutoSave();
         }
-        AppState.setPolygons(Utils.clonePolygons(statePayload.polygons || []));
+        AppState.setPolygons(polygons);
         // An infinite board has no fixed outline to frame: show what was drawn instead of the origin.
         if (Infinite.isActive()) AppState.resetView();
         AppState.setProjectName(payload.projectName || Config.DEFAULT_PROJECT_NAME);

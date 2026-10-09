@@ -66,7 +66,8 @@ const Utils = (() => {
         document.body.appendChild(anchor);
         anchor.click();
         document.body.removeChild(anchor);
-        URL.revokeObjectURL(url);
+        // Revoked later: some browsers (Safari, older Firefox) cancel the download if the URL goes away at once.
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
     }
 
     /**

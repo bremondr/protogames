@@ -79,6 +79,32 @@ test('confirming the replacement opens the shared board', async () => {
     assert.equal(env.calls.restores.length, 1);
 });
 
+test('opening a link removes the dialogs made on the fly but only hides the ones that live in the page', async () => {
+    const prompt = makeModal(undefined);
+    const printDialog = makeModal('printDialog');
+    const themeEditor = makeModal('themeEditor');
+    const alreadyHidden = makeModal('shareDialog');
+    alreadyHidden.hidden = true;
+    const env = fresh({ modals: [prompt, printDialog, themeEditor, alreadyHidden] });
+    env.location.hash = `#b=${await linkFor(env)}`;
+    assert.equal(await env.ShareLink.openFromHash(), true);
+    assert.equal(prompt.removed, true);
+    for (const kept of [printDialog, themeEditor]) {
+        assert.equal(kept.removed, false, `${kept.id} stays in the page`);
+        assert.equal(kept.hidden, true, `${kept.id} is hidden`);
+    }
+    assert.equal(alreadyHidden.removed, false);
+});
+
+test('a link that fails reports false and leaves the open dialogs alone', async () => {
+    const prompt = makeModal(undefined);
+    const env = fresh({ modals: [prompt] });
+    env.location.hash = '#b=AAAA';
+    assert.equal(await env.ShareLink.openFromHash(), false);
+    assert.equal(prompt.removed, false);
+    assert.equal(await env.ShareLink.openFromHash(), false, 'and with no link at all');
+});
+
 test('a deflate bomb is refused while inflating, before anything is built', async () => {
     const zlib = require('node:zlib');
     const env = fresh();

@@ -105,6 +105,20 @@ const AppState = (() => {
     }
 
     /**
+     * Replaces the board configuration with one from a file or link. Only known settings are kept and
+     * missing ones take their defaults, so nothing is inherited from the board that was open before.
+     *
+     * @param {Object} config - Board configuration as saved.
+     */
+    function setBoardConfig(config) {
+        const next = { ...Config.DEFAULT_BOARD_CONFIG };
+        for (const key of Object.keys(next)) {
+            if (config && config[key] !== undefined) next[key] = config[key];
+        }
+        state.boardConfig = next;
+    }
+
+    /**
      * Updates the list of palettes made available to the UI.
      *
      * @param {Array<Object>} palettes - Palette definitions.
@@ -365,6 +379,7 @@ const AppState = (() => {
         getState,
         setPolygons,
         updateBoardConfig,
+        setBoardConfig,
         setAvailablePalettes,
         setCurrentColor,
         setEraserActive,

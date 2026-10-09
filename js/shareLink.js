@@ -300,7 +300,18 @@ const ShareLink = (() => {
         $('shareCopy').textContent = copied ? 'Copied' : 'Press Ctrl+C';
     }
 
-    /** Opens the board in the address, if there is one. Returns true when a link was handled. */
+    /**
+     * Clears the way for the new board. Dialogs made on the fly (prompts, confirmations) are removed;
+     * the ones that live in index.html (print, share, theme editor) are only hidden, because
+     * removing them would break those features until the page is reloaded.
+     */
+    function dismissModals() {
+        document.querySelectorAll('.modal-backdrop:not(.hidden)').forEach((modal) => {
+            if (modal.id) modal.classList.add('hidden'); else modal.remove();
+        });
+    }
+
+    /** Opens the board in the address, if there is one. Returns true when a link was handled, false when there is none or it failed. */
     async function openFromHash() {
         const payload = hashPayload(location.hash);
         if (!payload) return false;
@@ -323,15 +334,16 @@ const ShareLink = (() => {
             }
             if (polygons.length > MAX_TILES) fail('The board in the link is too large.');
             const project = ProjectFormat.parse(unpack(data, polygons, { defaultProjectName: Config.DEFAULT_PROJECT_NAME }));
-            document.querySelectorAll('.modal-backdrop:not(.hidden)').forEach((modal) => modal.remove());
+            dismissModals();
             FileManager.restoreState(project, { skipNotification: true });
             try { ViewControls.fit(); } catch (error) { /* view not ready */ }
             UI.showNotification('Shared board opened', 3500);
+            return true;
         } catch (error) {
             console.error('Share link error:', error);
             UI.showNotification(`Could not open the shared link: ${error.message}`, 5000);
+            return false;
         }
-        return true;
     }
 
     function forgetHash() {

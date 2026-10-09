@@ -147,7 +147,13 @@ const ThemeEditor = (() => {
         renderRows();
     }
 
+    /** Closes on the person's request. While a save is running the dialog stays, so the save can finish and report. */
     function close() {
+        if (editor && editor.saving) return;
+        finish();
+    }
+
+    function finish() {
         editor = null;
         el.root.classList.add('hidden');
         if (lastFocus && lastFocus.focus) lastFocus.focus();
@@ -266,17 +272,20 @@ const ThemeEditor = (() => {
             data = { name, items };
         }
 
-        editor.saving = true;
+        const mine = editor;
+        mine.saving = true;
         el.save.disabled = true;
         el.save.textContent = 'Saving…';
         try {
-            const r = await ThemeManager.saveTheme(editor.kind, data, editor.id);
-            UI.showNotification((editor.id ? 'Updated "' : 'Created "') + name + '"' + (r && r.saved === false ? ' — too large to keep after reload' : ''));
-            close();
+            const r = await ThemeManager.saveTheme(mine.kind, data, mine.id);
+            UI.showNotification((mine.id ? 'Updated "' : 'Created "') + name + '"' + (r && r.saved === false ? ' — too large to keep after reload' : ''));
+            mine.saving = false;
+            if (editor === mine) finish();
         } catch (err) {
-            editor.saving = false;
+            mine.saving = false;
+            if (editor !== mine) return;
             el.save.disabled = false;
-            el.save.textContent = editor.id ? 'Save changes' : 'Create';
+            el.save.textContent = mine.id ? 'Save changes' : 'Create';
             setError('Could not save: ' + err.message);
         }
     }
