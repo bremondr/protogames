@@ -68,6 +68,13 @@ test('a Content-Security-Policy limits scripts to this site and the analytics sc
     }
 });
 
+test('the page has favicons (small .ico and the logo png), and they are files that exist', () => {
+    const hrefs = [...html.matchAll(/<link rel="icon"[^>]*href="([^"]+)"/g)].map((m) => m[1]);
+    assert.ok(hrefs.some((h) => h.endsWith('.ico')), 'a .ico favicon');
+    assert.ok(hrefs.some((h) => h.endsWith('.png')), 'a .png favicon');
+    for (const href of hrefs) assert.ok(fs.existsSync(path.resolve(__dirname, '..', decodeURIComponent(href))), `${href} exists`);
+});
+
 test('the main regions of the page are direct children of the right containers', () => {
     // A stray </div> shifts everything after it out of its container; these anchors would move with it.
     const body = html.slice(html.indexOf('<body'));
