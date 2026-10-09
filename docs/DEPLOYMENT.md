@@ -51,6 +51,8 @@ All versions are served from one origin, so code in a preview could read product
 - the workflow uses `pull_request_target`, so the workflow that runs is always the one on `main`, and a pull request's files are only copied out of git, never executed in CI;
 - preview code can still read production's storage if it wants to (the prefixing protects against accidents, not against malicious code), so only open pull requests you trust from people with write access.
 
+**Content-Security-Policy and analytics (accepted risk).** `index.html` carries a CSP `<meta>` that allows scripts only from the site itself and from `scripts.simpleanalyticscdn.com`, so injected markup cannot load other code. The analytics script is the one third-party script in production: it is loaded from a "latest" address, so it cannot be pinned with Subresource Integrity, and whoever controls that address could run code on the page. This is accepted for a static, secret-free app (the original requirement that no user data leaves the browser is therefore relaxed for anonymous page views), and previews do not load it. Styles allow `'unsafe-inline'` and images allow `https:` (themes may name images by web address); a meta tag cannot set `frame-ancestors`.
+
 ## Setting it up (once)
 
 1. Merge the pull request that adds the workflow.

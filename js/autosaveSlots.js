@@ -157,8 +157,10 @@ const AutosaveSlots = (() => {
      * null. `own` is true for this tab's own slot (a reload) and false for an orphan being adopted.
      */
     function takeRestorable() {
-        if (!window.localStorage || ownId === null) return null;
+        if (ownId === null) return null;
         try {
+            // Inside the try: with storage blocked, reading window.localStorage throws and start-up must go on.
+            if (!window.localStorage) return null;
             const entries = readEntries();
             // Without Web Locks nothing can be proven orphaned, so only the own slot is offered.
             const liveIds = hasLocks() ? liveSnapshot : entries.filter((e) => e.id !== ownId && e.id !== LEGACY_ID).map((e) => e.id);

@@ -33,6 +33,16 @@ const Utils = (() => {
     }
 
     /**
+     * Escapes a value for use inside a quoted XML/HTML attribute.
+     *
+     * @param {*} value - Anything; it is converted to text first.
+     * @returns {string} Text with & < > " ' replaced by entities.
+     */
+    function escapeAttribute(value) {
+        return String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    /**
      * Clones a polygon array so mutations will not affect the original.
      *
      * @param {Array<Object>} polygons - Source polygon list.
@@ -56,7 +66,8 @@ const Utils = (() => {
         document.body.appendChild(anchor);
         anchor.click();
         document.body.removeChild(anchor);
-        URL.revokeObjectURL(url);
+        // Revoked later: some browsers (Safari, older Firefox) cancel the download if the URL goes away at once.
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
     }
 
     /**
@@ -88,6 +99,7 @@ const Utils = (() => {
     return {
         debounce,
         sanitizeFileName,
+        escapeAttribute,
         clonePolygons,
         triggerBlobDownload,
         triggerDataUrlDownload,
