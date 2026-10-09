@@ -12,7 +12,6 @@
  */
 const PrintDialog = (() => {
     const STORAGE_KEY = 'protogames_print';
-    const BLOCKING = /no room|limit is|do not fit|first/;
     const $ = (id) => document.getElementById(id);
 
     let el = {};
@@ -138,7 +137,7 @@ const PrintDialog = (() => {
         $('printTotal').textContent = p.pageCount ? `${plural(p.pageCount, 'page')} in total` : '';
 
         el.warnings.innerHTML = '';
-        p.warnings.forEach((text) => {
+        p.warnings.forEach(({ text }) => {
             const note = document.createElement('div');
             note.className = 'print-warning';
             note.setAttribute('role', 'status');
@@ -146,7 +145,7 @@ const PrintDialog = (() => {
             el.warnings.appendChild(note);
         });
 
-        const blocked = !p.board || !p.layout || p.warnings.some((w) => BLOCKING.test(w));
+        const blocked = !p.board || !p.layout || p.blocked;
         el.download.disabled = blocked || busy;
         el.download.textContent = busy ? 'Preparing…' : 'Download PDF';
         schedulePreview();
