@@ -190,16 +190,26 @@ const AppState = (() => {
     const topologyCache = new WeakMap();
 
     /**
-     * Lazily built { adjacency, locate } for the current tiles. Tile order in
-     * the adjacency matches state.polygons.
+     * Lazily built { adjacency, locate } for the current tiles. Tile order in the adjacency matches
+     * state.polygons. The locator (hover, clicks) is built on first use and the adjacency graph
+     * (fill, line, brush footprints) separately on its first read, so an infinite board that swaps
+     * its tile array on every chunk crossing only pays for what the next action needs.
      */
     function getTopology() {
         const polygons = state.polygons;
         let topology = topologyCache.get(polygons);
         if (!topology) {
+            let adjacency = null;
+            let locate = null;
             topology = {
-                adjacency: Geometry.buildAdjacency(polygons),
-                locate: Geometry.buildLocator(polygons).locate
+                get adjacency() {
+                    if (!adjacency) adjacency = Geometry.buildAdjacency(polygons);
+                    return adjacency;
+                },
+                get locate() {
+                    if (!locate) locate = Geometry.buildLocator(polygons).locate;
+                    return locate;
+                }
             };
             topologyCache.set(polygons, topology);
         }

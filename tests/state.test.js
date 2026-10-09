@@ -177,3 +177,19 @@ test('discardLastStep goes back one step and cannot be redone', () => {
     assert.equal(AppState.redo(), null);
     assert.equal(AppState.discardLastStep(), null, 'the first step is never discarded');
 });
+
+test('the adjacency graph is built only when something asks for it, not when the board is set or hovered', () => {
+    const env = fresh();
+    const { AppState, Geometry } = env;
+    let builds = 0;
+    const original = Geometry.buildAdjacency;
+    Geometry.buildAdjacency = (...args) => { builds++; return original(...args); };
+    AppState.setPolygons(tiles(env));
+    const topology = AppState.getTopology();
+    const centre = AppState.getState().polygons[5].center;
+    assert.equal(topology.locate(centre).id, AppState.getState().polygons[5].id, 'hover only needs the locator');
+    assert.equal(builds, 0, 'no adjacency yet');
+    assert.equal(topology.adjacency.ids.length, 12);
+    assert.equal(topology.adjacency, topology.adjacency, 'built once');
+    assert.equal(builds, 1);
+});
