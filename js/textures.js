@@ -18,9 +18,9 @@ const Textures = (() => {
         const k = Math.max(S / img.width, S / img.height);
         x.drawImage(img, (S - img.width * k) / 2, (S - img.height * k) / 2, img.width * k, img.height * k);
         customTiles.set(key, c);
-        cache.delete(key); objUrls.delete(key);
+        cache.delete(key); dropUrl(key);
     }
-    function unregister(hex) { const key = String(hex).toLowerCase(); customTiles.delete(key); cache.delete(key); objUrls.delete(key); }
+    function unregister(hex) { const key = String(hex).toLowerCase(); customTiles.delete(key); cache.delete(key); dropUrl(key); }
     function resetLabels() { labelMap = null; }
 
     function getLabel(hex) {
@@ -122,9 +122,11 @@ const Textures = (() => {
     function blotches(ctx, R, hex, count, amt, rad) {
         for (let i = 0; i < count; i++) {
             const x = R() * S, y = R() * S, r = rad * (0.5 + R());
+            // Drawn once, outside the callback: every wrapped copy must be identical or the tile gets seams.
+            const centre = shade(hex, (R() - 0.5) * 2 * amt, 0.5);
             const g = (X, Y) => {
                 const grad = ctx.createRadialGradient(X, Y, 0, X, Y, r);
-                grad.addColorStop(0, shade(hex, (R() - 0.5) * 2 * amt, 0.5));
+                grad.addColorStop(0, centre);
                 grad.addColorStop(1, shade(hex, 0, 0));
                 ctx.fillStyle = grad;
                 ctx.fillRect(X - r, Y - r, r * 2, r * 2);
@@ -555,9 +557,9 @@ const Textures = (() => {
             ctx.save(); ctx.filter = 'blur(3px)';
             ctx.lineCap = 'round';
             for (let i = 0; i < 6; i++) {
-                const x = R() * S, y = R() * S, len = 20 + R() * 30, ang = R() * Math.PI, bend = (R() - 0.5) * 24;
+                const x = R() * S, y = R() * S, len = 20 + R() * 30, ang = R() * Math.PI, bend = (R() - 0.5) * 24, lw = 6 + R() * 6;
                 wrap(x, y, (X, Y) => {
-                    ctx.strokeStyle = shade(hex, 0.55, 0.22); ctx.lineWidth = 6 + R() * 6;
+                    ctx.strokeStyle = shade(hex, 0.55, 0.22); ctx.lineWidth = lw;
                     ctx.beginPath(); ctx.moveTo(X, Y); ctx.quadraticCurveTo(X + Math.cos(ang) * len / 2 - Math.sin(ang) * bend, Y + Math.sin(ang) * len / 2 + Math.cos(ang) * bend, X + Math.cos(ang) * len, Y + Math.sin(ang) * len); ctx.stroke();
                 });
             }
@@ -739,7 +741,7 @@ const Textures = (() => {
         if (cache.has(key)) return cache.get(key);
         if (customTiles.has(key)) { const e = { canvas: customTiles.get(key), feature: null, url: null, patterns: new WeakMap() }; cache.set(key, e); return e; }
         const label = getLabel(key);
-        if (!label) { cache.set(key, null); return null; }
+        if (!label) return null; // not cached: the palettes may gain this colour later (custom themes)
         const canvas = document.createElement('canvas');
         canvas.width = S; canvas.height = S;
         const ctx = canvas.getContext('2d');
@@ -796,11 +798,18 @@ const Textures = (() => {
         return URL.createObjectURL(new Blob([arr], { type: head.slice(5).split(';')[0] }));
     }
     const objUrls = new Map();
+    /** Forgets a cached object URL and frees the blob behind it. */
+    function dropUrl(key) {
+        const url = objUrls.get(key);
+        if (url) URL.revokeObjectURL(url);
+        objUrls.delete(key);
+    }
     function urlFor(hex) {
         if (flatView) return null;
         if (objUrls.has(String(hex).toLowerCase())) return objUrls.get(String(hex).toLowerCase());
         const d = dataUrlFor(hex);
-        const u = d ? toObjectUrl(d) : null;
+        if (!d) return null; // not cached, like tileFor
+        const u = toObjectUrl(d);
         objUrls.set(String(hex).toLowerCase(), u);
         return u;
     }
