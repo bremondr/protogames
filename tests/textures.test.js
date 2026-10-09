@@ -108,3 +108,17 @@ test('TextureUtils.createUrlCache revokes a blob URL when it is dropped', () => 
     assert.deepEqual(revoked, ['blob:test/a']);
     assert.equal(cache.has('a'), false);
 });
+
+test('textures tile seamlessly: every shape is drawn identically at all 9 wrapped positions', () => {
+    // A shape crossing the tile edge is drawn 9 times (shifted by -S, 0, +S in x and y). If each copy
+    // picks its own random colour or width the copies differ and the tile shows seams when repeated.
+    for (const pattern of [/forest/, /nebula/]) {
+        const { stops, widths } = recordTexture(hexOf(pattern));
+        assert.ok(stops.length > 0, `${pattern} draws gradients`);
+        for (const list of [stops, widths]) {
+            const counts = new Map();
+            list.forEach((v) => counts.set(v, (counts.get(v) || 0) + 1));
+            for (const [value, count] of counts) assert.equal(count % 9, 0, `${pattern}: ${value} is drawn ${count} times`);
+        }
+    }
+});
