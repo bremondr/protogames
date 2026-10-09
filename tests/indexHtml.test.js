@@ -58,3 +58,23 @@ test('the main regions of the page are direct children of the right containers',
         assert.ok(depth <= 1, `${id} is a top-level dialog (nesting depth ${depth})`);
     }
 });
+
+test('every element id the scripts look up by getElementById or a local $ helper exists in index.html', () => {
+    // shortcutHelp is created by shortcuts.js when the overlay opens. autoSaveToggle is kept only for code
+    // that tolerates its absence (the checkbox is commented out); drop it when that code is removed.
+    const allowed = new Set(['shortcutHelp', 'autoSaveToggle']);
+    const jsDir = path.resolve(__dirname, '..', 'js');
+    const pageIds = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
+    const missing = [];
+    for (const file of fs.readdirSync(jsDir).filter((f) => f.endsWith('.js'))) {
+        const source = fs.readFileSync(path.join(jsDir, file), 'utf8');
+        // Only files that define "$ = (id) => document.getElementById(id)" may use $('id').
+        const usesDollar = /const \$ = \(id\) => document\.getElementById\(id\)/.test(source);
+        const lookups = [...source.matchAll(/getElementById\('([^']+)'\)/g)];
+        if (usesDollar) lookups.push(...source.matchAll(/(?<![\w$.])\$\('([^']+)'\)/g));
+        for (const [, id] of lookups) {
+            if (!pageIds.has(id) && !allowed.has(id)) missing.push(`${file}: #${id}`);
+        }
+    }
+    assert.deepEqual([...new Set(missing)], []);
+});

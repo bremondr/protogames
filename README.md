@@ -115,7 +115,7 @@ The geometry tests (`tests/geometry.test.js`, `tests/neighbors.test.js`) cover e
 ### Geometry gallery
 `dev/geometry-gallery.html` renders every combination as a thumbnail, runs the same checks as the tests, and marks failing combinations in red and unsupported ones as dashed "invalid" cards with the reason. Serve the repository root with any static server and open the page:
 ```
-python -m http.server 8000
+python -m http.server 8000 --bind 127.0.0.1
 # then visit http://localhost:8000/dev/geometry-gallery.html
 ```
 Optional query parameters change the sizes, e.g. `?radius=5&size=8&width=10&height=6`.
