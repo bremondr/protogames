@@ -143,12 +143,19 @@ function build({ out, main, previews = [], repo = '' }) {
             skipped.push(preview.number);
             continue;
         }
-        exportApp(preview.ref, dir);
-        const info = buildInfo({ name, label: `PR #${preview.number}`, sha: commit });
-        fs.writeFileSync(path.join(dir, 'preview-runtime.js'), runtimeSource(template, info));
-        const indexFile = path.join(dir, 'index.html');
-        fs.writeFileSync(indexFile, previewIndexHtml(fs.readFileSync(indexFile, 'utf8')));
-        summary.previews.push({ name, sha: info.sha });
+        try {
+            exportApp(preview.ref, dir);
+            const info = buildInfo({ name, label: `PR #${preview.number}`, sha: commit });
+            fs.writeFileSync(path.join(dir, 'preview-runtime.js'), runtimeSource(template, info));
+            const indexFile = path.join(dir, 'index.html');
+            fs.writeFileSync(indexFile, previewIndexHtml(fs.readFileSync(indexFile, 'utf8')));
+            summary.previews.push({ name, sha: info.sha });
+        } catch (error) {
+            // A pull request without index.html or <head> must not stop production from being published.
+            console.warn(`Skipping ${name}: ${error.message}`);
+            fs.rmSync(dir, { recursive: true, force: true });
+            skipped.push(preview.number);
+        }
     }
     fs.mkdirSync(path.join(out, 'preview'), { recursive: true });
     fs.writeFileSync(path.join(out, 'preview', 'index.html'), previewsIndexHtml(chosen.filter((p) => !skipped.includes(p.number)), repo));
