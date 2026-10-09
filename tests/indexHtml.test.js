@@ -68,6 +68,12 @@ test('a Content-Security-Policy limits scripts to this site and the analytics sc
     }
 });
 
+test('the page has a favicon, and it is a file that exists', () => {
+    const match = /<link rel="icon"[^>]*href="([^"]+)"/.exec(html);
+    assert.ok(match, 'index.html has a <link rel="icon">');
+    assert.ok(fs.existsSync(path.resolve(__dirname, '..', decodeURIComponent(match[1]))), `${match[1]} exists`);
+});
+
 test('the main regions of the page are direct children of the right containers', () => {
     // A stray </div> shifts everything after it out of its container; these anchors would move with it.
     const body = html.slice(html.indexOf('<body'));
