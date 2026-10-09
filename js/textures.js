@@ -18,9 +18,9 @@ const Textures = (() => {
         const k = Math.max(S / img.width, S / img.height);
         x.drawImage(img, (S - img.width * k) / 2, (S - img.height * k) / 2, img.width * k, img.height * k);
         customTiles.set(key, c);
-        cache.delete(key); objUrls.delete(key);
+        cache.delete(key); dropUrl(key);
     }
-    function unregister(hex) { const key = String(hex).toLowerCase(); customTiles.delete(key); cache.delete(key); objUrls.delete(key); }
+    function unregister(hex) { const key = String(hex).toLowerCase(); customTiles.delete(key); cache.delete(key); dropUrl(key); }
     function resetLabels() { labelMap = null; }
 
     function getLabel(hex) {
@@ -741,7 +741,7 @@ const Textures = (() => {
         if (cache.has(key)) return cache.get(key);
         if (customTiles.has(key)) { const e = { canvas: customTiles.get(key), feature: null, url: null, patterns: new WeakMap() }; cache.set(key, e); return e; }
         const label = getLabel(key);
-        if (!label) { cache.set(key, null); return null; }
+        if (!label) return null; // not cached: the palettes may gain this colour later (custom themes)
         const canvas = document.createElement('canvas');
         canvas.width = S; canvas.height = S;
         const ctx = canvas.getContext('2d');
@@ -798,11 +798,18 @@ const Textures = (() => {
         return URL.createObjectURL(new Blob([arr], { type: head.slice(5).split(';')[0] }));
     }
     const objUrls = new Map();
+    /** Forgets a cached object URL and frees the blob behind it. */
+    function dropUrl(key) {
+        const url = objUrls.get(key);
+        if (url) URL.revokeObjectURL(url);
+        objUrls.delete(key);
+    }
     function urlFor(hex) {
         if (flatView) return null;
         if (objUrls.has(String(hex).toLowerCase())) return objUrls.get(String(hex).toLowerCase());
         const d = dataUrlFor(hex);
-        const u = d ? toObjectUrl(d) : null;
+        if (!d) return null; // not cached, like tileFor
+        const u = toObjectUrl(d);
         objUrls.set(String(hex).toLowerCase(), u);
         return u;
     }

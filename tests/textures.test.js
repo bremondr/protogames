@@ -73,3 +73,41 @@ test('textures tile seamlessly: every shape is drawn identically at all 9 wrappe
         }
     }
 });
+
+function fakeBrowser() {
+    const revoked = [];
+    let n = 0;
+    const ctx = new Proxy({}, { get: (target, prop) => (prop === 'createRadialGradient' ? () => ({ addColorStop() {} }) : target[prop] || (() => {})), set: () => true });
+    const globals = {
+        document: { createElement: () => ({ width: 0, height: 0, getContext: () => ctx, toDataURL: () => 'data:image/png;base64,AAAA' }) },
+        URL: { createObjectURL: () => `blob:test/${++n}`, revokeObjectURL: (url) => revoked.push(url) },
+        Blob, atob
+    };
+    return { revoked, app: loadApp(['js/config.js', 'js/textures.js'], globals) };
+}
+
+test('a colour without a label is not remembered as "no texture" for good', () => {
+    const { app: browser } = fakeBrowser();
+    const T = browser.run('Textures');
+    const C = browser.run('Config');
+    const hex = '#123456';
+    assert.equal(T.dataUrlFor(hex), null, 'unknown colour has no texture');
+    // A theme adds the colour to a palette afterwards.
+    C.COLOR_PALETTES[0].colors.push({ hex, label: 'Forest edge' });
+    T.resetLabels();
+    assert.ok(T.dataUrlFor(hex), 'it gets its texture once the palette knows it');
+});
+
+test('object URLs are revoked when their texture is replaced or removed', () => {
+    const { app: browser, revoked } = fakeBrowser();
+    const T = browser.run('Textures');
+    const forest = browser.run('Config').COLOR_PALETTES.flatMap((p) => p.colors).find((c) => /forest/i.test(c.label)).hex;
+    const url = T.urlFor(forest);
+    assert.ok(url);
+    assert.equal(T.urlFor(forest), url, 'the URL is cached');
+    T.registerImage(forest, { width: 10, height: 10 });
+    assert.deepEqual(revoked, [url], 'replacing the texture frees the old blob');
+    const second = T.urlFor(forest);
+    T.unregister(forest);
+    assert.deepEqual(revoked, [url, second]);
+});
