@@ -18,19 +18,19 @@ A preview shows a small **Preview: PR #n (commit)** badge with links to producti
 
 `.github/workflows/pages.yml` runs on every push to `main` and on every pull request event, and each run rebuilds the **whole** site (so nothing stale is left behind) using `scripts/build-site.js`:
 
-1. checks out `main` and, for pushes, runs the unit tests (a failing `main` is not published);
+1. checks out `main` and runs the unit tests on every run, whatever started it (a failing `main` is never published, not even by a pull request event);
 2. lists the open pull requests of this repository and fetches their heads;
 3. writes production at the root and each pull request under `preview/pr-<number>/`, reading every version straight from git (only `index.html`, `styles.css`, `js/`, `images/` and `showcases/` are published);
 4. deploys the folder with the official Pages actions and comments the preview link.
 
-Runs are serialised and the latest one wins. At most 20 previews are published.
+Runs are serialised and the latest one wins (the concurrency group is on the deploy job, so a skipped fork pull request cannot cancel a deploy in flight). A pull request that cannot be built into a preview (for example it has no `index.html`) is skipped with a warning and never blocks production. Actions are referenced by version tag, not pinned to a commit. At most 20 previews are published.
 
 You can build the same folder locally from any git refs:
 
 ```bash
 node scripts/build-site.js --out _site --main main --previews previews.json --repo bremondr/protogames
 # previews.json: [{ "number": 66, "title": "Experiment", "ref": "my-branch" }]
-python -m http.server 8000 --directory _site
+python -m http.server 8000 --bind 127.0.0.1 --directory _site
 ```
 
 ## What is different in a preview
