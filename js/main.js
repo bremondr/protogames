@@ -18,7 +18,6 @@ const Main = (() => {
         UI.init();
         const uiRefs = UI.getElements();
         UI.initializePaletteSelector(Config.DEFAULT_PALETTE_ID);
-        AppState.setAvailablePalettes(Config.getAllPalettes());
         const defaultPalette = Config.getDefaultPalette();
         const paletteRender = UI.renderColorPalette(defaultPalette.id, defaultPalette.colors[0]?.hex);
         AppState.setCurrentPaletteId(paletteRender.paletteId);
@@ -42,10 +41,10 @@ const Main = (() => {
             .catch((error) => console.error('Theme restore failed:', error))
             .then(() => AutosaveSlots.claim())
             .catch((error) => console.error('Autosave slot setup failed:', error))
-            .finally(startBoard);
+            .finally(() => startBoard().catch((error) => console.error('Start-up failed:', error)));
     }
 
-    function startBoard() {
+    async function startBoard() {
         FileManager.setupAutoSave();
 
         window.addEventListener('resize', debouncedResize);
@@ -53,8 +52,11 @@ const Main = (() => {
         const autoSaved = FileManager.loadAutoSave();
         // A shared link wins over a saved autosave: the person opened it on purpose.
         if (ShareLink.hasLink()) {
-            ShareLink.openFromHash();
-            return;
+            let opened = false;
+            try { opened = await ShareLink.openFromHash(); } catch (error) { console.error('Share link failed:', error); }
+            if (opened) return;
+            // The link was bad (the reason is already on screen): carry on as if there had been none,
+            // so the person gets their autosave offered or a fresh board instead of an empty canvas.
         }
         FileManager.showStartupMessage();
         if (autoSaved) {
@@ -63,12 +65,11 @@ const Main = (() => {
         }
 
         Interactions.generateBoard(AppState.getState().boardConfig, { skipDirtyFlag: true });
-        UI.updateCanvasMessage(AppState.getState().polygons.length);
     }
 
     document.addEventListener('DOMContentLoaded', initializeApp);
 
     return {
-        initializeApp
+        startBoard
     };
 })();

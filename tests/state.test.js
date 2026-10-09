@@ -109,3 +109,87 @@ test('undo/redo snapshots keep colours and objects, and restoring them deletes s
     assert.equal(polygons[0].color, '#111111');
     assert.equal(polygons[1].object, 'castle');
 });
+
+test('the undo stack keeps only HISTORY_LIMIT steps and undo can still walk back through them', () => {
+    const env = fresh();
+    const { AppState, Config } = env;
+    AppState.setPolygons(tiles(env));
+    const state = AppState.getState();
+    for (let i = 0; i < Config.HISTORY_LIMIT + 10; i++) {
+        state.polygons[0].color = `#${String(i).padStart(6, '0')}`;
+        AppState.recordHistory();
+    }
+    assert.equal(state.history.length, Config.HISTORY_LIMIT);
+    assert.equal(state.historyIndex, Config.HISTORY_LIMIT - 1);
+    assert.equal(state.history[state.history.length - 1][0].color, `#${String(Config.HISTORY_LIMIT + 9).padStart(6, '0')}`);
+    assert.equal(state.history[0][0].color, `#${String(10).padStart(6, '0')}`, 'the oldest steps were dropped');
+    let steps = 0;
+    while (AppState.undo()) steps++;
+    assert.equal(steps, Config.HISTORY_LIMIT - 1);
+});
+
+test('recording after an undo throws the redo branch away', () => {
+    const env = fresh();
+    const { AppState } = env;
+    AppState.setPolygons(tiles(env));
+    const state = AppState.getState();
+    for (const color of ['#111111', '#222222', '#333333']) { state.polygons[0].color = color; AppState.recordHistory(); }
+    AppState.undo();
+    AppState.undo();
+    state.polygons[0].color = '#444444';
+    AppState.recordHistory();
+    assert.equal(state.history.length, 2);
+    assert.equal(AppState.redo(), null, 'nothing left to redo');
+    assert.equal(state.history[state.historyIndex][0].color, '#444444');
+    assert.equal(AppState.undo()[0].color, '#111111');
+});
+
+test('remapColors rewrites the tiles and every undo step, leaving other colours alone', () => {
+    const env = fresh();
+    const { AppState } = env;
+    AppState.setPolygons(tiles(env));
+    const state = AppState.getState();
+    state.polygons[0].color = '#AA0000';
+    state.polygons[1].color = '#00aa00';
+    AppState.recordHistory();
+    state.polygons[2].color = '#aa0000';
+    AppState.recordHistory();
+    const changed = AppState.remapColors(new Map([['#aa0000', '#bb0000']]));
+    assert.equal(changed, 2);
+    assert.equal(state.polygons[0].color, '#bb0000');
+    assert.equal(state.polygons[1].color, '#00aa00');
+    for (const snapshot of state.history) assert.ok(snapshot.every((entry) => entry.color.toLowerCase() !== '#aa0000'));
+    AppState.restoreSnapshot(AppState.undo());
+    assert.equal(state.polygons[0].color, '#bb0000', 'undo no longer brings the old colour back');
+});
+
+test('discardLastStep goes back one step and cannot be redone', () => {
+    const env = fresh();
+    const { AppState } = env;
+    AppState.setPolygons(tiles(env));
+    const state = AppState.getState();
+    AppState.recordHistory();
+    state.polygons[0].color = '#111111';
+    AppState.recordHistory();
+    const snapshot = AppState.discardLastStep();
+    assert.equal(snapshot[0].color, '#ffffff');
+    assert.equal(state.history.length, 1);
+    assert.equal(AppState.redo(), null);
+    assert.equal(AppState.discardLastStep(), null, 'the first step is never discarded');
+});
+
+test('the adjacency graph is built only when something asks for it, not when the board is set or hovered', () => {
+    const env = fresh();
+    const { AppState, Geometry } = env;
+    let builds = 0;
+    const original = Geometry.buildAdjacency;
+    Geometry.buildAdjacency = (...args) => { builds++; return original(...args); };
+    AppState.setPolygons(tiles(env));
+    const topology = AppState.getTopology();
+    const centre = AppState.getState().polygons[5].center;
+    assert.equal(topology.locate(centre).id, AppState.getState().polygons[5].id, 'hover only needs the locator');
+    assert.equal(builds, 0, 'no adjacency yet');
+    assert.equal(topology.adjacency.ids.length, 12);
+    assert.equal(topology.adjacency, topology.adjacency, 'built once');
+    assert.equal(builds, 1);
+});

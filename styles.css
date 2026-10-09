@@ -190,16 +190,6 @@ button {
     background: transparent;
 }
 
-.canvas-placeholder {
-    margin: 0;
-    padding: 1rem 1.5rem;
-    font-size: 0.95rem;
-    color: var(--color-muted);
-    text-align: center;
-    border-top: 1px dashed var(--color-border);
-    background-color: #f8f9fd;
-}
-
 /* Panels */
 /* ==============================================================
    SIDEBAR PANELS
@@ -276,8 +266,7 @@ input[type="number"]:focus-visible {
    icon, and destructive actions.
    ============================================================== */
 .primary-button,
-.secondary-button,
-.icon-button {
+.secondary-button {
     border: none;
     border-radius: var(--radius-sm);
     padding: 0.65rem 0.75rem;
@@ -308,26 +297,6 @@ input[type="number"]:focus-visible {
 
 .secondary-button:hover {
     background: rgba(255, 255, 255, 0.2);
-}
-
-.icon-button {
-    width: 100%;
-    justify-content: flex-start;
-    background: rgba(255, 255, 255, 0.08);
-    color: #ffffff;
-}
-
-.icon-button:hover {
-    background: rgba(255, 255, 255, 0.18);
-}
-
-.icon-button.destructive {
-    color: #ffe0e0;
-    border: 1px solid rgba(214, 69, 69, 0.4);
-}
-
-.icon-button.destructive:hover {
-    background: rgba(214, 69, 69, 0.2);
 }
 
 button:active {
@@ -457,18 +426,6 @@ button:focus-visible {
 }
 
 /* Actions */
-/* ==============================================================
-   ACTIONS PANEL
-   --------------------------------------------------------------
-   Vertical stack for undo, redo, and clear buttons to remain
-   readable in tight spaces.
-   ============================================================== */
-.action-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
 /* Responsive adjustments */
 /* ==============================================================
    RESPONSIVE ADJUSTMENTS
@@ -1266,6 +1223,16 @@ button:focus-visible {
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
     cursor: pointer;
     overflow: hidden;
+}
+
+.editor-color:focus-within {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+}
+
+#gameCanvas:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
 }
 
 .editor-color input {

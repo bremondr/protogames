@@ -2,6 +2,7 @@
   "name": "protogames",
   "version": "0.0.0",
   "private": true,
+  "license": "AGPL-3.0-only",
   "description": "Browser-based drawing tool for tabletop board prototyping. No build step; this file only defines the test script.",
   "scripts": {
     "test": "node --test \"tests/**/*.test.js\""

@@ -21,14 +21,15 @@ permissions:
   id-token: write
   pull-requests: write
 
-# The latest run wins: every run builds all versions, so an older one is never needed.
-concurrency:
-  group: pages
-  cancel-in-progress: true
-
 jobs:
   deploy:
     if: github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository
+    # The latest run wins: every run builds all versions, so an older one is never needed.
+    # This is set on the job, not the workflow, on purpose: a workflow-level group is entered even by a
+    # run whose only job is skipped (a fork pull request), and such a run would cancel a deploy in flight.
+    concurrency:
+      group: pages
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -42,9 +43,9 @@ jobs:
         with:
           node-version: 22
 
-      # Do not publish a broken production build (pull request events only add previews to a main that was already tested).
+      # Every run publishes main, whatever event started it, so every run tests main first. A pull request
+      # event (or a manual run) must not be able to deploy an untested or broken main.
       - name: Run unit tests
-        if: github.event_name != 'pull_request_target'
         run: npm test
 
       - name: Collect open pull requests from this repository

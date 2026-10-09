@@ -38,9 +38,20 @@ const ThemeManager = (() => {
         n = n || 1;
         return '#' + [r, g, b].map((v) => Math.round(v / n).toString(16).padStart(2, '0')).join('');
     }
+    /**
+     * A tile colour is its identity and ends up in CSS (--swatch-color), saved files and share links,
+     * so only real hex colours are accepted. Returns "#rrggbb", or null for anything else.
+     */
+    function cleanHex(value) {
+        const text = typeof value === 'string' ? value.trim() : '';
+        if (/^#[0-9a-f]{6}$/i.test(text)) return text.toLowerCase();
+        const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(text);
+        return short ? `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`.toLowerCase() : null;
+    }
     // Ensure palette hexes are unique across all palettes (hex is the tile's identity).
     function uniqueHex(hex, used) {
-        let h = hex.toLowerCase();
+        let h = cleanHex(hex);
+        if (!h) throw new Error('A tile colour is not a hex colour like #4b5d3a.');
         while (used.has(h)) {
             const n = parseInt(h.slice(1), 16);
             h = '#' + ((n + 1) & 0xffffff).toString(16).padStart(6, '0');
@@ -73,13 +84,15 @@ const ThemeManager = (() => {
     function refreshPaletteSelect() {
         const s = AppState.getState();
         UI.initializePaletteSelector(s.currentPaletteId);
-        AppState.setAvailablePalettes(Config.getAllPalettes());
     }
     function emit() { window.dispatchEvent(new CustomEvent('pg:themeschange')); }
 
     async function init() {
         try { store = JSON.parse(localStorage.getItem(KEY)) || store; } catch (e) { /* ignore */ }
-        store.tiles = store.tiles || []; store.items = store.items || [];
+        store.tiles = Array.isArray(store.tiles) ? store.tiles : []; store.items = Array.isArray(store.items) ? store.items : [];
+        // Themes saved before colours were checked: anything that is not a hex colour falls back to grey.
+        store.tiles.forEach((t) => { if (t && Array.isArray(t.tiles)) t.tiles.forEach((tile) => { tile.hex = cleanHex(tile.hex) || '#cccccc'; }); });
+        store.tiles = store.tiles.filter((t) => t && Array.isArray(t.tiles));
         for (const t of store.tiles) await applyTileTheme(t);
         for (const s of store.items) await applyItemSet(s);
         refreshPaletteSelect();
@@ -101,7 +114,11 @@ const ThemeManager = (() => {
             if (kind === 'tiles') {
                 const tiles = data.tiles || data.colors;
                 if (!Array.isArray(tiles) || !tiles.length) throw new Error('No "tiles" found in file');
-                return { name: data.name || labelFromFile(json.name), tiles: tiles.map((t, i) => ({ label: t.label || `Tile ${i + 1}`, hex: t.hex || '#cccccc', image: t.image || null })) };
+                return { name: data.name || labelFromFile(json.name), tiles: tiles.map((t, i) => {
+                    const hex = t.hex === undefined || t.hex === null || t.hex === '' ? '#cccccc' : cleanHex(t.hex);
+                    if (!hex) throw new Error(`Tile ${i + 1} has an invalid colour; use a hex colour like #4b5d3a.`);
+                    return { label: t.label || `Tile ${i + 1}`, hex, image: t.image || null };
+                }) };
             }
             if (!Array.isArray(data.items) || !data.items.length) throw new Error('No "items" found in file');
             return { name: data.name || labelFromFile(json.name), items: data.items.map((it, i) => ({ label: it.label || `Item ${i + 1}`, image: it.image })) };
@@ -147,6 +164,7 @@ const ThemeManager = (() => {
         const idx = list.findIndex((x) => x.id === replaceId);
         if (idx < 0) return addParsed(kind, data);
         detach(kind, replaceId);
+        let recolored = 0;
         if (kind === 'tiles') {
             const used = usedHexes();
             const tiles = data.tiles.map((tl) => ({ label: tl.label, hex: uniqueHex(tl.hex, used), image: tl.image || null, orig: tl.orig }));
@@ -154,7 +172,8 @@ const ThemeManager = (() => {
             const theme = { id: replaceId, name: data.name, tiles: tiles.map(({ orig, ...rest }) => rest) };
             await applyTileTheme(theme);
             list[idx] = theme;
-            AppState.getState().polygons.forEach((p) => { const n = remap.get(String(p.color).toLowerCase()); if (n) p.color = n; });
+            // Recolour the undo steps too, or undo / resize would bring back colours no palette has any more.
+            recolored = AppState.remapColors(remap);
             const s = AppState.getState();
             const n = remap.get(String(s.currentColor).toLowerCase()); if (n) AppState.setCurrentColor(n);
             refreshPaletteSelect();
@@ -170,6 +189,7 @@ const ThemeManager = (() => {
             list[idx] = set;
         }
         Renderer.renderBoard();
+        if (recolored) { AppState.markDirty(); FileManager.autoSaveToLocalStorage(true); }
         const saved = persist();
         emit();
         return { name: data.name, count: (data.tiles || data.items).length, saved };

@@ -101,8 +101,8 @@ const Shortcuts = (() => {
     }
 
     /**
-     * The binding an event triggers, or null. `context.focusNeutral` says whether keyboard
-     * focus is on nothing in particular (so Tab may cycle swatches instead of moving focus).
+     * The binding an event triggers, or null. `context.focusNeutral` says whether the canvas
+     * has keyboard focus (so Tab may cycle swatches instead of moving focus).
      */
     function findBinding(event, isMac, context = {}, bindings = BINDINGS) {
         for (const binding of bindings) {
@@ -122,17 +122,8 @@ const Shortcuts = (() => {
 
     // ---- Which events to leave alone --------------------------------------------------------------------
 
-    /** Typing targets: shortcuts must never fire while the user is entering text. */
-    function isTypingTarget(target) {
-        if (!target) return false;
-        const tag = String(target.tagName || '').toUpperCase();
-        if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
-        if (tag === 'INPUT') {
-            // Checkboxes, buttons, file and colour inputs do not take typed text.
-            return !['checkbox', 'radio', 'button', 'submit', 'reset', 'file', 'color', 'range', 'image'].includes(String(target.type || 'text').toLowerCase());
-        }
-        return Boolean(target.isContentEditable);
-    }
+    /** Typing targets: shortcuts must never fire while the user is entering text (one rule, shared with pan-with-Space). */
+    const isTypingTarget = (target) => FocusUtils.isTypingTarget(target);
 
     /** Should this keydown be ignored entirely (typing, dialogs open, IME, held modifier-only)? */
     function shouldIgnore(event, state) {
@@ -248,10 +239,16 @@ const Shortcuts = (() => {
         return Boolean(document.querySelector('.modal-backdrop:not(.hidden)'));
     }
 
-    /** Keyboard focus is on nothing in particular, so Tab may cycle swatches instead of moving focus. */
+    /**
+     * Tab cycles swatches only while the board canvas itself has focus. With focus on the
+     * page (or anything else) Tab keeps moving focus, so keyboard users can reach the controls.
+     */
+    function isFocusNeutral(active, canvas) {
+        return Boolean(canvas) && active === canvas;
+    }
+
     function focusNeutral() {
-        const active = document.activeElement;
-        return !active || active === document.body || active === document.getElementById('gameCanvas');
+        return isFocusNeutral(document.activeElement, document.getElementById('gameCanvas'));
     }
 
     function onKeyDown(event) {
@@ -389,6 +386,7 @@ const Shortcuts = (() => {
                 closeHelp();
             }
         });
+        FocusUtils.trapTab(overlay);
         close.focus();
     }
 
@@ -412,6 +410,7 @@ const Shortcuts = (() => {
         matchesCombo,
         findBinding,
         isTypingTarget,
+        isFocusNeutral,
         shouldIgnore,
         formatCombo,
         displayFor,

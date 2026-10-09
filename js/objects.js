@@ -8,18 +8,10 @@ const Objects = (() => {
     const D = 128;          // design space
     const RES = 256;        // raster resolution
     const cache = new Map();
+    const { shade } = TextureUtils;
+    const urls = TextureUtils.createUrlCache();
     const LINE = 'rgba(20,16,12,0.6)';
 
-    function rgb(c) {
-        const m = /^rgba?\(([^)]+)\)/.exec(c);
-        if (m) return m[1].split(',').slice(0, 3).map((v) => parseFloat(v));
-        const n = parseInt(c.replace('#', ''), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-    }
-    function shade(hex, amt, a = 1) {
-        const [r, g, b] = rgb(hex);
-        const f = (c) => Math.round(amt >= 0 ? c + (255 - c) * amt : c * (1 + amt));
-        return `rgba(${f(r)},${f(g)},${f(b)},${a})`;
-    }
     function shadow(ctx, x, y, w) {
         ctx.fillStyle = 'rgba(0,0,0,0.32)';
         ctx.beginPath(); ctx.ellipse(x + w * 0.25, y + 1, w, w * 0.26, 0, 0, Math.PI * 2); ctx.fill();
@@ -402,14 +394,15 @@ const Objects = (() => {
     function removeSet(id) {
         const i = THEMES.findIndex((t) => t.id === id && t.custom);
         if (i < 0) return;
-        THEMES[i].items.forEach((it) => { custom.delete(it.id); cache.delete(it.id); if (typeof objUrls !== 'undefined') objUrls.delete(it.id); });
+        THEMES[i].items.forEach((it) => { custom.delete(it.id); cache.delete(it.id); urls.drop(it.id); });
         THEMES.splice(i, 1);
         ALL = THEMES.flatMap((t) => t.items);
     }
 
     function canvasFor(id) {
         if (custom.has(id)) { if (!cache.has(id)) cache.set(id, { canvas: custom.get(id), url: null }); return custom.get(id); }
-        if (!G[id]) return null;
+        // Own keys only: ids come from files and links, and "__proto__" or "constructor" must not resolve.
+        if (!Object.prototype.hasOwnProperty.call(G, id)) return null;
         if (cache.has(id)) return cache.get(id).canvas;
         const c = document.createElement('canvas'); c.width = RES; c.height = RES;
         const ctx = c.getContext('2d');
@@ -437,20 +430,11 @@ const Objects = (() => {
     }
 
 
-    // Object URL (no ';' in it) so it can be interpolated into inline style strings.
-    function toObjectUrl(dataUrl) {
-        const [head, b64] = dataUrl.split(',');
-        const bin = atob(b64), arr = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-        return URL.createObjectURL(new Blob([arr], { type: head.slice(5).split(';')[0] }));
-    }
-    const objUrls = new Map();
     function urlFor(key) {
-        if (objUrls.has(key) && (custom.has(key) ? cache.has(key) : true)) return objUrls.get(key);
+        if (urls.has(key) && (custom.has(key) ? cache.has(key) : true)) return urls.get(key);
+        urls.drop(key);
         const d = dataUrlFor(key);
-        const u = d ? toObjectUrl(d) : null;
-        objUrls.set(key, u);
-        return u;
+        return urls.set(key, d ? TextureUtils.toObjectUrl(d) : null);
     }
     const themes = () => THEMES.map(({ id, name }) => ({ id, name }));
     const list = (themeId) => ((THEMES.find((t) => t.id === themeId) || THEMES[0]).items).slice();

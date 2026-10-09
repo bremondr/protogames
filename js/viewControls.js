@@ -104,8 +104,6 @@ const ViewControls = (() => {
         return size ? Math.round(((state().view.scale * size) / Config.ACTUAL_TILE_PX) * 100) : 100;
     }
 
-    const isSpaceDown = () => spaceDown;
-
     // ---- Wheel ------------------------------------------------------------------------
 
     function onWheel(event) {
@@ -121,10 +119,14 @@ const ViewControls = (() => {
 
     // ---- Space key -----------------------------------------------------------------------
 
-    function isTypingTarget(target) {
-        if (!target || !target.tagName) return false;
-        const tag = target.tagName;
-        return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON' || tag === 'A' || target.isContentEditable;
+    /**
+     * Targets that keep the Space key: text entry (the shared rule), or a button or link focused
+     * with the keyboard, which Space should still press. After a mouse click a button has focus
+     * but not :focus-visible, so Space pans instead of pressing it.
+     */
+    function ownsSpace(target) {
+        if (FocusUtils.isTypingTarget(target)) return true;
+        try { return Boolean(target && target.matches && target.matches('button:focus-visible, a:focus-visible')); } catch (e) { return false; }
     }
 
     function setSpace(down) {
@@ -135,7 +137,7 @@ const ViewControls = (() => {
     }
 
     function onKeyDown(event) {
-        if (event.code !== 'Space' || isTypingTarget(event.target) || event.ctrlKey || event.metaKey || event.altKey) return;
+        if (event.code !== 'Space' || ownsSpace(event.target) || event.ctrlKey || event.metaKey || event.altKey) return;
         // Space must not scroll the page or click a focused control while navigating.
         event.preventDefault();
         setSpace(true);
@@ -470,7 +472,6 @@ const ViewControls = (() => {
         fit,
         actualSize,
         toggleMinimap,
-        zoomPercent,
-        isSpaceDown
+        zoomPercent
     };
 })();

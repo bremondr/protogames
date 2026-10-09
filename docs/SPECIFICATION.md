@@ -4,7 +4,7 @@ Reference for formats that other code (and other people's saved files) depend on
 
 ## Project file format
 
-Projects are saved as `<name>.protogames.json` and the editor also keeps one copy in `localStorage` (key `protogames_autosave`) as an autosave. Both are produced and read by `js/projectFormat.js`; nothing else should build or inspect these objects by hand.
+Projects are saved as `<name>.protogames.json` and the editor also keeps one copy per tab in `localStorage` (key `protogames_autosave:<tab id>`, see "Autosave storage") as an autosave. Both are produced and read by `js/projectFormat.js`; nothing else should build or inspect these objects by hand.
 
 ### Version
 
@@ -63,10 +63,10 @@ The autosave has the same shape except it carries `timestamp` (milliseconds sinc
 1. parses JSON text (error: "not valid JSON");
 2. detects the version (see above);
 3. migrates one version at a time until it is current (`MIGRATIONS[n]` upgrades v*n* to v*n+1*);
-4. validates the result: board settings, palette and colour, and every tile (id, at least 3 finite vertices, centre, colour, optional object id; ids unique);
-5. returns the project, or throws a `ProjectFormatError` whose `message` is meant for users and whose `code` is one of `not-json`, `not-a-project`, `bad-version`, `newer-version`, `invalid`.
+4. fills in a tile's `bounds` from its vertices when an older file left them out, then validates the result: board settings (`width`/`height` 1 to 201, `radius`/`size` 0 to 100, `orientation` and `triangleOrientation` one of the known values when present) and every tile (id, 3 to 64 finite vertices, centre, finite `bounds`, colour as `#rgb` or `#rrggbb`, optional object id of 1 to 200 characters; ids unique; an infinite board has at least one tile);
+5. returns the project, or throws a `ProjectFormatError` whose `message` is meant for users and whose `code` is one of `not-json`, `not-a-project`, `bad-version`, `newer-version`, `invalid`, `no-migration` or `bad-migration`. The last two are developer errors rather than file problems: `no-migration` means `MIGRATIONS` has no step for a version the file claims (a missing step after bumping `CURRENT_VERSION`), and `bad-migration` means a step ran but did not set `version` to the next number.
 
-Parsing never mutates its input. The editor shows these messages in a dialog when a file is opened, and when an autosave from a newer version (or a damaged one) cannot be restored.
+These limits only turn away files the app cannot have written (they would crash or hang it, or put markup into an exported SVG), so they changed no format version; `tests/projectFormat.test.js` checks that every fixture and showcase still loads and lists the hostile cases. Parsing never mutates its input. The editor shows these messages in a dialog when a file is opened, and when an autosave from a newer version (or a damaged one) cannot be restored.
 
 ### Changing the format
 
@@ -151,7 +151,7 @@ The payload is JSON, deflate-compressed (`deflate-raw`) and written as base64url
 | `o` | Tiles that hold an object: `tileIndex:objectIndex` pairs (base 36), dot separated |
 | `i` | Infinite boards only: the ids of the drawn tiles, dot separated, in the order of `t` and `o`. The tiles are rebuilt from the ids instead of regenerated from `c`. |
 
-Tile geometry is not stored: the board is regenerated from `c`, which fixes the tile order, so `t` must have exactly one entry per generated tile (for an infinite board, per id in `i`). Anything unexpected (wrong version, bad colour, out-of-range index, size mismatch) is refused with a message instead of opening a damaged board.
+Tile geometry is not stored: the board is regenerated from `c`, which fixes the tile order, so `t` must have exactly one entry per generated tile (for an infinite board, per id in `i`). Anything unexpected (wrong version, bad colour, out-of-range index, size mismatch) is refused with a message instead of opening a damaged board. The payload is inflated through a reader that stops at 2 MB of output, the settings and tile count are checked before any tile is built, and the link is removed from the address before it is decoded, so a hostile link cannot hang the tab again after a reload.
 
 Links are not capped, but the dialog warns about length: a note above 2,000 characters and a stronger one above 8,000 (rules of thumb for chat and email apps), always with a "Download project file instead" button. The link stays copyable at every size.
 

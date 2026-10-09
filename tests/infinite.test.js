@@ -47,6 +47,14 @@ test('ids that are not infinite-board tiles are refused', () => {
     }
     assert.ok(Infinite.fromId('inf_hp_-3_4'), 'negative coordinates are fine');
     assert.ok(Infinite.fromId('inf_t_-1_-2_up'));
+    assert.ok(Infinite.fromId('inf_s_0_0'));
+});
+
+test('ids that are not in canonical form are refused instead of being renamed', () => {
+    for (const id of ['inf_s_01_2', 'inf_s_1_02', 'inf_s_1e1_2', 'inf_s_0x10_2', 'inf_s_-0_2', 'inf_s_+1_2', 'inf_s__2', 'inf_s_ 1_2', 'inf_s_1_2_extra_', 'inf_hp_1e400_2']) {
+        assert.equal(Infinite.fromId(id), null, JSON.stringify(id));
+    }
+    for (const id of ['inf_s_0_0', 'inf_s_-12_340', 'inf_hf_5_-6', 'inf_t_7_8_down']) assert.equal(Infinite.fromId(id)?.id, id);
 });
 
 test('neighbouring tiles of a lattice share edges (no gaps, no overlaps)', () => {
@@ -133,4 +141,22 @@ test('an export frames what was drawn, with blank tiles around it, however far i
         assert.ok(x > 0 && x < CANVAS.width && y > 0 && y < CANVAS.height, `${polygon.id} lands on the canvas`);
     }
     assert.ok(scene.view.scale <= 2);
+});
+
+test('an export of tiles drawn very far apart falls back to the drawn tiles without building the area between them', () => {
+    const state = AppState.getState();
+    state.canvas = { width: CANVAS.width, height: CANVAS.height };
+    for (const gridType of ['hexagon', 'square', 'triangle']) {
+        AppState.setPolygons(Geometry.generateGrid(config(gridType), state.canvas, null));
+        const a = Infinite.fromId(gridType === 'hexagon' ? 'inf_hp_0_0' : gridType === 'square' ? 'inf_s_0_0' : 'inf_t_0_0_up');
+        const b = Infinite.fromId(gridType === 'hexagon' ? 'inf_hp_900000_900000' : gridType === 'square' ? 'inf_s_900000_900000' : 'inf_t_900000_900000_up');
+        a.color = '#7CB342';
+        b.color = '#E53935';
+        state.polygons = state.polygons.concat([a, b]);
+        // The area between them holds around 10^11 tiles; building it would never finish (or run out of memory).
+        const started = Date.now();
+        const scene = Infinite.exportScene(CANVAS.width, CANVAS.height);
+        assert.ok(Date.now() - started < 2000, `${gridType} export is quick`);
+        assert.deepEqual(plain(scene.polygons.map((p) => p.id).sort()), [a.id, b.id].sort());
+    }
 });

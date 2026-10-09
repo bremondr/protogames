@@ -53,9 +53,12 @@ const Playtest = (() => {
         $('playButton')?.addEventListener('click', () => setOn(!isOn()));
         $('playtestBack')?.addEventListener('click', () => setOn(false));
         document.addEventListener('keydown', (event) => {
-            // The help overlay uses Escape to close itself first.
-            if (event.key === 'Escape' && isOn() && !document.getElementById('shortcutHelp')) setOn(false);
-        });
+            // One Escape closes only the topmost layer: a dialog or the help overlay first, then a
+            // popover or full screen (the toolbar marks those keys as used), then playtest.
+            // Capture phase, so a dialog closing on this same key press is still seen as open.
+            if (event.key !== 'Escape' || event.defaultPrevented || !isOn() || FocusUtils.layerOpen()) return;
+            setOn(false);
+        }, true);
     }
 
     return { init, setOn, isOn };

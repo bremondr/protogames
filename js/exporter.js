@@ -17,7 +17,7 @@ const Exporter = (() => {
     function exportToPNG() {
         const state = AppState.getState();
         if (!state.canvas || !state.polygons.length) {
-            alert('Generate a board before exporting.');
+            UI?.showNotification('Generate a board before exporting.');
             return;
         }
         // Painted at the identity view on a separate canvas, so exports ignore the current zoom/pan.
@@ -27,10 +27,27 @@ const Exporter = (() => {
         UI?.showNotification('PNG exported', 3000);
     }
 
+    /**
+     * The flat-colour SVG of a set of tiles. Every value that goes into an attribute is escaped:
+     * a colour comes from a file or link and must not be able to close the attribute and add its own.
+     */
+    function buildSvg(polygons, { width, height, viewBox }) {
+        const paths = polygons
+            .map((polygon) => {
+                const commands = polygon.vertices
+                    .map((vertex, index) => `${index === 0 ? 'M' : 'L'} ${vertex.x.toFixed(2)} ${vertex.y.toFixed(2)}`)
+                    .join(' ');
+                const fill = Utils.escapeAttribute(polygon.color || Config.DEFAULT_FILL);
+                return `<path d="${commands} Z" fill="${fill}" stroke="${Utils.escapeAttribute(Config.GRID_STROKE)}" stroke-width="1" />`;
+            })
+            .join('');
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${Utils.escapeAttribute(viewBox)}" width="${Utils.escapeAttribute(width)}" height="${Utils.escapeAttribute(height)}">${paths}</svg>`;
+    }
+
     function exportToSVG() {
         const state = AppState.getState();
         if (!state.canvas || !state.polygons.length) {
-            alert('Generate a board before exporting.');
+            UI?.showNotification('Generate a board before exporting.');
             return;
         }
         let { width, height } = state.canvas;
@@ -44,16 +61,7 @@ const Exporter = (() => {
             height = Math.ceil(scene.bounds.maxY - scene.bounds.minY);
             viewBox = `${scene.bounds.minX.toFixed(2)} ${scene.bounds.minY.toFixed(2)} ${width} ${height}`;
         }
-        const paths = polygons
-            .map((polygon) => {
-                const commands = polygon.vertices
-                    .map((vertex, index) => `${index === 0 ? 'M' : 'L'} ${vertex.x.toFixed(2)} ${vertex.y.toFixed(2)}`)
-                    .join(' ');
-                const fill = polygon.color || Config.DEFAULT_FILL;
-                return `<path d="${commands} Z" fill="${fill}" stroke="${Config.GRID_STROKE}" stroke-width="1" />`;
-            })
-            .join('');
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" width="${width}" height="${height}">${paths}</svg>`;
+        const svg = buildSvg(polygons, { width, height, viewBox });
         const blob = new Blob([svg], { type: 'image/svg+xml' });
         const base = state.currentProjectName || Config.DEFAULT_PROJECT_NAME;
         Utils.triggerBlobDownload(blob, `${Utils.sanitizeFileName(base)}.svg`);
@@ -63,6 +71,7 @@ const Exporter = (() => {
     return {
         init,
         exportToPNG,
-        exportToSVG
+        exportToSVG,
+        buildSvg
     };
 })();

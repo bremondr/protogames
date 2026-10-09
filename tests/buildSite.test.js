@@ -171,7 +171,7 @@ test('a site build puts production at the root and previews under /preview/<name
         const production = fs.readFileSync(path.join(out, 'index.html'), 'utf8');
         const preview = fs.readFileSync(path.join(out, 'preview', 'pr-66', 'index.html'), 'utf8');
         assert.ok(!production.includes('preview-runtime'), 'production is the app exactly as committed');
-        assert.ok(preview.includes('preview-runtime.js') && !preview.includes('simpleanalytics'));
+        assert.ok(preview.includes('preview-runtime.js') && !/<script[^>]*simpleanalytics/.test(preview), 'no analytics script (the CSP meta still names its host, which is harmless)');
         assert.ok(fs.existsSync(path.join(out, 'js', 'config.js')) && fs.existsSync(path.join(out, 'preview', 'pr-66', 'js', 'config.js')));
         assert.ok(fs.existsSync(path.join(out, 'preview', 'pr-66', 'preview-runtime.js')));
         assert.ok(!fs.existsSync(path.join(out, 'preview-runtime.js')), 'the runtime is not in production');
@@ -197,6 +197,31 @@ test('a pull request whose ref cannot be read is skipped instead of failing the 
         assert.deepEqual(summary.skipped, [1]);
         assert.ok(!fs.existsSync(path.join(out, 'preview', 'pr-1')));
         assert.ok(!fs.readFileSync(path.join(out, 'preview', 'index.html'), 'utf8').includes('pr-1/'));
+    } finally {
+        console.warn = warn;
+        fs.rmSync(out, { recursive: true, force: true });
+    }
+});
+
+test('a pull request that cannot become a preview is skipped and never aborts the build', () => {
+    const out = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-site-'));
+    const warn = console.warn;
+    try {
+        console.warn = () => {};
+        const run = (args, input) => execFileSync('git', args, { cwd: ROOT, input }).toString().trim();
+        const head = run(['rev-parse', 'HEAD']);
+        // Unreferenced commits: one without index.html, one whose index.html has no <head>.
+        const commitOf = (tree) => run(['commit-tree', tree, '-m', 'test']);
+        const noIndex = commitOf(run(['mktree'], ''));
+        const blob = run(['hash-object', '-w', '--stdin'], '<p>no head here</p>');
+        const noHead = commitOf(run(['mktree'], `100644 blob ${blob}\tindex.html\n`));
+        const summary = Site.build({ out, main: head, previews: [{ number: 1, ref: noIndex }, { number: 2, ref: noHead }, { number: 3, ref: head }] });
+        assert.deepEqual(summary.previews.map((p) => p.name), ['pr-3']);
+        assert.deepEqual(summary.skipped, [1, 2]);
+        assert.ok(fs.existsSync(path.join(out, 'index.html')), 'production is still published');
+        assert.ok(!fs.existsSync(path.join(out, 'preview', 'pr-1')) && !fs.existsSync(path.join(out, 'preview', 'pr-2')));
+        const list = fs.readFileSync(path.join(out, 'preview', 'index.html'), 'utf8');
+        assert.ok(list.includes('pr-3') && !list.includes('pr-1/') && !list.includes('pr-2/'));
     } finally {
         console.warn = warn;
         fs.rmSync(out, { recursive: true, force: true });

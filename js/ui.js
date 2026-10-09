@@ -11,7 +11,6 @@ const UI = (() => {
 
     function init() {
         elements.canvas = document.getElementById('gameCanvas');
-        elements.canvasPlaceholder = document.querySelector('.canvas-placeholder');
         elements.paletteGrid = document.querySelector('.palette-grid');
         elements.paletteSelect = document.getElementById('paletteSelect');
         elements.eraserButton = document.getElementById('eraserButton');
@@ -42,7 +41,6 @@ const UI = (() => {
         elements.loadInput = document.getElementById('loadProject');
         elements.exportPNGBtn = document.getElementById('exportPNGBtn');
         elements.exportSVGBtn = document.getElementById('exportSVGBtn');
-        elements.autoSaveToggle = document.getElementById('autoSaveToggle');
         elements.notificationBar = document.getElementById('notificationBar');
 
         elements.boardShapeSelect?.addEventListener('change', () => {
@@ -50,17 +48,6 @@ const UI = (() => {
             applyGridTypeRestrictions();
         });
         elements.gridTypeSelect?.addEventListener('change', applyGridTypeVisibility);
-        elements.autoSaveToggle?.addEventListener('change', () => {
-            const enabled = elements.autoSaveToggle.checked;
-            AppState.setAutoSaveEnabled(enabled);
-            FileManager.setupAutoSave();
-        });
-
-        // Sync toggle with state on init.
-        if (elements.autoSaveToggle) {
-            elements.autoSaveToggle.checked = AppState.getState().autoSaveEnabled;
-        }
-
         applyBoardShapeVisibility();
         applyGridTypeRestrictions();
         applyGridTypeVisibility();
@@ -159,21 +146,26 @@ const UI = (() => {
         }, duration);
     }
 
-    function updateCanvasMessage(count) {
-        if (!elements.canvasPlaceholder) return;
-        elements.canvasPlaceholder.textContent = count
-            ? 'Tap or click a tile to paint it. Use the palette to change colors.'
-            : 'Configure a board and click Generate Board to begin.';
+    // Share links refuse boards over 100 tiles a side (ShareLink.MAX_DIMENSION); a hex radius of 50 is already 7.5k tiles.
+    const MAX_BOARD_SIDE = 100;
+    const MAX_BOARD_RADIUS = 50;
+
+    /** Whole number from a board input, clamped to 1..max; empty or invalid input gives the default. The field shows the value used. */
+    function readBoardNumber(input, fallback, max) {
+        const parsed = parseInt(input?.value, 10);
+        const value = Number.isFinite(parsed) ? Math.min(max, Math.max(1, parsed)) : fallback;
+        if (input && input.value !== '' && String(value) !== input.value.trim()) input.value = value;
+        return value;
     }
 
     function getBoardConfig() {
         const boardShape = elements.boardShapeSelect?.value || Config.DEFAULT_BOARD_CONFIG.boardShape;
         const gridType = elements.gridTypeSelect?.value || Config.DEFAULT_BOARD_CONFIG.gridType;
         const orientation = elements.orientationSelect?.value || Config.DEFAULT_BOARD_CONFIG.orientation;
-        const radius = parseInt(elements.radiusInput?.value, 10) || Config.DEFAULT_BOARD_CONFIG.radius;
-        const size = parseInt(elements.sizeInput?.value, 10) || Config.DEFAULT_BOARD_CONFIG.size;
-        let width = parseInt(elements.widthInput?.value, 10) || Config.DEFAULT_BOARD_CONFIG.width;
-        let height = parseInt(elements.heightInput?.value, 10) || Config.DEFAULT_BOARD_CONFIG.height;
+        const radius = readBoardNumber(elements.radiusInput, Config.DEFAULT_BOARD_CONFIG.radius, MAX_BOARD_RADIUS);
+        const size = readBoardNumber(elements.sizeInput, Config.DEFAULT_BOARD_CONFIG.size, MAX_BOARD_SIDE);
+        let width = readBoardNumber(elements.widthInput, Config.DEFAULT_BOARD_CONFIG.width, MAX_BOARD_SIDE);
+        let height = readBoardNumber(elements.heightInput, Config.DEFAULT_BOARD_CONFIG.height, MAX_BOARD_SIDE);
 
         switch (boardShape) {
             case 'square':
@@ -343,7 +335,6 @@ const UI = (() => {
         init,
         getElements,
         showNotification,
-        updateCanvasMessage,
         getBoardConfig,
         updateBoardControls,
         setPaletteSelection,

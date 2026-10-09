@@ -115,23 +115,28 @@ const FileManager = (() => {
         if (!state.autoSaveEnabled) return;
         if (!state.polygons.length) return;
         if (!force && !state.isDirty) return;
-        if (!window.localStorage) return;
 
         try {
+            // Inside the try: with storage blocked, even reading window.localStorage throws.
+            if (!window.localStorage) return;
             const payload = ProjectFormat.createAutosave({
                 projectName: state.currentProjectName || Config.DEFAULT_PROJECT_NAME,
                 appState: serializeAppState()
             });
             localStorage.setItem(AutosaveSlots.ownKey(), JSON.stringify(payload));
-            state.lastSaveTime = payload.timestamp;
             AppState.clearDirty();
+            quotaWarned = false;
         } catch (error) {
-            if (error.name === 'QuotaExceededError') {
-                alert('Auto-save failed: Browser storage quota exceeded.');
+            // Every stroke and the 30 s timer retry the save, so the warning is shown once until a save works again.
+            if (error && error.name === 'QuotaExceededError' && !quotaWarned) {
+                quotaWarned = true;
+                UI?.showNotification('Auto-save failed: browser storage is full. Save the project to a file so you do not lose work.', 8000);
             }
             console.error('Auto-save error:', error);
         }
     }
+
+    let quotaWarned = false;
 
     /** The slot offered at start-up, so a choice in the prompt can clean it up. */
     let offeredSlot = null;
@@ -156,9 +161,42 @@ const FileManager = (() => {
                     message: `${error.message} The next auto-save will replace it.`
                 };
             }
-            if (!slot.own) AutosaveSlots.remove(slot.key);
+            // A newer version's autosave is not damaged, this (older, cached) copy of the app just cannot read it.
+            const unreadableHere = error instanceof ProjectFormat.ProjectFormatError && error.code === 'newer-version';
+            if (!slot.own && !unreadableHere) AutosaveSlots.remove(slot.key);
             return null;
         }
+    }
+
+    let modalCount = 0;
+
+    /**
+     * Makes a freshly built backdrop a proper modal dialog: role and label, Tab kept inside, focus
+     * moved in (to `initialFocus`, else the first control), Escape routed to `onEscape`. Returns a
+     * function that removes the backdrop and puts focus back where it was.
+     */
+    function presentModal(backdrop, { initialFocus, onEscape, role = 'dialog' } = {}) {
+        const opener = document.activeElement;
+        const dialog = backdrop.querySelector('.modal');
+        const heading = backdrop.querySelector('h3');
+        dialog.setAttribute('role', role);
+        dialog.setAttribute('aria-modal', 'true');
+        if (heading) {
+            heading.id = heading.id || `fileManagerModalTitle${++modalCount}`;
+            dialog.setAttribute('aria-labelledby', heading.id);
+        }
+        document.body.appendChild(backdrop);
+        FocusUtils.trapTab(backdrop);
+        backdrop.addEventListener('keydown', (event) => {
+            if (event.key !== 'Escape' || !onEscape) return;
+            event.preventDefault(); // so playtest/popover Escape handlers leave their own state alone
+            onEscape();
+        });
+        (initialFocus || FocusUtils.tabbables(backdrop)[0])?.focus();
+        return () => {
+            backdrop.remove();
+            if (opener && opener.isConnected && opener.focus) opener.focus();
+        };
     }
 
     /**
@@ -167,7 +205,7 @@ const FileManager = (() => {
      * @param {Object} payload - Autosave payload.
      */
     function promptAutosaveRestore(payload) {
-        const timestamp = payload.timestamp ? new Date(payload.timestamp).toLocaleString() : 'a previous session';
+        const timestamp = Utils.formatTimestamp(payload.timestamp) || 'a previous session';
         const modal = document.createElement('div');
         modal.className = 'modal-backdrop';
         modal.innerHTML = `
@@ -180,10 +218,14 @@ const FileManager = (() => {
                 </div>
             </div>
         `;
-        document.body.appendChild(modal);
+        const closeModal = presentModal(modal, {
+            initialFocus: modal.querySelector('[data-action="load"]'),
+            // Escape must not throw away work, so it takes the safe choice.
+            onEscape: () => handleChoice('load')
+        });
 
-        const handleChoice = (action) => {
-            modal.remove();
+        function handleChoice(action) {
+            closeModal();
             const slot = offeredSlot;
             offeredSlot = null;
             if (action === 'load') {
@@ -195,7 +237,7 @@ const FileManager = (() => {
                 if (slot) AutosaveSlots.remove(slot.key);
                 UI?.showNotification('Autosave discarded', 2500);
             }
-        };
+        }
 
         modal.addEventListener('click', (event) => {
             const button = event.target.closest('button[data-action]');
@@ -229,16 +271,11 @@ const FileManager = (() => {
         modal.querySelector('h3').textContent = title;
         const input = modal.querySelector('input');
         input.value = defaultValue;
-        document.body.appendChild(modal);
-        input.focus();
+        const close = presentModal(modal, { initialFocus: input, onEscape: () => close() });
         input.select();
 
-        const close = () => modal.remove();
         modal.addEventListener('click', (event) => {
             if (event.target === modal || event.target.closest('[data-action="cancel"]')) close();
-        });
-        modal.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape') close();
         });
         modal.querySelector('form').addEventListener('submit', (event) => {
             event.preventDefault();
@@ -253,7 +290,7 @@ const FileManager = (() => {
         const modal = document.createElement('div');
         modal.className = 'modal-backdrop';
         modal.innerHTML = `
-            <div class="modal" role="alertdialog" aria-modal="true">
+            <div class="modal">
                 <h3></h3>
                 <p></p>
                 <div class="modal-actions">
@@ -263,14 +300,9 @@ const FileManager = (() => {
         `;
         modal.querySelector('h3').textContent = title;
         modal.querySelector('p').textContent = message;
-        document.body.appendChild(modal);
-        modal.querySelector('[data-action="ok"]').focus();
-        const close = () => modal.remove();
+        const close = presentModal(modal, { initialFocus: modal.querySelector('[data-action="ok"]'), onEscape: () => close(), role: 'alertdialog' });
         modal.addEventListener('click', (event) => {
             if (event.target === modal || event.target.closest('[data-action="ok"]')) close();
-        });
-        modal.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape') close();
         });
     }
 
@@ -283,29 +315,31 @@ const FileManager = (() => {
     }
 
     /** In-page replacement for window.confirm when loading over an existing board. */
-    function confirmReplace(onConfirm) {
+    function confirmReplace(onConfirm, options = {}) {
+        const { message = 'Loading a project will replace your current board.', confirmLabel = 'Load', onCancel } = options;
         const modal = document.createElement('div');
         modal.className = 'modal-backdrop';
         modal.innerHTML = `
             <div class="modal">
                 <h3>Replace current board?</h3>
-                <p>Loading a project will replace your current board.</p>
+                <p></p>
                 <div class="modal-actions">
                     <button type="button" class="secondary-button" data-action="cancel">Cancel</button>
-                    <button type="button" class="primary-button" data-action="confirm">Load</button>
+                    <button type="button" class="primary-button" data-action="confirm"></button>
                 </div>
             </div>
         `;
-        document.body.appendChild(modal);
-        modal.querySelector('[data-action="confirm"]').focus();
+        modal.querySelector('p').textContent = message;
+        modal.querySelector('[data-action="confirm"]').textContent = confirmLabel;
+        const closeModal = presentModal(modal, { initialFocus: modal.querySelector('[data-action="confirm"]'), onEscape: () => decide(false) });
+        function decide(confirmed) {
+            closeModal();
+            if (confirmed) onConfirm(); else if (onCancel) onCancel();
+        }
         modal.addEventListener('click', (event) => {
             const button = event.target.closest('button[data-action]');
             if (!button && event.target !== modal) return;
-            modal.remove();
-            if (button?.dataset.action === 'confirm') onConfirm();
-        });
-        modal.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape') modal.remove();
+            decide(button?.dataset.action === 'confirm');
         });
     }
 
@@ -327,7 +361,6 @@ const FileManager = (() => {
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
         const filename = `${Utils.sanitizeFileName(payload.projectName)}.protogames.json`;
         Utils.triggerBlobDownload(blob, filename);
-        AppState.getState().lastSaveTime = Date.now();
         AppState.clearDirty();
         autoSaveToLocalStorage(true);
         UI?.showNotification('Project saved', 3500);
@@ -339,12 +372,7 @@ const FileManager = (() => {
         const reader = new FileReader();
         reader.onload = (loadEvent) => {
             try {
-                const payload = ProjectFormat.parse(loadEvent.target.result);
-                if (AppState.getState().polygons.length) {
-                    confirmReplace(() => restoreState(payload));
-                    return;
-                }
-                restoreState(payload);
+                openProject(ProjectFormat.parse(loadEvent.target.result));
             } catch (error) {
                 console.error('Load error:', error);
                 showMessage('Could not open this file', error.message || 'Unable to load project file.');
@@ -355,9 +383,28 @@ const FileManager = (() => {
         reader.readAsText(file);
     }
 
+    /**
+     * Shows a parsed project, asking first when it would replace work. The restore runs from the
+     * confirmation too, so a failure there is reported instead of vanishing into a click handler.
+     */
+    function openProject(payload) {
+        const open = () => {
+            try {
+                restoreState(payload);
+            } catch (error) {
+                console.error('Load error:', error);
+                showMessage('Could not open this file', error.message || 'Unable to load project file.');
+            }
+        };
+        if (hasUserWork()) confirmReplace(open); else open();
+    }
+
     function restoreState(payload, options = {}) {
         const statePayload = payload.appState;
-        AppState.updateBoardConfig(statePayload.boardConfig);
+        // Cloned before anything is changed, so a problem here cannot leave a half-loaded board.
+        const polygons = Utils.clonePolygons(statePayload.polygons || []);
+        // Replaces the settings: keys the file lacks fall back to defaults instead of the previous board's values.
+        AppState.setBoardConfig(statePayload.boardConfig);
         const paletteId = statePayload.paletteId || Config.DEFAULT_PALETTE_ID;
         const palette = Config.getPaletteById(paletteId) || Config.getDefaultPalette();
         const resolved = UI.renderColorPalette(palette.id, statePayload.currentColor || AppState.getState().currentColor);
@@ -369,19 +416,15 @@ const FileManager = (() => {
         window.dispatchEvent(new CustomEvent('pg:toolchange'));
         if (typeof statePayload.autoSaveEnabled === 'boolean') {
             AppState.setAutoSaveEnabled(statePayload.autoSaveEnabled);
-            if (ui?.autoSaveToggle) {
-                ui.autoSaveToggle.checked = statePayload.autoSaveEnabled;
-            }
             setupAutoSave();
         }
-        AppState.setPolygons(Utils.clonePolygons(statePayload.polygons || []));
+        AppState.setPolygons(polygons);
         // An infinite board has no fixed outline to frame: show what was drawn instead of the origin.
         if (Infinite.isActive()) AppState.resetView();
         AppState.setProjectName(payload.projectName || Config.DEFAULT_PROJECT_NAME);
 
         UI?.updateBoardControls(AppState.getState().boardConfig);
         Renderer.renderBoard();
-        UI?.updateCanvasMessage(AppState.getState().polygons.length);
 
         AppState.resetHistory();
         AppState.recordHistory();
@@ -399,6 +442,9 @@ const FileManager = (() => {
         autoSaveToLocalStorage,
         loadAutoSave,
         restoreState,
+        openProject,
+        hasUserWork,
+        confirmReplace,
         saveProjectFile,
         promptAutosaveRestore,
         showStartupMessage

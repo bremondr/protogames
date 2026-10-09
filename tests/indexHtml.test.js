@@ -49,6 +49,25 @@ test('index.html is well nested, so every panel, dialog and toolbar ends where i
     assert.equal(nestingProblem(html), null);
 });
 
+test('a Content-Security-Policy limits scripts to this site and the analytics script, and allows what the app needs', () => {
+    const match = /<meta http-equiv="Content-Security-Policy" content="([^"]+)"/.exec(html);
+    assert.ok(match, 'the policy is in a meta tag');
+    const policy = Object.fromEntries(match[1].split(';').map((part) => part.trim().split(/\s+/)).filter((p) => p[0]).map(([name, ...values]) => [name, values]));
+    assert.deepEqual(policy['script-src'], ["'self'", 'https://scripts.simpleanalyticscdn.com']);
+    assert.ok(!match[1].includes("'unsafe-eval'") && !policy['script-src'].includes("'unsafe-inline'"));
+    assert.ok(policy['img-src'].includes('data:') && policy['img-src'].includes('blob:'), 'textures and objects are data and blob images');
+    assert.ok(policy['style-src'].includes("'unsafe-inline'"), 'style attributes are used');
+    assert.deepEqual(policy['object-src'], ["'none'"]);
+    // The policy only holds if the page really has no inline script or event handler attributes.
+    const scripts = [...html.matchAll(/<script\b([^>]*)>/gi)].map((m) => m[1]);
+    assert.ok(scripts.every((attrs) => /\bsrc=/.test(attrs)), 'every script is external');
+    assert.ok(!/\son[a-z]+\s*=/i.test(html.replace(/<!--[\s\S]*?-->/g, '')), 'no inline event handlers');
+    for (const attrs of scripts) {
+        const src = /\bsrc="([^"]+)"/.exec(attrs)[1];
+        assert.ok(!/^https?:/.test(src) || src.startsWith('https://scripts.simpleanalyticscdn.com/'), `${src} is allowed by the policy`);
+    }
+});
+
 test('the main regions of the page are direct children of the right containers', () => {
     // A stray </div> shifts everything after it out of its container; these anchors would move with it.
     const body = html.slice(html.indexOf('<body'));
@@ -57,4 +76,23 @@ test('the main regions of the page are direct children of the right containers',
         const depth = (before.match(/<div\b/g) || []).length - (before.match(/<\/div>/g) || []).length;
         assert.ok(depth <= 1, `${id} is a top-level dialog (nesting depth ${depth})`);
     }
+});
+
+test('every element id the scripts look up by getElementById or a local $ helper exists in index.html', () => {
+    // shortcutHelp is created by shortcuts.js when the overlay opens.
+    const allowed = new Set(['shortcutHelp']);
+    const jsDir = path.resolve(__dirname, '..', 'js');
+    const pageIds = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
+    const missing = [];
+    for (const file of fs.readdirSync(jsDir).filter((f) => f.endsWith('.js'))) {
+        const source = fs.readFileSync(path.join(jsDir, file), 'utf8');
+        // Only files that define "$ = (id) => document.getElementById(id)" may use $('id').
+        const usesDollar = /const \$ = \(id\) => document\.getElementById\(id\)/.test(source);
+        const lookups = [...source.matchAll(/getElementById\('([^']+)'\)/g)];
+        if (usesDollar) lookups.push(...source.matchAll(/(?<![\w$.])\$\('([^']+)'\)/g));
+        for (const [, id] of lookups) {
+            if (!pageIds.has(id) && !allowed.has(id)) missing.push(`${file}: #${id}`);
+        }
+    }
+    assert.deepEqual([...new Set(missing)], []);
 });

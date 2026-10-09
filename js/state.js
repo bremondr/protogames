@@ -13,7 +13,6 @@ const AppState = (() => {
         boardConfig: { ...Config.DEFAULT_BOARD_CONFIG },
         currentColor: Config.getDefaultPalette().colors[0].hex,
         currentPaletteId: Config.DEFAULT_PALETTE_ID,
-        availablePalettes: [],
         /**
          * When true, painting uses the eraser and resets tiles to the default
          * blank color instead of applying a swatch color.
@@ -48,7 +47,6 @@ const AppState = (() => {
         history: [],
         historyIndex: -1,
         currentProjectName: null,
-        lastSaveTime: null,
         isDirty: false,
         /**
          * Indicates whether the user currently has a pointer pressed down
@@ -105,12 +103,17 @@ const AppState = (() => {
     }
 
     /**
-     * Updates the list of palettes made available to the UI.
+     * Replaces the board configuration with one from a file or link. Only known settings are kept and
+     * missing ones take their defaults, so nothing is inherited from the board that was open before.
      *
-     * @param {Array<Object>} palettes - Palette definitions.
+     * @param {Object} config - Board configuration as saved.
      */
-    function setAvailablePalettes(palettes) {
-        state.availablePalettes = Array.isArray(palettes) ? palettes.slice() : [];
+    function setBoardConfig(config) {
+        const next = { ...Config.DEFAULT_BOARD_CONFIG };
+        for (const key of Object.keys(next)) {
+            if (config && config[key] !== undefined) next[key] = config[key];
+        }
+        state.boardConfig = next;
     }
 
     /**
@@ -187,16 +190,26 @@ const AppState = (() => {
     const topologyCache = new WeakMap();
 
     /**
-     * Lazily built { adjacency, locate } for the current tiles. Tile order in
-     * the adjacency matches state.polygons.
+     * Lazily built { adjacency, locate } for the current tiles. Tile order in the adjacency matches
+     * state.polygons. The locator (hover, clicks) is built on first use and the adjacency graph
+     * (fill, line, brush footprints) separately on its first read, so an infinite board that swaps
+     * its tile array on every chunk crossing only pays for what the next action needs.
      */
     function getTopology() {
         const polygons = state.polygons;
         let topology = topologyCache.get(polygons);
         if (!topology) {
+            let adjacency = null;
+            let locate = null;
             topology = {
-                adjacency: Geometry.buildAdjacency(polygons),
-                locate: Geometry.buildLocator(polygons).locate
+                get adjacency() {
+                    if (!adjacency) adjacency = Geometry.buildAdjacency(polygons);
+                    return adjacency;
+                },
+                get locate() {
+                    if (!locate) locate = Geometry.buildLocator(polygons).locate;
+                    return locate;
+                }
             };
             topologyCache.set(polygons, topology);
         }
@@ -316,6 +329,38 @@ const AppState = (() => {
         state.historyIndex = -1;
     }
 
+    /**
+     * Rewrites tile colours everywhere they are remembered: the tiles and every undo step.
+     * A theme edit changes colours that no longer exist in any palette, so a snapshot left
+     * as it was would bring the old ones back on undo, resize or playtest.
+     *
+     * @param {Map<string,string>} remap - lower-case old colour -> new colour.
+     * @returns {number} How many tiles of the board changed.
+     */
+    function remapColors(remap) {
+        const apply = (entry) => {
+            const next = remap.get(String(entry.color).toLowerCase());
+            if (!next || next.toLowerCase() === String(entry.color).toLowerCase()) return false;
+            entry.color = next;
+            return true;
+        };
+        let changed = 0;
+        state.polygons.forEach((polygon) => { if (apply(polygon)) changed += 1; });
+        state.history.forEach((snapshot) => snapshot.forEach(apply));
+        return changed;
+    }
+
+    /**
+     * Steps back to the previous snapshot and forgets the step left behind, so it cannot be redone.
+     * Used to take back a change that should never have counted (a fill when a pinch begins).
+     */
+    function discardLastStep() {
+        if (state.historyIndex <= 0) return null;
+        state.history.splice(state.historyIndex);
+        state.historyIndex -= 1;
+        return state.history[state.historyIndex];
+    }
+
     function undo() {
         if (state.historyIndex <= 0) return null;
         state.historyIndex -= 1;
@@ -333,7 +378,7 @@ const AppState = (() => {
         getState,
         setPolygons,
         updateBoardConfig,
-        setAvailablePalettes,
+        setBoardConfig,
         setCurrentColor,
         setEraserActive,
         setObjectToolActive,
@@ -358,6 +403,8 @@ const AppState = (() => {
         recordHistory,
         restoreSnapshot,
         resetHistory,
+        remapColors,
+        discardLastStep,
         undo,
         redo
     };

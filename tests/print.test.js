@@ -47,7 +47,8 @@ test('without a board there is nothing to print', () => {
     const p = plain(Print.plan({}));
     assert.equal(p.board, null);
     assert.equal(p.pageCount, 0);
-    assert.deepEqual(p.warnings, ['Generate a board first.']);
+    assert.deepEqual(plain(p.warnings), [{ text: 'Generate a board first.', blocking: true }]);
+    assert.equal(p.blocked, true);
 });
 
 test('the tile size in mm is what the board is scaled to, for every tile shape', () => {
@@ -116,7 +117,7 @@ test('a single sheet: fit-to-board grows with the board, a fixed sheet warns whe
 
     const small = Print.plan({ mode: 'sheet', sheet: 'A3', tileMm: 50, marginMm: 10 });
     assert.equal(small.layout.fits, false);
-    assert.match(small.warnings[0], /larger than A3/);
+    assert.match(small.warnings[0].text, /larger than A3/);
 
     const roomy = Print.plan({ mode: 'sheet', sheet: 'A0', tileMm: 25, marginMm: 10 });
     assert.equal(roomy.layout.fits, true);
@@ -141,7 +142,7 @@ test('the legend lists what is painted, most used first, with names from the pal
 test('an empty legend is explained, and the legend can go on its own page', () => {
     useBoard();
     const empty = Print.plan({ legend: true });
-    assert.match(empty.warnings.join(' '), /legend would be empty/);
+    assert.match(empty.warnings.map((w) => w.text).join(' '), /legend would be empty/);
     const polygons = AppState.getState().polygons;
     polygons[0].color = '#7CB342';
     const page = Print.plan({ legend: true, mode: 'sheet', legendPlace: 'page', sheet: 'fit' });
@@ -163,14 +164,14 @@ test('objects can be printed as tokens, which adds pages and is checked against 
     const both = Print.plan({ objects: 'both', tileMm: 25 });
     assert.equal(both.pageCount, tokens.pageCount);
     const huge = Print.plan({ objects: 'tokens', tileMm: 200, paper: 'A4' });
-    assert.match(huge.warnings.join(' '), /do not fit/);
+    assert.match(huge.warnings.map((w) => w.text).join(' '), /do not fit/);
 });
 
 test('printing is capped at 300 pages', () => {
     useBoard({ boardShape: 'hexagon', radius: 10, width: 21, height: 21 });
     const p = Print.plan({ tileMm: 200, paper: 'A4' });
     assert.ok(p.pageCount > 300);
-    assert.match(p.warnings.join(' '), /limit is 300/);
+    assert.match(p.warnings.map((w) => w.text).join(' '), /limit is 300/);
 });
 
 test('the PDF writer produces a well-formed file with correct cross-reference offsets', async () => {
@@ -200,4 +201,39 @@ test('the PDF writer produces a well-formed file with correct cross-reference of
     }
     // The JPEG bytes survive untouched inside the stream.
     assert.ok(bytes.includes(Buffer.from(jpeg)));
+});
+
+test('warnings say themselves whether they block the PDF', () => {
+    useBoard({ boardShape: 'hexagon', radius: 10, width: 21, height: 21 });
+    const tooMany = Print.plan({ tileMm: 200, paper: 'A4' });
+    assert.equal(tooMany.blocked, true);
+    assert.ok(tooMany.warnings.some((w) => w.blocking && /limit is 300/.test(w.text)));
+    const cut = Print.plan({ mode: 'sheet', sheet: 'A3', tileMm: 50, marginMm: 10 });
+    assert.ok(cut.warnings.length > 0 && cut.warnings.every((w) => !w.blocking), 'a board larger than the sheet is only a warning');
+    assert.equal(cut.blocked, false);
+    useBoard();
+    assert.equal(Print.plan({ legend: true }).blocked, false, 'an empty legend is only a note');
+});
+
+test('a cleared or invalid setting falls back to its default instead of becoming 0 or a bad option', () => {
+    const d = Print.DEFAULTS;
+    const s = Print.normalize({ tileMm: '', marginMm: null, overlapMm: 'abc', paper: 'A9', mode: 'poster', objects: 'x', orientation: 7, legend: 1 });
+    assert.equal(s.tileMm, d.tileMm);
+    assert.equal(s.marginMm, d.marginMm);
+    assert.equal(s.overlapMm, d.overlapMm);
+    assert.equal(s.paper, d.paper);
+    assert.equal(s.mode, d.mode);
+    assert.equal(s.objects, d.objects);
+    assert.equal(s.orientation, d.orientation);
+    assert.equal(s.legend, true);
+    assert.equal(Print.normalize({ tileMm: '0' }).tileMm, 5, 'a typed 0 is still clamped to the minimum');
+});
+
+test('a sheet too large for one canvas is made at a lower resolution, and says so', () => {
+    useBoard({ boardShape: 'hexagon', radius: 8, width: 17, height: 17 });
+    const big = Print.plan({ mode: 'sheet', sheet: 'A0', tileMm: 25, marginMm: 10 });
+    assert.ok(big.warnings.some((w) => !w.blocking && /full resolution/.test(w.text)));
+    assert.equal(big.blocked, false);
+    const small = Print.plan({ mode: 'sheet', sheet: 'A4', tileMm: 10, marginMm: 10 });
+    assert.ok(!small.warnings.some((w) => /full resolution/.test(w.text)));
 });

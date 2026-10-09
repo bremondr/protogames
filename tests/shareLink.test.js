@@ -71,6 +71,9 @@ test('unpack refuses links it cannot trust', () => {
         assert.throws(() => ShareLink.unpack(data, blankBoard()), pattern);
     };
     reject((d) => { d.v = ShareLink.LINK_VERSION + 1; }, /newer version/);
+    reject((d) => { d.v = '3'; }, /Unrecognised/);
+    reject((d) => { d.v = '1'; }, /Unrecognised/);
+    reject((d) => { d.c = { ...d.c, boardShape: 'infinite' }; }, /Unrecognised/);
     reject((d) => { d.v = 0; }, /Unrecognised/);
     reject((d) => { d.v = 1.5; }, /Unrecognised/);
     reject((d) => { delete d.f; }, /Unrecognised/);

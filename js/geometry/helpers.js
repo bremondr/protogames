@@ -3,16 +3,23 @@
  * builders, and hit-testing utilities.
  */
 (function (global) {
+    /** Bounding box { minX, maxX, minY, maxY } of a list of points. */
+    function boundsOf(points) {
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let minY = Infinity;
+        let maxY = -Infinity;
+        for (const p of points) {
+            minX = Math.min(minX, p.x);
+            maxX = Math.max(maxX, p.x);
+            minY = Math.min(minY, p.y);
+            maxY = Math.max(maxY, p.y);
+        }
+        return { minX, maxX, minY, maxY };
+    }
+
     function createPolygon({ id, type, center, vertices, color, metadata = {} }) {
-        const bounds = vertices.reduce(
-            (acc, point) => ({
-                minX: Math.min(acc.minX, point.x),
-                maxX: Math.max(acc.maxX, point.x),
-                minY: Math.min(acc.minY, point.y),
-                maxY: Math.max(acc.maxY, point.y)
-            }),
-            { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
-        );
+        const bounds = boundsOf(vertices);
 
         return {
             id,
@@ -31,16 +38,7 @@
      * grid to an outline stays symmetric.
      */
     function boundsCenter(vertices) {
-        let minX = Infinity;
-        let maxX = -Infinity;
-        let minY = Infinity;
-        let maxY = -Infinity;
-        for (const v of vertices) {
-            minX = Math.min(minX, v.x);
-            maxX = Math.max(maxX, v.x);
-            minY = Math.min(minY, v.y);
-            maxY = Math.max(maxY, v.y);
-        }
+        const { minX, maxX, minY, maxY } = boundsOf(vertices);
         return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
     }
 
@@ -52,18 +50,7 @@
      */
     function fitPolygonsToCanvas(polygons, canvas) {
         if (!canvas || !polygons.length) return polygons;
-        let minX = Infinity;
-        let maxX = -Infinity;
-        let minY = Infinity;
-        let maxY = -Infinity;
-        for (const polygon of polygons) {
-            for (const v of polygon.vertices) {
-                minX = Math.min(minX, v.x);
-                maxX = Math.max(maxX, v.x);
-                minY = Math.min(minY, v.y);
-                maxY = Math.max(maxY, v.y);
-            }
-        }
+        const { minX, maxX, minY, maxY } = boundsOf(polygons.flatMap((polygon) => polygon.vertices));
         const width = maxX - minX;
         const height = maxY - minY;
         const availableWidth = canvas.width - Config.CANVAS_PADDING * 2;
@@ -80,15 +67,7 @@
         for (const polygon of polygons) {
             polygon.vertices = polygon.vertices.map(map);
             polygon.center = map(polygon.center);
-            polygon.bounds = polygon.vertices.reduce(
-                (acc, v) => ({
-                    minX: Math.min(acc.minX, v.x),
-                    maxX: Math.max(acc.maxX, v.x),
-                    minY: Math.min(acc.minY, v.y),
-                    maxY: Math.max(acc.maxY, v.y)
-                }),
-                { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
-            );
+            polygon.bounds = boundsOf(polygon.vertices);
         }
         return polygons;
     }
@@ -219,16 +198,6 @@
         ];
     }
 
-    function createDiamondVertices(center, size) {
-        const half = size / 2;
-        return [
-            { x: center.x, y: center.y - half },
-            { x: center.x + half, y: center.y },
-            { x: center.x, y: center.y + half },
-            { x: center.x - half, y: center.y }
-        ];
-    }
-
     function createTriangleVertices(origin, size, pointingUp) {
         const height = (Math.sqrt(3) / 2) * size;
         if (pointingUp) {
@@ -300,8 +269,8 @@
         isPointInCircle,
         normalizeBoardDimensions,
         createHexVertices,
+        boundsOf,
         createSquareVertices,
-        createDiamondVertices,
         createTriangleVertices,
         isPointInPolygon,
         findPolygonAtPoint

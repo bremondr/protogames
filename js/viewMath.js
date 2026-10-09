@@ -10,8 +10,6 @@
  * unit-tested in Node.
  */
 const ViewMath = (() => {
-    const IDENTITY = Object.freeze({ scale: 1, x: 0, y: 0 });
-
     const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
     function identity() {
@@ -128,7 +126,6 @@ const ViewMath = (() => {
     }
 
     return {
-        IDENTITY,
         identity,
         clamp,
         toWorld,
