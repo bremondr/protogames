@@ -6,6 +6,8 @@
  */
 const Textures = (() => {
     const S = 128;
+    const { rgb, shade } = TextureUtils;
+    const urls = TextureUtils.createUrlCache();
     const cache = new Map();
     let labelMap = null;
 
@@ -18,9 +20,9 @@ const Textures = (() => {
         const k = Math.max(S / img.width, S / img.height);
         x.drawImage(img, (S - img.width * k) / 2, (S - img.height * k) / 2, img.width * k, img.height * k);
         customTiles.set(key, c);
-        cache.delete(key); dropUrl(key);
+        cache.delete(key); urls.drop(key);
     }
-    function unregister(hex) { const key = String(hex).toLowerCase(); customTiles.delete(key); cache.delete(key); dropUrl(key); }
+    function unregister(hex) { const key = String(hex).toLowerCase(); customTiles.delete(key); cache.delete(key); urls.drop(key); }
     function resetLabels() { labelMap = null; }
 
     function getLabel(hex) {
@@ -45,12 +47,6 @@ const Textures = (() => {
         };
     }
     function hashStr(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
-    function rgb(hex) { const n = parseInt(hex.replace('#', ''), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
-    function shade(hex, amt, alpha = 1) {
-        const [r, g, b] = rgb(hex);
-        const f = (c) => Math.round(amt >= 0 ? c + (255 - c) * amt : c * (1 + amt));
-        return `rgba(${f(r)},${f(g)},${f(b)},${alpha})`;
-    }
     function mix(a, b, k) {
         const A = rgb(a), B = rgb(b);
         return '#' + A.map((c, i) => Math.round(c + (B[i] - c) * k).toString(16).padStart(2, '0')).join('');
@@ -724,7 +720,7 @@ const Textures = (() => {
         const l = label || '';
         const pick = [
             [/asteroid belt/, 'belt'], [/frozen ocean|sea ice|pack ice/, 'seaice'], [/iceberg/, 'icebergs'], [/glacier/, 'glacier'],
-            [/snowy mountain/, 'snowymtn'], [/snow hill|snowfield|snow dune/, 'snowhills'], [/icy peak|rocky peak/, 'icypeaks'], [/ocean/, 'water'], [/forest/, 'forest'], [/grass|life support/, 'grass'], [/snow/, 'snow'], [/glacier|deep ice|^ice$|frozen/, 'ice'],
+            [/snowy mountain/, 'snowymtn'], [/snow hill|snowfield|snow dune/, 'snowhills'], [/icy peak|rocky peak/, 'icypeaks'], [/ocean/, 'water'], [/forest/, 'forest'], [/grass|life support/, 'grass'], [/snow/, 'snow'], [/deep ice|^ice$|frozen/, 'ice'],
             [/water|planet/, 'water'], [/mountain/, 'mountain'], [/desert|sand/, 'desert'], [/village/, 'village'],
             [/volcan/, 'volcanic'], [/lava|engine/, 'lava'], [/wall/, 'bricks'], [/stone floor|corridor|storage/, 'flagstone'],
             [/door/, 'planks'], [/rock|cave|asteroid|hull/, 'rock'], [/deep space/, 'deepspace'], [/nebula/, 'nebula'], [/void/, 'void'],
@@ -789,28 +785,13 @@ const Textures = (() => {
     }
 
 
-    // Object URL (no ';' in it) so it can be interpolated into inline style strings.
-    function toObjectUrl(dataUrl) {
-        const [head, b64] = dataUrl.split(',');
-        const bin = atob(b64), arr = new Uint8Array(bin.length);
-        for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-        return URL.createObjectURL(new Blob([arr], { type: head.slice(5).split(';')[0] }));
-    }
-    const objUrls = new Map();
-    /** Forgets a cached object URL and frees the blob behind it. */
-    function dropUrl(key) {
-        const url = objUrls.get(key);
-        if (url) URL.revokeObjectURL(url);
-        objUrls.delete(key);
-    }
     function urlFor(hex) {
         if (flatView) return null;
-        if (objUrls.has(String(hex).toLowerCase())) return objUrls.get(String(hex).toLowerCase());
+        const key = String(hex).toLowerCase();
+        if (urls.has(key)) return urls.get(key);
         const d = dataUrlFor(hex);
         if (!d) return null; // not cached, like tileFor
-        const u = toObjectUrl(d);
-        objUrls.set(String(hex).toLowerCase(), u);
-        return u;
+        return urls.set(key, TextureUtils.toObjectUrl(d));
     }
     function isFeature(hex) { const t = tileFor(hex); return !!(t && t.feature); }
 

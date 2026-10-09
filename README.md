@@ -69,6 +69,7 @@ protogames/
 │  ├─ viewMath.js        (pure zoom/pan maths)
 │  ├─ viewControls.js    (zoom, pan, fit, minimap, texture toggle)
 │  ├─ renderer.js
+│  ├─ textureUtils.js    (colour helpers and blob-URL cache shared by textures and objects)
 │  ├─ textures.js        (procedural tile textures)
 │  ├─ objects.js         (placeable map objects)
 │  ├─ interactions.js

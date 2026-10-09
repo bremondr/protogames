@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { loadApp } = require('./support/load');
 
-const app = loadApp(['js/config.js', 'js/textures.js']);
+const app = loadApp(['js/config.js', 'js/textureUtils.js', 'js/textures.js']);
 const Textures = app.run('Textures');
 
 test('the colours-only view is off by default and can be switched on and off', () => {
@@ -45,7 +45,7 @@ function recordTexture(hex) {
             return true;
         }
     });
-    const recorder = loadApp(['js/config.js', 'js/textures.js'], {
+    const recorder = loadApp(['js/config.js', 'js/textureUtils.js', 'js/textures.js'], {
         document: { createElement: () => ({ width: 0, height: 0, getContext: () => ctx, toDataURL: () => 'data:,' }) }
     });
     recorder.run('Textures').dataUrlFor(hex);
@@ -83,7 +83,7 @@ function fakeBrowser() {
         URL: { createObjectURL: () => `blob:test/${++n}`, revokeObjectURL: (url) => revoked.push(url) },
         Blob, atob
     };
-    return { revoked, app: loadApp(['js/config.js', 'js/textures.js'], globals) };
+    return { revoked, app: loadApp(['js/config.js', 'js/textureUtils.js', 'js/textures.js'], globals) };
 }
 
 test('a colour without a label is not remembered as "no texture" for good', () => {
@@ -110,4 +110,15 @@ test('object URLs are revoked when their texture is replaced or removed', () => 
     const second = T.urlFor(forest);
     T.unregister(forest);
     assert.deepEqual(revoked, [url, second]);
+});
+
+test('TextureUtils.createUrlCache revokes a blob URL when it is dropped', () => {
+    const { app: browser, revoked } = fakeBrowser();
+    const cache = browser.run('TextureUtils').createUrlCache();
+    cache.set('a', 'blob:test/a');
+    assert.equal(cache.get('a'), 'blob:test/a');
+    cache.drop('a');
+    cache.drop('missing');
+    assert.deepEqual(revoked, ['blob:test/a']);
+    assert.equal(cache.has('a'), false);
 });
