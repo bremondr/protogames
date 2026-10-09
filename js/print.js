@@ -38,6 +38,7 @@ const Print = (() => {
     const TOKEN_GAP_MM = 3;
     const PAGE_DPI = 200;
     const MAX_SHEET_PX = 9000;
+    const MAX_CANVAS_PX = 16 * 1024 * 1024; // iOS Safari refuses canvases above ~16.7 million pixels
     const MAX_PAGES = 300;
 
     // ---- Board source and scale ---------------------------------------------------------
@@ -184,36 +185,55 @@ const Print = (() => {
         return { paperW: w, paperH: h, cols, rows, perPage, count, pages: perPage > 0 ? Math.ceil(count / perPage) : 0 };
     }
 
+    /** Resolution for a page of this size: PAGE_DPI, lowered so one canvas stays within the browser limits. */
+    function pageDpi(wMm, hMm) {
+        const bySide = (MAX_SHEET_PX * 25.4) / Math.max(wMm, hMm);
+        const byArea = Math.sqrt(MAX_CANVAS_PX / (wMm * hMm)) * 25.4;
+        return Math.min(PAGE_DPI, bySide, byArea);
+    }
+
     const fmt = (mm) => (mm >= 1000 ? `${(mm / 10).toFixed(0)} cm` : `${Math.round(mm)} mm`);
 
     function normalize(settings) {
         const s = { ...DEFAULTS, ...(settings || {}) };
-        const num = (v, min, max, d) => (Number.isFinite(+v) ? Math.min(max, Math.max(min, +v)) : d);
+        // A cleared field ('' or null) is "no value", not 0; unknown strings (e.g. from old saved settings) fall back to the default.
+        const num = (v, min, max, d) => (v === '' || v === null || v === undefined || !Number.isFinite(+v) ? d : Math.min(max, Math.max(min, +v)));
+        const oneOf = (v, allowed, d) => (allowed.includes(v) ? v : d);
+        s.mode = oneOf(s.mode, ['tiled', 'sheet'], DEFAULTS.mode);
+        s.paper = oneOf(s.paper, Object.keys(PAPERS), DEFAULTS.paper);
+        s.orientation = oneOf(s.orientation, ['auto', 'portrait', 'landscape'], DEFAULTS.orientation);
+        s.sheet = oneOf(s.sheet, ['fit', ...Object.keys(PAPERS)], DEFAULTS.sheet);
+        s.objects = oneOf(s.objects, ['board', 'tokens', 'both'], DEFAULTS.objects);
+        s.legendPlace = oneOf(s.legendPlace, ['sheet', 'page'], DEFAULTS.legendPlace);
+        for (const key of ['cropMarks', 'textures', 'labels', 'legend']) s[key] = Boolean(s[key]);
         s.tileMm = num(s.tileMm, 5, 200, DEFAULTS.tileMm);
         s.marginMm = num(s.marginMm, 0, 30, DEFAULTS.marginMm);
         s.overlapMm = num(s.overlapMm, 0, 30, DEFAULTS.overlapMm);
         return s;
     }
 
+    /** A note for the dialog; blocking ones stop the PDF from being made. */
+    const warning = (text, blocking = false) => ({ text, blocking });
+
     /** Everything the dialog shows, without drawing anything. */
     function plan(settings) {
         const s = normalize(settings);
         const b = board(s);
-        if (!b) return { settings: s, board: null, warnings: ['Generate a board first.'], pageCount: 0 };
+        if (!b) return { settings: s, board: null, warnings: [warning('Generate a board first.', true)], pageCount: 0, blocked: true };
         const warnings = [];
         const entries = s.legend ? legendEntries(b) : [];
-        if (s.legend && !entries.length) warnings.push('Nothing is painted yet, so the legend would be empty.');
+        if (s.legend && !entries.length) warnings.push(warning('Nothing is painted yet, so the legend would be empty.'));
         let legendOnSheet = s.mode === 'sheet' && s.legendPlace === 'sheet' && entries.length > 0;
         let layout = s.mode === 'sheet' ? sheetLayout(b, s, legendOnSheet ? entries.length : 0) : tiledLayout(b, s);
         if (legendOnSheet && layout && !layout.fits && layout.boardFits === false) {
             // keep the board warning below
         } else if (legendOnSheet && layout && !layout.fits) {
-            warnings.push(`The legend does not fit on ${layout.name} below the board, so it goes on a separate page.`);
+            warnings.push(warning(`The legend does not fit on ${layout.name} below the board, so it goes on a separate page.`));
             legendOnSheet = false;
             layout = sheetLayout(b, s, 0);
         }
-        if (!layout) warnings.push('Margins and overlap leave no room on the page.');
-        if (layout && s.mode === 'sheet' && !layout.fits) warnings.push(`The board (${fmt(b.wMm)} × ${fmt(b.hMm)}) is larger than ${layout.name}. Pick a bigger sheet or smaller tiles; the edges would be cut off.`);
+        if (!layout) warnings.push(warning('Margins and overlap leave no room on the page.', true));
+        if (layout && s.mode === 'sheet' && !layout.fits) warnings.push(warning(`The board (${fmt(b.wMm)} × ${fmt(b.hMm)}) is larger than ${layout.name}. Pick a bigger sheet or smaller tiles; the edges would be cut off.`));
         let legend = null;
         if (entries.length) {
             if (legendOnSheet) legend = { entries, onSheet: true, pages: 0 };
@@ -226,11 +246,15 @@ const Print = (() => {
         }
         const wantTokens = s.objects !== 'board' && b.tokens.length > 0;
         const tokens = wantTokens ? tokenLayout(b, s) : null;
-        if (tokens && tokens.perPage === 0) warnings.push(`Tokens of ${s.tileMm} mm do not fit on ${s.paper}.`);
+        if (tokens && tokens.perPage === 0) warnings.push(warning(`Tokens of ${s.tileMm} mm do not fit on ${s.paper}.`, true));
         const boardPages = layout ? layout.pages.length : 0;
         const pageCount = boardPages + (legend ? legend.pages : 0) + (tokens ? tokens.pages : 0);
-        if (pageCount > MAX_PAGES) warnings.push(`That would be ${pageCount} pages; the limit is ${MAX_PAGES}. Use smaller tiles.`);
-        return { settings: s, board: b, layout, tokens, legend, boardPages, pageCount, warnings, measureLabel: measureLabel(b.type), sizeText: `${fmt(b.wMm)} × ${fmt(b.hMm)}` };
+        if (pageCount > MAX_PAGES) warnings.push(warning(`That would be ${pageCount} pages; the limit is ${MAX_PAGES}. Use smaller tiles.`, true));
+        if (layout && s.mode === 'sheet') {
+            const dpi = pageDpi(layout.paperW, layout.paperH);
+            if (dpi < PAGE_DPI - 1) warnings.push(warning(`This sheet is too large to print at full resolution; it will be made at about ${Math.round(dpi)} dpi.`));
+        }
+        return { settings: s, board: b, layout, tokens, legend, boardPages, pageCount, warnings, blocked: warnings.some((w) => w.blocking), measureLabel: measureLabel(b.type), sizeText: `${fmt(b.wMm)} × ${fmt(b.hMm)}` };
     }
 
     // ---- Drawing ------------------------------------------------------------------------------
@@ -242,27 +266,32 @@ const Print = (() => {
         try { return fn(); } finally { if (T) T.setFlat(was); }
     }
 
+    /** A canvas and its 2D context, or a clear error when the browser refuses (too large, out of memory). */
+    function createSurface(w, h) {
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(w));
+        c.height = Math.max(1, Math.round(h));
+        const ctx = c.getContext('2d');
+        if (!ctx) throw new Error('The browser could not allocate a drawing surface this large. Pick a smaller sheet or smaller tiles.');
+        return { c, ctx };
+    }
+
     /** Paints a board region (in board mm, origin = board top-left) onto a new canvas. */
     function renderRegion(b, s, region, pxPerMm) {
-        const c = document.createElement('canvas');
-        c.width = Math.max(1, Math.round(region.w * pxPerMm));
-        c.height = Math.max(1, Math.round(region.h * pxPerMm));
+        const { c, ctx } = createSurface(region.w * pxPerMm, region.h * pxPerMm);
         const view = {
             scale: b.mmPerWorld * pxPerMm,
             x: -(b.bounds.minX * b.mmPerWorld + region.x0) * pxPerMm,
             y: -(b.bounds.minY * b.mmPerWorld + region.y0) * pxPerMm
         };
         const polygons = s.objects === 'tokens' ? b.polygons.map((p) => (p.object ? { ...p, object: undefined } : p)) : b.polygons;
-        withTextures(s.textures, () => Renderer.paint(c.getContext('2d'), { polygons, width: c.width, height: c.height, view }));
+        withTextures(s.textures, () => Renderer.paint(ctx, { polygons, width: c.width, height: c.height, view }));
         return c;
     }
 
     function newPage(wMm, hMm, dpi) {
-        const k = dpi / 25.4;
-        const c = document.createElement('canvas');
-        c.width = Math.round(wMm * k);
-        c.height = Math.round(hMm * k);
-        const ctx = c.getContext('2d');
+        const k = Math.min(dpi, pageDpi(wMm, hMm)) / 25.4;
+        const { c, ctx } = createSurface(wMm * k, hMm * k);
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, c.width, c.height);
         ctx.scale(k, k); // draw in mm from here on
@@ -318,9 +347,7 @@ const Print = (() => {
 
     async function sheetPage(p, b, s, layout) {
         const images = p.legend && p.legend.onSheet ? await legendImages(p.legend.entries, s) : null;
-        const mm = Math.max(layout.paperW, layout.paperH);
-        const dpi = Math.min(PAGE_DPI, (MAX_SHEET_PX * 25.4) / mm);
-        const { c, ctx, k } = newPage(layout.paperW, layout.paperH, dpi);
+        const { c, ctx, k } = newPage(layout.paperW, layout.paperH, PAGE_DPI);
         const mg = s.marginMm;
         const page = layout.pages[0];
         const img = renderRegion(b, s, { x0: page.x0, y0: page.y0, w: layout.printW, h: layout.printH }, k);
@@ -416,6 +443,7 @@ const Print = (() => {
 
     async function jpegOf(canvas) {
         const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+        if (!blob) throw new Error('The browser could not encode a page image (the page may be too large for it).');
         return new Uint8Array(await blob.arrayBuffer());
     }
 
@@ -456,7 +484,7 @@ const Print = (() => {
 
     async function toPdf(settings, onStep) {
         const p = plan(settings);
-        if (!p.board || !p.layout || p.warnings.some((w) => /no room|limit is|do not fit/.test(w))) throw new Error(p.warnings[0] || 'Nothing to print.');
+        if (!p.board || !p.layout || p.blocked) throw new Error((p.warnings.find((w) => w.blocking) || p.warnings[0])?.text || 'Nothing to print.');
         const { board: b, layout, settings: s } = p;
         const out = [];
         const add = async (canvas, wMm, hMm) => {

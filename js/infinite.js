@@ -53,13 +53,17 @@ const Infinite = (() => {
         return H.createPolygon({ id: `inf_t_${i}_${j}_${kind}`, type: 'triangle', center, vertices: corners, metadata: { pointingUp: kind === 'up' } });
     }
 
+    const CANONICAL_INT = /^(0|-?[1-9]\d*)$/;
+
     /** Rebuilds a tile from its id, or null for ids that are not infinite-board tiles. */
     function fromId(id) {
         const p = String(id).split('_');
-        if (p[0] !== 'inf') return null;
+        if (p[0] !== 'inf' || p.length !== (p[1] === 't' ? 5 : 4)) return null;
+        // Only the canonical spelling (inf_s_1_2, never inf_s_01_2, 1e1 or 0x10), so ids are never silently renamed.
+        if (!CANONICAL_INT.test(p[2] ?? '') || !CANONICAL_INT.test(p[3] ?? '')) return null;
         const a = Number(p[2]);
         const b = Number(p[3]);
-        if (!Number.isInteger(a) || !Number.isInteger(b)) return null;
+        if (!Number.isSafeInteger(a) || !Number.isSafeInteger(b)) return null;
         switch (p[1]) {
             case 'hp': return hex(a, b, false);
             case 'hf': return hex(a, b, true);
@@ -74,6 +78,14 @@ const Infinite = (() => {
         if (config.gridType === 'square') return 'inf_s';
         if (config.gridType === 'triangle') return 'inf_t';
         return config.orientation === 'flat-top' ? 'inf_hf' : 'inf_hp';
+    }
+
+    /** Rough number of tiles cellsIn would build for a rectangle, without building any. */
+    function estimateCells(family, rect) {
+        const cellArea = family === 'inf_s' ? SQ * SQ : family === 'inf_t' ? (TRI * TRI_H) / 2 : 1.5 * R3 * HEX * HEX;
+        const w = rect.maxX - rect.minX + 4 * HEX;
+        const h = rect.maxY - rect.minY + 4 * HEX;
+        return (w * h) / cellArea;
     }
 
     /** Every tile of a lattice family that touches a world rectangle. */
@@ -196,9 +208,12 @@ const Infinite = (() => {
         const base = ViewMath.boundsOf(painted.length ? painted : s.polygons);
         const rect = { minX: base.minX - EXPORT_MARGIN, minY: base.minY - EXPORT_MARGIN, maxX: base.maxX + EXPORT_MARGIN, maxY: base.maxY + EXPORT_MARGIN };
         const byId = new Map(s.polygons.map((p) => [p.id, p]));
-        let polygons = cellsIn(familyOf(s.polygons[0].id), rect).map((cell) => byId.get(cell.id) || cell);
+        const family = familyOf(s.polygons[0].id);
         // Drawings spread over a huge area: export the drawn tiles only rather than millions of blanks.
-        if (polygons.length > EXPORT_MAX_TILES) polygons = painted;
+        // Estimated first so those blanks are never allocated.
+        const polygons = estimateCells(family, rect) > EXPORT_MAX_TILES
+            ? painted
+            : cellsIn(family, rect).map((cell) => byId.get(cell.id) || cell);
         const bounds = ViewMath.boundsOf(polygons);
         const pad = 24;
         const scale = Math.min(2, (width - pad * 2) / Math.max(1, bounds.maxX - bounds.minX), (height - pad * 2) / Math.max(1, bounds.maxY - bounds.minY));
