@@ -204,7 +204,7 @@
              ================================================ -->
         <main class="workspace" aria-label="Game board workspace">
             <div class="canvas-wrapper">
-                <canvas id="gameCanvas" aria-label="Board editor canvas"></canvas>
+                <canvas id="gameCanvas" tabindex="0" aria-label="Board editor canvas"></canvas>
             </div>
 
             <!-- Focus mode: hides the header and sidebar and goes full screen -->
@@ -263,7 +263,7 @@
                         <span class="pop-title">Theme</span>
                         <select id="paletteSelect" aria-label="Select color palette"></select>
                     </label>
-                    <div class="palette-grid" role="list" aria-live="polite"></div>
+                    <div class="palette-grid" role="group" aria-label="Colors"></div>
                 </div>
 
                 <div id="objectGroup" class="object-group pg-tip" data-tip="Objects" role="group" aria-label="Object tool">
@@ -279,7 +279,7 @@
                         <span class="pop-title">Theme</span>
                         <select id="objectThemeSelect" aria-label="Select object theme"></select>
                     </label>
-                    <div id="objectGrid" class="object-grid" role="list"></div>
+                    <div id="objectGrid" class="object-grid" role="group" aria-label="Objects"></div>
                 </div>
 
                 <div class="eraser-group">
@@ -513,6 +513,7 @@
     <script src="js/textures.js"></script>
     <script src="js/objects.js"></script>
     <script src="js/utils.js"></script>
+    <script src="js/focusUtils.js"></script>
     <script src="js/state.js"></script>
     <script src="js/geometry/helpers.js"></script>
     <script src="js/geometry/hex.js"></script>
