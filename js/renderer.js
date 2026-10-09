@@ -14,6 +14,13 @@ const Renderer = (() => {
     const renderListeners = [];
     let frameRequested = false;
 
+    /** Setting canvas.width/height resets the context state, so this runs again after every resize. */
+    function applyContextDefaults(ctx) {
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.imageSmoothingEnabled = true;
+    }
+
     /**
      * Resizes the canvas to fit its parent container and stores the
      * updated context inside AppState.
@@ -24,9 +31,7 @@ const Renderer = (() => {
         if (!canvas) return;
         canvas.style.touchAction = 'none';
         const ctx = canvas.getContext('2d');
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-        ctx.imageSmoothingEnabled = true;
+        applyContextDefaults(ctx);
         AppState.setCanvas(canvas, ctx);
         resizeCanvas();
     }
@@ -37,7 +42,7 @@ const Renderer = (() => {
      * @returns {{width:number,height:number, changed:boolean}|null}
      */
     function resizeCanvas() {
-        const { canvas } = AppState.getState();
+        const { canvas, ctx } = AppState.getState();
         if (!canvas || !canvas.parentElement) return null;
         const parentRect = canvas.parentElement.getBoundingClientRect();
         const newWidth = Math.floor(parentRect.width);
@@ -45,6 +50,7 @@ const Renderer = (() => {
         const changed = canvas.width !== newWidth || canvas.height !== newHeight;
         canvas.width = newWidth;
         canvas.height = newHeight;
+        if (ctx) applyContextDefaults(ctx);
         return { width: newWidth, height: newHeight, changed };
     }
 
