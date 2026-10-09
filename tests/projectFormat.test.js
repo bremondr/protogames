@@ -359,3 +359,79 @@ test('the infinite board shape is valid, and a file that uses it needs the curre
     const future = { ...plain(PF.parse(JSON.stringify(v2Project()))), version: PF.CURRENT_VERSION + 1 };
     assert.throws(() => PF.parse(JSON.stringify(future)), (error) => error.code === 'newer-version');
 });
+
+// ---- Hostile and out-of-range input (no format change: nothing here rejects a file the app writes) ----
+
+const hostile = () => JSON.parse(JSON.stringify(plain(PF.parse(JSON.stringify(v2Project())))));
+
+test('every existing fixture and showcase still loads under the stricter rules', () => {
+    const files = [
+        ...fs.readdirSync(path.join(__dirname, 'fixtures')).map((name) => path.join(__dirname, 'fixtures', name)),
+        ...fs.readdirSync(path.join(ROOT, 'showcases')).filter((name) => name.endsWith('.json')).map((name) => path.join(ROOT, 'showcases', name))
+    ];
+    assert.ok(files.length >= 5);
+    for (const file of files) assert.doesNotThrow(() => PF.parse(fs.readFileSync(file, 'utf8')), file);
+});
+
+test('hostile files are refused with a readable reason', () => {
+    const cases = [
+        ['non-numeric bounds', (p) => (p.appState.polygons[0].bounds = { minX: 'a', maxX: 1, minY: 0, maxY: 1 }), 'bounds'],
+        ['bounds not an object', (p) => (p.appState.polygons[0].bounds = 5), 'bounds'],
+        ['radius 1e6', (p) => (p.appState.boardConfig.radius = 1e6), 'radius'],
+        ['negative radius', (p) => (p.appState.boardConfig.radius = -3), 'radius'],
+        ['radius as text', (p) => (p.appState.boardConfig.radius = '5'), 'radius'],
+        ['size 1e6', (p) => (p.appState.boardConfig.size = 1e6), 'size'],
+        ['width 1e9', (p) => (p.appState.boardConfig.width = 1e9), 'width'],
+        ['height as text', (p) => (p.appState.boardConfig.height = 'Infinity'), 'height'],
+        ['unknown orientation', (p) => (p.appState.boardConfig.orientation = 'sideways'), 'orientation'],
+        ['unknown triangle orientation', (p) => (p.appState.boardConfig.triangleOrientation = {}), 'orientation'],
+        ['markup in colour', (p) => (p.appState.polygons[0].color = 'red" onload="alert(1)'), 'colour'],
+        ['url() as colour', (p) => (p.appState.polygons[0].color = 'url(https://example.com/x)'), 'colour'],
+        ['named colour', (p) => (p.appState.polygons[0].color = 'red'), 'colour'],
+        ['empty object id', (p) => (p.appState.polygons[0].object = ''), 'object'],
+        ['huge object id', (p) => (p.appState.polygons[0].object = 'x'.repeat(5000)), 'object'],
+        ['thousands of vertices', (p) => (p.appState.polygons[0].vertices = Array.from({ length: 5000 }, () => ({ x: 0, y: 0 }))), 'vertices'],
+        ['infinite board with no tiles', (p) => { p.appState.boardConfig.boardShape = 'infinite'; p.appState.polygons = []; }, 'tile']
+    ];
+    for (const [label, mutate, word] of cases) {
+        const project = hostile();
+        mutate(project);
+        assert.throws(() => PF.parse(JSON.stringify(project)), (error) => {
+            assert.equal(error.code, 'invalid', label);
+            assert.match(error.message, new RegExp(word, 'i'), label);
+            return true;
+        }, label);
+    }
+});
+
+test('"__proto__" as an object id is a plain string to the format (the renderer must look it up safely)', () => {
+    const project = hostile();
+    project.appState.polygons[0].object = '__proto__';
+    const loaded = plain(PF.parse(JSON.stringify(project)));
+    assert.equal(loaded.appState.polygons[0].object, '__proto__');
+});
+
+test('a file without bounds gets them from the vertices instead of crashing the renderer', () => {
+    const project = hostile();
+    const polygon = project.appState.polygons[0];
+    const expected = plain(polygon.bounds);
+    delete polygon.bounds;
+    const loaded = plain(PF.parse(JSON.stringify(project)));
+    assert.deepEqual(loaded.appState.polygons[0].bounds, expected);
+});
+
+test('values at the edge of the allowed range, and three-digit colours, are still accepted', () => {
+    const project = hostile();
+    Object.assign(project.appState.boardConfig, { radius: 100, size: 100, width: 201, height: 201, orientation: 'flat-top', triangleOrientation: 'point-down' });
+    project.appState.polygons[0].color = '#FfF';
+    assert.doesNotThrow(() => PF.parse(JSON.stringify(project)));
+    delete project.appState.boardConfig.orientation;
+    delete project.appState.boardConfig.radius;
+    assert.doesNotThrow(() => PF.parse(JSON.stringify(project)), 'optional settings may be absent');
+});
+
+test('an empty board is still accepted unless it is infinite', () => {
+    const project = hostile();
+    project.appState.polygons = [];
+    assert.doesNotThrow(() => PF.parse(JSON.stringify(project)));
+});

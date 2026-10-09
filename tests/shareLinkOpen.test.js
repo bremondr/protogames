@@ -79,6 +79,47 @@ test('confirming the replacement opens the shared board', async () => {
     assert.equal(env.calls.restores.length, 1);
 });
 
+test('a deflate bomb is refused while inflating, before anything is built', async () => {
+    const zlib = require('node:zlib');
+    const env = fresh();
+    const bomb = zlib.deflateRawSync(Buffer.alloc(64 * 1024 * 1024));
+    assert.ok(bomb.length < 200 * 1024, 'the bomb itself is small');
+    const text = env.ShareLink.toBase64Url(new Uint8Array(bomb));
+    await assert.rejects(() => env.ShareLink.decode(text), /too large/);
+    env.location.hash = `#b=${text}`;
+    await env.ShareLink.openFromHash();
+    assert.equal(env.calls.restores.length, 0);
+    assert.match(env.ui.notes[0], /too large/);
+});
+
+test('the link is dropped from the address before it is decoded, so a crash cannot make a reload retry it', async () => {
+    const env = fresh();
+    env.location.hash = `#b=${await linkFor(env)}`;
+    const pending = env.ShareLink.openFromHash();
+    assert.equal(env.location.hash, '', 'cleared synchronously, before the first await finishes');
+    await pending;
+});
+
+test('settings that ask for an absurd number of tiles are refused before the grid is generated', async () => {
+    const env = fresh();
+    // Triangle tiles on a hexagon board of the largest radius: within the per-setting caps, far over the tile limit.
+    env.location.hash = `#b=${await linkFor(env, (d) => { d.c = { ...d.c, gridType: 'triangle', boardShape: 'hexagon', radius: 100, width: 100, height: 100 }; })}`;
+    env.app.context.Geometry.generateGrid = () => { throw new Error('must not be generated'); };
+    await env.ShareLink.openFromHash();
+    assert.equal(env.calls.restores.length, 0);
+    assert.match(env.ui.notes[0], /too large/);
+});
+
+test('an infinite link naming too many tiles is refused before they are rebuilt', async () => {
+    const env = fresh();
+    env.app.context.Infinite.fromId = () => { throw new Error('must not be rebuilt'); };
+    const ids = Array.from({ length: 20001 }, (_, i) => `inf_s_${i}_0`).join('.');
+    env.location.hash = `#b=${await linkFor(env, (d) => { d.v = 2; d.c = { ...d.c, boardShape: 'infinite' }; d.i = ids; })}`;
+    await env.ShareLink.openFromHash();
+    assert.equal(env.calls.restores.length, 0);
+    assert.match(env.ui.notes[0], /too large/);
+});
+
 test('a hash change without a link is ignored', () => {
     const env = fresh({ hasWork: true, hash: '#something-else' });
     env.ShareLink.onHashChange();

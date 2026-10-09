@@ -409,7 +409,8 @@ const Objects = (() => {
 
     function canvasFor(id) {
         if (custom.has(id)) { if (!cache.has(id)) cache.set(id, { canvas: custom.get(id), url: null }); return custom.get(id); }
-        if (!G[id]) return null;
+        // Own keys only: ids come from files and links, and "__proto__" or "constructor" must not resolve.
+        if (!Object.prototype.hasOwnProperty.call(G, id)) return null;
         if (cache.has(id)) return cache.get(id).canvas;
         const c = document.createElement('canvas'); c.width = RES; c.height = RES;
         const ctx = c.getContext('2d');

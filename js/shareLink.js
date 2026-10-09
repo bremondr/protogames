@@ -20,6 +20,8 @@ const ShareLink = (() => {
     const LINK_VERSION = 2;
     const MAX_TILES = 20000;
     const MAX_DIMENSION = 100;
+    // A link for the biggest board (20000 tiles) inflates to well under 1 MB; this leaves room and stops bombs.
+    const MAX_INFLATED_BYTES = 2 * 1024 * 1024;
     const HASH_PATTERN = /[#&]b=([A-Za-z0-9_-]+)/;
     const HEX_COLOR = /^#[0-9a-f]{6}$/i;
     // Rules of thumb for the apps a link gets pasted into (chat, email); browsers themselves take far more.
@@ -84,16 +86,33 @@ const ShareLink = (() => {
         return config;
     }
 
+    /** The cheap checks on a payload's version fields, so a bad link is refused before any board is built. */
+    function checkEnvelope(data) {
+        if (!data || typeof data !== 'object') fail('Unrecognised link.');
+        // The type comes first: "3" > 2 is true in JavaScript and would claim a newer version.
+        if (!Number.isInteger(data.v) || data.v < 1) fail('Unrecognised link.');
+        if (data.v > LINK_VERSION) fail('This link was made by a newer version of Protogames.');
+        if (!Number.isInteger(data.f) || data.f < 0) fail('Unrecognised link.');
+        if (data.v < 2 && data.c && data.c.boardShape === 'infinite') fail('Unrecognised link.');
+    }
+
+    /** Rough tile count of a board's settings, high enough never to undercount (the exact check follows the build). */
+    function estimateTiles(config) {
+        const number = (key, fallback) => (Number.isFinite(config[key]) ? config[key] : fallback);
+        let cells;
+        if (config.boardShape === 'hexagon' || config.boardShape === 'circle') cells = (2 * number('radius', 5) + 1) ** 2;
+        else if (config.boardShape === 'square' || config.boardShape === 'triangle') cells = number('size', 10) ** 2;
+        else cells = number('width', 11) * number('height', 11);
+        return config.gridType === 'triangle' && config.boardShape !== 'triangle' ? cells * 6 : cells;
+    }
+
     /**
      * Rebuilds a project-shaped object from a payload and freshly generated, blank tiles
      * (the tile order of a generated board is fixed by its settings). Throws on anything
      * unexpected; the result still has to go through ProjectFormat.parse.
      */
     function unpack(data, polygons, { defaultProjectName = 'Untitled' } = {}) {
-        if (!data || typeof data !== 'object') fail('Unrecognised link.');
-        if (data.v > LINK_VERSION) fail('This link was made by a newer version of Protogames.');
-        if (!Number.isInteger(data.v) || data.v < 1) fail('Unrecognised link.');
-        if (!Number.isInteger(data.f) || data.f < 0) fail('Unrecognised link.');
+        checkEnvelope(data);
         if (!Array.isArray(data.k) || !data.k.every((c) => typeof c === 'string' && HEX_COLOR.test(c))) fail('The link has invalid colours.');
         if (typeof data.t !== 'string') fail('The link has no tiles.');
         const tiles = data.t ? data.t.split('.') : [];
@@ -181,9 +200,32 @@ const ShareLink = (() => {
         return toBase64Url(await pipe(json, new CompressionStream('deflate-raw')));
     }
 
+    /**
+     * Inflates a stream but gives up once the output passes `limit` bytes: a few kilobytes of
+     * deflate can expand to gigabytes, so the size must be checked while reading, not after.
+     */
+    async function inflate(bytes, limit) {
+        const reader = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader();
+        const chunks = [];
+        let total = 0;
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            total += value.length;
+            if (total > limit) {
+                await reader.cancel().catch(() => {});
+                fail('The link is too large to open.');
+            }
+            chunks.push(value);
+        }
+        const out = new Uint8Array(total);
+        let offset = 0;
+        for (const chunk of chunks) { out.set(chunk, offset); offset += chunk.length; }
+        return out;
+    }
+
     async function decode(text) {
-        const bytes = await pipe(fromBase64Url(text), new DecompressionStream('deflate-raw'));
-        return JSON.parse(new TextDecoder().decode(bytes));
+        return JSON.parse(new TextDecoder().decode(await inflate(fromBase64Url(text), MAX_INFLATED_BYTES)));
     }
 
     // ---- Browser glue ------------------------------------------------------------------------------------
@@ -262,14 +304,23 @@ const ShareLink = (() => {
     async function openFromHash() {
         const payload = hashPayload(location.hash);
         if (!payload) return false;
+        // Forgotten before decoding: a link that crashes the tab must not be opened again by the reload.
+        forgetHash();
         try {
             const data = await decode(payload);
-            if (!data || typeof data !== 'object') fail('Unrecognised link.');
+            checkEnvelope(data);
             const config = boardConfigFrom(data.c);
             // An infinite board has no fixed tile list: its tiles are named in the link and rebuilt from their ids.
-            const polygons = config.boardShape === 'infinite'
-                ? String(data.i || '').split('.').filter(Boolean).map((id) => Infinite.fromId(id)).filter(Boolean)
-                : Geometry.generateGrid(config, AppState.getState().canvas, null);
+            let polygons;
+            if (config.boardShape === 'infinite') {
+                const ids = String(data.i || '').split('.').filter(Boolean);
+                if (ids.length > MAX_TILES) fail('The board in the link is too large.');
+                polygons = ids.map((id) => Infinite.fromId(id)).filter(Boolean);
+            } else {
+                // Checked before the grid is generated: the settings alone can ask for far more tiles than a board may have.
+                if (estimateTiles(config) > MAX_TILES * 8) fail('The board in the link is too large.');
+                polygons = Geometry.generateGrid(config, AppState.getState().canvas, null);
+            }
             if (polygons.length > MAX_TILES) fail('The board in the link is too large.');
             const project = ProjectFormat.parse(unpack(data, polygons, { defaultProjectName: Config.DEFAULT_PROJECT_NAME }));
             document.querySelectorAll('.modal-backdrop:not(.hidden)').forEach((modal) => modal.remove());
@@ -280,7 +331,6 @@ const ShareLink = (() => {
             console.error('Share link error:', error);
             UI.showNotification(`Could not open the shared link: ${error.message}`, 5000);
         }
-        forgetHash();
         return true;
     }
 

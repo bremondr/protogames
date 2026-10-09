@@ -33,6 +33,16 @@ const Utils = (() => {
     }
 
     /**
+     * Escapes a value for use inside a quoted XML/HTML attribute.
+     *
+     * @param {*} value - Anything; it is converted to text first.
+     * @returns {string} Text with & < > " ' replaced by entities.
+     */
+    function escapeAttribute(value) {
+        return String(value).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    /**
      * Clones a polygon array so mutations will not affect the original.
      *
      * @param {Array<Object>} polygons - Source polygon list.
@@ -88,6 +98,7 @@ const Utils = (() => {
     return {
         debounce,
         sanitizeFileName,
+        escapeAttribute,
         clonePolygons,
         triggerBlobDownload,
         triggerDataUrlDownload,
