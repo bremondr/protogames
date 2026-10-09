@@ -1,5 +1,7 @@
 # Protogames - Development Specification Document
 
+> **Historical document.** This is the original product requirements document, kept for history. The app has since diverged from it: it is plain vanilla JS with IIFE modules and no build step, not a component-based framework, and the page loads an analytics script from a third party (`scripts.simpleanalyticscdn.com`). For what the app does today see `README.md`, `SPECIFICATION.md` and `DEPLOYMENT.md`.
+
 **Version:** 1.0 - MVP  
 **Date:** November 15, 2025  
 **Project Type:** Experimental tool for game design workshops  
