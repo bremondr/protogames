@@ -763,8 +763,31 @@ const Textures = (() => {
         const t = tileFor(hex);
         if (!t) return null;
         let p = t.patterns.get(ctx);
-        if (!p) { p = ctx.createPattern(t.canvas, 'repeat'); t.patterns.set(ctx, p); }
+        if (!p) { p = ctx.createPattern(t.canvas, 'repeat'); p.__k = 1; t.patterns.set(ctx, p); }
+        // Keep the same texture-to-tile proportion on every board: the pattern is drawn 1:1 when tiles
+        // are REF_TILE_PX across and scaled with the board's typical tile size otherwise.
+        const k = patternScale();
+        if (p.__k !== k && typeof p.setTransform === 'function' && typeof DOMMatrix !== 'undefined') {
+            p.setTransform(new DOMMatrix([k, 0, 0, k, 0, 0]));
+            p.__k = k;
+        }
         return p;
+    }
+
+    /** Tile size (in board units) at which a texture is drawn 1:1. */
+    const REF_TILE_PX = 80;
+    const tileSizeCache = new WeakMap();
+
+    /** How much to scale textures so they keep their proportion to the tiles of the current board. */
+    function patternScale() {
+        if (typeof AppState === 'undefined' || typeof ViewMath === 'undefined') return 1;
+        const polygons = AppState.getState().polygons;
+        if (!polygons || !polygons.length) return 1;
+        if (!tileSizeCache.has(polygons)) {
+            const size = ViewMath.typicalTileSize(polygons);
+            tileSizeCache.set(polygons, size > 0 ? Math.round((size / REF_TILE_PX) * 1000) / 1000 : 1);
+        }
+        return tileSizeCache.get(polygons);
     }
 
     function dataUrlFor(hex) {
@@ -809,5 +832,5 @@ const Textures = (() => {
         return true;
     }
 
-    return { registerImage, unregister, resetLabels, patternFor, dataUrlFor, urlFor, isFeature, drawFeature, setFlat, isFlat };
+    return { registerImage, unregister, resetLabels, patternFor, dataUrlFor, urlFor, isFeature, drawFeature, setFlat, isFlat, patternScale, REF_TILE_PX };
 })();
