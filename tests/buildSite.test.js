@@ -229,3 +229,8 @@ test('a pull request that cannot become a preview is skipped and never aborts th
         fs.rmSync(out, { recursive: true, force: true });
     }
 });
+
+test('the folders that make up the app are published, including data/ (the country outlines)', () => {
+    for (const name of ['index.html', 'styles.css', 'js', 'images', 'showcases', 'data']) assert.ok(Site.APP_PATHS.includes(name), name);
+    for (const name of ['tests', 'scripts', 'docs', '.github', 'dev']) assert.ok(!Site.APP_PATHS.includes(name), `${name} is not part of the app`);
+});
