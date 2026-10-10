@@ -95,10 +95,10 @@ Migrations are frozen history: do not edit one after it has been released, and d
 
 | Setting | Meaning |
 |---|---|
-| `country` | Country name as in the outline file (for example `Czechia`); required, at most 100 characters |
+| `country` | Country name as in the outline file (for example `Czechia`), or the name of a **region** (a multi-country area such as `Balkans` or `Scandinavia`, defined in `js/countryRegions.js`); required, at most 100 characters |
 | `width` | Tiles across (2 to 120); `height` is derived from the country's proportions and stored (at most 201) |
 | `countryParts` | Which islands are on the board: `main` (the large ones), `nearby` (plus island chains close to the coast, the default) or `all` |
-| `countryBorders` | Optional boolean (used by multi-country regions) |
+| `countryBorders` | Optional boolean for regions: `false` hides the white lines drawn on the tile edges between two countries (default: shown). Drawn on screen, in PNG exports and on printed pages; not stored per tile |
 | `countryMain` | Older boolean form of `countryParts` (`true` = `nearby`, `false` = `all`); still read, not written |
 
 Tiles keep the ids of the rectangle grid they are cut from, and a country board saves its tiles like any fixed board, so a file opens without the outlines. The outlines are only needed to *regenerate* the board (new size, window resize, share link), and are downloaded the first time that happens; until then the plain rectangle is shown and cut to shape when they arrive. Other settings of a board shape that has them (here `country`, `countryParts`, `countryBorders`, `countryMain`) are kept when a file or link is opened and dropped for boards of other shapes.
