@@ -2229,3 +2229,24 @@ kbd {
 #countryStatus.error {
     color: #ffb3b3;
 }
+
+/* Country regions: the switch for the borders between countries (shown only for multi-country areas) */
+.country-borders {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 32px;
+    font-size: 0.88rem;
+    color: rgba(255, 255, 255, 0.85);
+    cursor: pointer;
+}
+
+.country-borders.hidden {
+    display: none;
+}
+
+.country-borders input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--color-accent);
+}
