@@ -23,7 +23,7 @@ A preview shows a small **Preview: PR #n (commit)** badge with links to producti
 3. writes production at the root and each pull request under `preview/pr-<number>/`, reading every version straight from git (only `index.html`, `styles.css`, `js/`, `images/`, `showcases/` and `data/` are published);
 4. deploys the folder with the official Pages actions and comments the preview link.
 
-Runs are serialised and the latest one wins (the concurrency group is on the deploy job, so a skipped fork pull request cannot cancel a deploy in flight). A pull request that cannot be built into a preview (for example it has no `index.html`) is skipped with a warning and never blocks production. Actions are referenced by version tag, not pinned to a commit. At most 20 previews are published.
+Runs are serialised and the latest one wins (the concurrency group is on the deploy job, so a skipped fork pull request cannot cancel a deploy in flight). A pull request that cannot be built into a preview (for example it has no `index.html`) is skipped with a warning and never blocks production. Actions are referenced by version tag, not pinned to a commit. At most 20 previews are published. The workflow and the build script that run are always the ones on `main` (see Security), so a change to what is published, such as adding a folder to the list in `scripts/build-site.js`, only shows up in previews once it has been merged.
 
 You can build the same folder locally from any git refs:
 
