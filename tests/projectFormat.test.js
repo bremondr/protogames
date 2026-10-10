@@ -435,3 +435,58 @@ test('an empty board is still accepted unless it is infinite', () => {
     project.appState.polygons = [];
     assert.doesNotThrow(() => PF.parse(JSON.stringify(project)));
 });
+
+// ---- v3 -> v4: the country board shape ---------------------------------------------------------------
+
+const v3Project = () => fixture('v3-space-arctic.protogames.json');
+
+test('v3 to v4 changes nothing but the version number', () => {
+    const source = v3Project();
+    const migrated = plain(PF.MIGRATIONS[3](source));
+    assert.equal(migrated.version, 4);
+    const expected = JSON.parse(JSON.stringify(source));
+    expected.version = 4;
+    assert.deepEqual(migrated, expected);
+    assert.equal(source.version, 3, 'the input is not mutated');
+});
+
+test('a v3 file loads through parse() as a current project', () => {
+    const loaded = plain(PF.parse(JSON.stringify(v3Project())));
+    assert.equal(loaded.version, PF.CURRENT_VERSION);
+    assert.equal(loaded.appState.polygons.length, v3Project().appState.polygons.length);
+});
+
+test('a country board needs a country; its other settings are checked when present', () => {
+    const base = () => {
+        const project = plain(PF.parse(JSON.stringify(v3Project())));
+        project.appState.boardConfig.boardShape = 'country';
+        project.appState.boardConfig.country = 'Czechia';
+        return project;
+    };
+    assert.doesNotThrow(() => PF.validate(base()));
+    const ok = base();
+    ok.appState.boardConfig.countryParts = 'all';
+    ok.appState.boardConfig.countryBorders = false;
+    ok.appState.boardConfig.countryMain = true;
+    assert.doesNotThrow(() => PF.validate(ok));
+
+    const reject = (mutate, pattern) => {
+        const project = base();
+        mutate(project.appState.boardConfig);
+        assert.throws(() => PF.validate(project), pattern);
+    };
+    reject((c) => { delete c.country; }, /no valid country/);
+    reject((c) => { c.country = '   '; }, /no valid country/);
+    reject((c) => { c.country = 7; }, /no valid country/);
+    reject((c) => { c.country = 'x'.repeat(101); }, /no valid country/);
+    reject((c) => { c.countryParts = 'everything'; }, /islands setting/);
+    reject((c) => { c.countryBorders = 'yes'; }, /countryBorders is not true\/false/);
+    reject((c) => { c.countryMain = 1; }, /countryMain is not true\/false/);
+});
+
+test('country settings on other board shapes are ignored, not validated', () => {
+    const project = plain(PF.parse(JSON.stringify(v3Project())));
+    project.appState.boardConfig.country = 12345;
+    project.appState.boardConfig.countryParts = 'nonsense';
+    assert.doesNotThrow(() => PF.validate(project), 'a hexagon board that once was a country board still loads');
+});

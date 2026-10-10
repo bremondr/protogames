@@ -17,10 +17,12 @@
  * read live app config inside them.
  */
 const ProjectFormat = (() => {
-    const CURRENT_VERSION = 3;
+    const CURRENT_VERSION = 4;
 
     const GRID_TYPES = ['hexagon', 'square', 'triangle'];
-    const BOARD_SHAPES = ['hexagon', 'square', 'rectangle', 'triangle', 'circle', 'infinite'];
+    const BOARD_SHAPES = ['hexagon', 'square', 'rectangle', 'triangle', 'circle', 'infinite', 'country'];
+    const COUNTRY_PARTS = ['main', 'nearby', 'all'];
+    const MAX_COUNTRY_NAME = 100;
     const ORIENTATIONS = ['pointy-top', 'flat-top', 'orthogonal', 'diagonal'];
     const TRIANGLE_ORIENTATIONS = ['point-up', 'point-down'];
     const MAX_BOARD_DIMENSION = 100; // same cap as share links
@@ -155,11 +157,23 @@ const ProjectFormat = (() => {
         return next;
     }
 
+    /**
+     * v3 -> v4: the board shape "country" was added (boardConfig.country, countryParts, countryBorders).
+     * Nothing in an existing project changes; the bump makes an older app say "saved by a newer
+     * version" instead of "unknown board shape" when it meets a country board.
+     */
+    function migrateV3toV4(project) {
+        const next = clone(project);
+        next.version = 4;
+        return next;
+    }
+
     /** MIGRATIONS[n] upgrades a version-n project to version n + 1. */
     const MIGRATIONS = {
         0: migrateV0toV1,
         1: migrateV1toV2,
-        2: migrateV2toV3
+        2: migrateV2toV3,
+        3: migrateV3toV4
     };
 
     /**
@@ -220,6 +234,17 @@ const ProjectFormat = (() => {
         }
         if (config.triangleOrientation !== undefined && !TRIANGLE_ORIENTATIONS.includes(config.triangleOrientation)) {
             fail(`The board has an unknown triangle orientation (${JSON.stringify(config.triangleOrientation)}).`);
+        }
+        if (config.boardShape === 'country') {
+            if (typeof config.country !== 'string' || !config.country.trim() || config.country.length > MAX_COUNTRY_NAME) {
+                fail('The country board has no valid country (boardConfig.country).');
+            }
+            if (config.countryParts !== undefined && !COUNTRY_PARTS.includes(config.countryParts)) {
+                fail(`The country board has an unknown islands setting (${JSON.stringify(config.countryParts)}).`);
+            }
+            for (const key of ['countryBorders', 'countryMain']) {
+                if (config[key] !== undefined && typeof config[key] !== 'boolean') fail(`The board setting ${key} is not true/false.`);
+            }
         }
     }
 
