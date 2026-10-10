@@ -163,3 +163,28 @@ test('an infinite link can be compressed and decoded like any other', async () =
     const data = plain(ShareLink.pack({ projectName: '', boardConfig: config, paletteId: 'landscape', polygons: tiles, formatVersion: 3 }));
     assert.deepEqual(plain(await ShareLink.decode(await ShareLink.encode(data))), data);
 });
+
+// ---- Country boards ----------------------------------------------------------------------------------
+
+test('a country board link is version 3, so older apps say "newer version" instead of failing oddly', () => {
+    const config = { ...CONFIG, boardShape: 'country', country: 'Czechia', width: 24, height: 15, countryParts: 'nearby' };
+    const tiles = painted().slice(0, 3);
+    const data = plain(ShareLink.pack({ projectName: 'Czechia', boardConfig: config, paletteId: 'landscape', polygons: tiles, formatVersion: ProjectFormat.CURRENT_VERSION }));
+    assert.equal(data.v, 3);
+    assert.equal(data.c.country, 'Czechia');
+    assert.equal(data.i, undefined, 'the tiles are regenerated from the settings, not named');
+    assert.equal(ShareLink.LINK_VERSION, 3);
+    // A link that claims an older version but describes a country board is refused.
+    assert.throws(() => ShareLink.unpack({ ...data, v: 2 }, blankBoard()), /Unrecognised/);
+});
+
+test('a country board may be wider and taller than other boards, within its own limits', () => {
+    const polygons = blankBoard();
+    const link = (c) => ({ ...packOf(polygons), v: 3, c });
+    const country = { ...CONFIG, boardShape: 'country', country: 'Chile', width: 120, height: 201 };
+    assert.doesNotThrow(() => ShareLink.unpack(link(country), polygons));
+    assert.throws(() => ShareLink.unpack(link({ ...country, width: 121 }), polygons), /width in the link is out of range/);
+    assert.throws(() => ShareLink.unpack(link({ ...country, height: 202 }), polygons), /height in the link is out of range/);
+    // Every other shape keeps the old limit.
+    assert.throws(() => ShareLink.unpack(link({ ...CONFIG, width: 101 }), polygons), /width in the link is out of range/);
+});

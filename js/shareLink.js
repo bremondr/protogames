@@ -14,10 +14,14 @@
  */
 const ShareLink = (() => {
     /**
-     * Version of the link payload (not the project file format). 2 added infinite boards; links of
-     * other boards are still written as version 1 so older apps can open them.
+     * Version of the link payload (not the project file format). 2 added infinite boards and 3 country
+     * boards; links of other boards are still written as version 1 so older apps can open them.
      */
-    const LINK_VERSION = 2;
+    const LINK_VERSION = 3;
+    // A country board is cut from a rectangle up to this wide and (derived from the outline) this tall.
+    const COUNTRY_MAX_ACROSS = 120;
+    const COUNTRY_MAX_SPAN = 201;
+    const LINK_VERSION_FOR_SHAPE = { infinite: 2, country: 3 };
     const MAX_TILES = 20000;
     const MAX_DIMENSION = 100;
     // A link for the biggest board (20000 tiles) inflates to well under 1 MB; this leaves room and stops bombs.
@@ -59,7 +63,7 @@ const ShareLink = (() => {
         });
         const infinite = Boolean(boardConfig && boardConfig.boardShape === 'infinite');
         return {
-            v: infinite ? 2 : 1,
+            v: LINK_VERSION_FOR_SHAPE[boardConfig && boardConfig.boardShape] || 1,
             f: formatVersion,
             n: projectName || '',
             c: boardConfig,
@@ -79,9 +83,10 @@ const ShareLink = (() => {
     function boardConfigFrom(raw) {
         if (!raw || typeof raw !== 'object') fail('The link has no board settings.');
         const config = { ...raw };
+        const limit = (key) => (config.boardShape === 'country' ? (key === 'width' ? COUNTRY_MAX_ACROSS : key === 'height' ? COUNTRY_MAX_SPAN : MAX_DIMENSION) : MAX_DIMENSION);
         for (const key of ['width', 'height', 'radius', 'size']) {
             if (config[key] === undefined) continue;
-            if (!Number.isInteger(config[key]) || config[key] < 1 || config[key] > MAX_DIMENSION) fail(`The board ${key} in the link is out of range.`);
+            if (!Number.isInteger(config[key]) || config[key] < 1 || config[key] > limit(key)) fail(`The board ${key} in the link is out of range.`);
         }
         return config;
     }
@@ -93,7 +98,8 @@ const ShareLink = (() => {
         if (!Number.isInteger(data.v) || data.v < 1) fail('Unrecognised link.');
         if (data.v > LINK_VERSION) fail('This link was made by a newer version of Protogames.');
         if (!Number.isInteger(data.f) || data.f < 0) fail('Unrecognised link.');
-        if (data.v < 2 && data.c && data.c.boardShape === 'infinite') fail('Unrecognised link.');
+        const needs = data.c && LINK_VERSION_FOR_SHAPE[data.c.boardShape];
+        if (needs && data.v < needs) fail('Unrecognised link.');
     }
 
     /** Rough tile count of a board's settings, high enough never to undercount (the exact check follows the build). */
@@ -312,6 +318,13 @@ const ShareLink = (() => {
     }
 
     /** Opens the board in the address, if there is one. Returns true when a link was handled, false when there is none or it failed. */
+    /** Waits (a few seconds at most) for the country outlines a link needs; refuses the link if they cannot be had. */
+    async function outlinesFor(config) {
+        if (typeof CountryBoard === 'undefined') fail('This link needs the country outlines, which are not available here.');
+        const ok = await Promise.race([CountryBoard.ready(), new Promise((resolve) => setTimeout(() => resolve(false), 8000))]);
+        if (!ok) fail(`The outlines of ${config.country || 'the country'} could not be downloaded. Check the connection and open the link again.`);
+    }
+
     async function openFromHash() {
         const payload = hashPayload(location.hash);
         if (!payload) return false;
@@ -330,6 +343,8 @@ const ShareLink = (() => {
             } else {
                 // Checked before the grid is generated: the settings alone can ask for far more tiles than a board may have.
                 if (estimateTiles(config) > MAX_TILES * 8) fail('The board in the link is too large.');
+                // A country board is cut to an outline that has to be downloaded the first time.
+                if (config.boardShape === 'country') await outlinesFor(config);
                 polygons = Geometry.generateGrid(config, AppState.getState().canvas, null);
             }
             if (polygons.length > MAX_TILES) fail('The board in the link is too large.');
