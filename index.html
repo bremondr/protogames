@@ -68,6 +68,7 @@
                             <option value="triangle">Triangle</option>
                             <option value="circle">Circle</option>
                             <option value="infinite">Infinite canvas</option>
+                            <option value="country">Country</option>
                         </select>
                     </label>                    
                     <label class="field">
@@ -102,6 +103,29 @@
                             <option value="point-up" selected>Point Up</option>
                             <option value="point-down">Point Down</option>
                         </select>
+                    </div>
+                    <div class="hidden" id="countryFields">
+                        <label class="field">
+                            <span class="field-label">Country</span>
+                            <input type="text" id="countryInput" list="countryList" value="Czechia" autocomplete="off" spellcheck="false" placeholder="Country, e.g. Czechia" aria-label="Country">
+                            <datalist id="countryList"></datalist>
+                        </label>
+                        <label class="field">
+                            <span class="field-label">Tiles across</span>
+                            <input type="number" id="countryAcross" min="2" max="120" step="1" value="24" aria-label="Tiles across">
+                            <p class="field-hint">Rows follow from the country's proportions.</p>
+                        </label>
+                        <div class="field">
+                            <span class="field-label">Islands</span>
+                            <div id="countryParts" class="mode-switch" role="group" aria-label="Islands">
+                                <button type="button" data-value="main" aria-pressed="false">Main</button>
+                                <button type="button" data-value="nearby" aria-pressed="true">Nearby</button>
+                                <button type="button" data-value="all" aria-pressed="false">All</button>
+                            </div>
+                            <p class="field-hint" id="countryPartsHint">Adds island chains close to the coast; far territories are left out.</p>
+                        </div>
+                        <p class="field-hint" id="countryStatus" role="status"></p>
+                        <p class="field-hint">Outlines: Natural Earth (1:50m)</p>
                     </div>
                     <div class="field dimension-fields" id="rectangularFields">
                         <label>
@@ -539,6 +563,7 @@
     <script src="js/playtest.js"></script>
     <script src="js/themeEditor.js"></script>
     <script src="js/infinite.js"></script>
+    <script src="js/countryBoard.js"></script>
     <script src="js/print.js"></script>
     <script src="js/printDialog.js"></script>
     <script src="js/main.js"></script>

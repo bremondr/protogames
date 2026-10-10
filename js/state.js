@@ -102,6 +102,9 @@ const AppState = (() => {
         state.boardConfig = { ...state.boardConfig, ...config };
     }
 
+    /** Board settings that only some shapes use (the country board); kept when present, absent otherwise. */
+    const SHAPE_SETTINGS = ['country', 'countryParts', 'countryBorders', 'countryMain'];
+
     /**
      * Replaces the board configuration with one from a file or link. Only known settings are kept and
      * missing ones take their defaults, so nothing is inherited from the board that was open before.
@@ -111,6 +114,10 @@ const AppState = (() => {
     function setBoardConfig(config) {
         const next = { ...Config.DEFAULT_BOARD_CONFIG };
         for (const key of Object.keys(next)) {
+            if (config && config[key] !== undefined) next[key] = config[key];
+        }
+        // Settings of a particular board shape exist only on boards of that shape, so they have no default.
+        for (const key of SHAPE_SETTINGS) {
             if (config && config[key] !== undefined) next[key] = config[key];
         }
         state.boardConfig = next;

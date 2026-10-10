@@ -177,6 +177,7 @@ test('a site build puts production at the root and previews under /preview/<name
         assert.ok(!fs.existsSync(path.join(out, 'preview-runtime.js')), 'the runtime is not in production');
         assert.ok(!fs.existsSync(path.join(out, 'preview', 'pr-70')), 'a fork is not published');
         assert.ok(!fs.existsSync(path.join(out, 'tests')) && !fs.existsSync(path.join(out, 'scripts')), 'only the app is published');
+        assert.ok(fs.existsSync(path.join(out, 'data', 'countries-50m.json')) && fs.existsSync(path.join(out, 'preview', 'pr-66', 'data', 'countries-50m.json')), 'the country outlines are published with production and every preview');
         assert.ok(fs.existsSync(path.join(out, '.nojekyll')));
         assert.ok(fs.readFileSync(path.join(out, 'preview', 'index.html'), 'utf8').includes('pr-66'));
         // Binary files survive the trip through git.

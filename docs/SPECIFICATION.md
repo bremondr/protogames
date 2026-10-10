@@ -8,28 +8,29 @@ Projects are saved as `<name>.protogames.json` and the editor also keeps one cop
 
 ### Version
 
-Every file has a top-level integer `version`. The current version is **3**.
+Every file has a top-level integer `version`. The current version is **4**.
 
 | `version` in the file | Meaning |
 |---|---|
 | missing, or the string `"1.0"` | **v0**: written before versioning existed. Migrated to v1 on load. |
 | integer `1` | migrated to v2 on load (Space/Arctic colours, see below), then to v3 |
-| integer `2` | migrated to v3 on load (only the version number changes) |
-| integer `3` | current format |
+| integer `2` | migrated to v3, then v4 on load (only the version number changes) |
+| integer `3` | migrated to v4 on load (only the version number changes) |
+| integer `4` | current format |
 | integer greater than the app's current version | rejected: "saved by a newer version of Protogames, update to open it" |
 | anything else (`1.5`, `-1`, `"abc"`, `null`, ...) | rejected as unreadable |
 
-### Project file (v3)
+### Project file (v4)
 
 ```jsonc
 {
-  "version": 3,
+  "version": 4,
   "projectName": "my board",
   "created": "2026-10-02T13:31:51.661Z",     // ISO time of the save
   "appState": {
     "boardConfig": {
       "gridType": "hexagon",                 // tile shape: hexagon | square | triangle
-      "boardShape": "hexagon",               // hexagon | square | rectangle | triangle | circle | infinite
+      "boardShape": "hexagon",               // hexagon | square | rectangle | triangle | circle | infinite | country
       "orientation": "pointy-top",           // pointy-top | flat-top (hexagon tiles / boards)
       "triangleOrientation": "point-up",     // point-up | point-down (triangle boards)
       "width": 11, "height": 11,             // columns / rows (derived from radius or size for some shapes)
@@ -86,6 +87,21 @@ Migrations are frozen history: do not edit one after it has been released, and d
 | 1 | Integer `version`. Migration fills `projectName`, `paletteId`, `isEraserActive`, `autoSaveEnabled`, tile `color` when missing and drops `object: null`. Validation became strict. |
 | 2 | The Space and Arctic palettes were redesigned. The structure is unchanged; migration remaps tile colours (and the selected colour) that no longer exist, see "v1 to v2 colour map". |
 | 3 | New board shape `infinite` (see "Infinite boards"). Nothing in existing projects changes; the bump makes an older app report "saved by a newer version" instead of an unknown board shape. |
+| 4 | New board shape `country` (see "Country boards"). Same kind of bump: nothing in existing projects changes. |
+
+### Country boards
+
+`boardShape: "country"` is a rectangle of tiles cut to the outline of a real country (`js/countryBoard.js`). The outlines are Natural Earth data (public domain) from `data/countries-50m.json` (see `data/README.md`), which ships with the app. Its settings live in `boardConfig`:
+
+| Setting | Meaning |
+|---|---|
+| `country` | Country name as in the outline file (for example `Czechia`); required, at most 100 characters |
+| `width` | Tiles across (2 to 120); `height` is derived from the country's proportions and stored (at most 201) |
+| `countryParts` | Which islands are on the board: `main` (the large ones), `nearby` (plus island chains close to the coast, the default) or `all` |
+| `countryBorders` | Optional boolean (used by multi-country regions) |
+| `countryMain` | Older boolean form of `countryParts` (`true` = `nearby`, `false` = `all`); still read, not written |
+
+Tiles keep the ids of the rectangle grid they are cut from, and a country board saves its tiles like any fixed board, so a file opens without the outlines. The outlines are only needed to *regenerate* the board (new size, window resize, share link), and are downloaded the first time that happens; until then the plain rectangle is shown and cut to shape when they arrive. Other settings of a board shape that has them (here `country`, `countryParts`, `countryBorders`, `countryMain`) are kept when a file or link is opened and dropped for boards of other shapes.
 
 ### Infinite boards
 
@@ -140,7 +156,7 @@ The payload is JSON, deflate-compressed (`deflate-raw`) and written as base64url
 
 | Key | Meaning |
 |---|---|
-| `v` | Link version: **1** for fixed boards, **2** when the board is infinite (older apps can still open version 1 links). A number higher than the app knows is rejected as "made by a newer version". |
+| `v` | Link version: **1** for fixed boards, **2** for infinite boards, **3** for country boards (older apps can still open the links of the boards they know). A number higher than the app knows is rejected as "made by a newer version", and a link that describes a board shape newer than its version is refused. |
 | `f` | **Project file format** the colours belong to. On opening, the link is turned into a project of this version and passed through `ProjectFormat.parse`, so a link made before a palette change migrates exactly like a saved file. |
 | `n` | Project name |
 | `c` | Board settings (`boardConfig`); every size must be an integer from 1 to 100 |
@@ -150,6 +166,8 @@ The payload is JSON, deflate-compressed (`deflate-raw`) and written as base64url
 | `ob` | Distinct object ids |
 | `o` | Tiles that hold an object: `tileIndex:objectIndex` pairs (base 36), dot separated |
 | `i` | Infinite boards only: the ids of the drawn tiles, dot separated, in the order of `t` and `o`. The tiles are rebuilt from the ids instead of regenerated from `c`. |
+
+A country board link carries the country settings in `c` and regenerates the tiles from the outlines, so opening it downloads them first (an offline or failed download refuses the link with a message). Limits for `c`: width up to 120 and height up to 201 for country boards, up to 100 for others.
 
 Tile geometry is not stored: the board is regenerated from `c`, which fixes the tile order, so `t` must have exactly one entry per generated tile (for an infinite board, per id in `i`). Anything unexpected (wrong version, bad colour, out-of-range index, size mismatch) is refused with a message instead of opening a damaged board. The payload is inflated through a reader that stops at 2 MB of output, the settings and tile count are checked before any tile is built, and the link is removed from the address before it is decoded, so a hostile link cannot hang the tab again after a reload.
 
