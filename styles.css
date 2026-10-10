@@ -2194,3 +2194,38 @@ kbd {
         height: 260px;
     }
 }
+
+/* Country board: the settings that replace the width and height fields */
+#countryFields {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+#countryFields.hidden {
+    display: none;
+}
+
+/* The country name is a text box with a list of suggestions; it looks like the number boxes around it. */
+#countryInput {
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.65rem;
+    background: rgba(15, 23, 42, 0.35);
+    color: #f5f5f5;
+    min-height: 44px;
+}
+
+#countryInput:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+}
+
+#countryStatus:empty {
+    display: none;
+}
+
+#countryStatus.error {
+    color: #ffb3b3;
+}

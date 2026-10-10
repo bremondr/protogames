@@ -193,3 +193,17 @@ test('the adjacency graph is built only when something asks for it, not when the
     assert.equal(topology.adjacency, topology.adjacency, 'built once');
     assert.equal(builds, 1);
 });
+
+test('setBoardConfig keeps the country board\'s own settings, and does not inherit them from the previous board', () => {
+    const { AppState } = fresh();
+    AppState.setBoardConfig({ boardShape: 'country', gridType: 'hexagon', width: 24, height: 17, country: 'Japan', countryParts: 'main', countryBorders: false, rogue: 1 });
+    const config = plain(AppState.getState().boardConfig);
+    assert.equal(config.country, 'Japan');
+    assert.equal(config.countryParts, 'main');
+    assert.equal(config.countryBorders, false);
+    assert.equal(config.rogue, undefined, 'unknown settings are still dropped');
+    AppState.setBoardConfig({ boardShape: 'hexagon', gridType: 'hexagon' });
+    const next = plain(AppState.getState().boardConfig);
+    assert.equal(next.country, undefined, 'a board of another shape does not carry the country along');
+    assert.equal(next.countryParts, undefined);
+});
