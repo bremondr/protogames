@@ -14,6 +14,7 @@ Needs: nothing (works in a pure lock mode, so it is a good companion to pieces).
 - Open questions: distance for triangle grids (edge or vertex adjacency?), and whether diagonals count on square grids (a setting).
 
 ## 2. Dice and randomizers
+First version is planned in [PLAYTEST_DICE_PLAN.md](PLAYTEST_DICE_PLAN.md): a standard d3 to d20 set saved with the design, rolled from each player's tray. The list below is what remains after that.
 Needs: nothing.
 - d4, d6, d8, d10, d12, d20, and custom face lists.
 - Coin flip, random number in a range, random tile, random direction.

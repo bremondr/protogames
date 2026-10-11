@@ -114,7 +114,7 @@ state.play = {
 Per the project's versioning rule this needs a bump in the same change.
 
 1. `ProjectFormat.CURRENT_VERSION` 3 → **4**.
-2. `MIGRATIONS[3]` sets `appState.players = []` when absent. Tiles need nothing: `start` is optional. Frozen history, reads no live config.
+2. `MIGRATIONS[3]` sets `appState.players = []` when absent, and `appState.dice` to the standard dice set (see [PLAYTEST_DICE_PLAN.md](PLAYTEST_DICE_PLAN.md); it rides on this version bump). Tiles need nothing: `start` is optional. Frozen history, reads no live config.
 3. `validate`:
    - `appState.players`: array of at most 8; each has a valid hex `color` (unique across players), a `seat` in the whitelist, and a `pieces` array whose entries have a `kind` in the whitelist (unique per player) and an integer `count` from 1 to 500; total count at most 500.
    - Tile `start`: when present, a valid hex string.
