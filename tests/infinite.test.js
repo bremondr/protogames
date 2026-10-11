@@ -160,3 +160,12 @@ test('an export of tiles drawn very far apart falls back to the drawn tiles with
         assert.deepEqual(plain(scene.polygons.map((p) => p.id).sort()), [a.id, b.id].sort());
     }
 });
+
+test('a tile with a start marker counts as drawn, so it is saved and kept when the view moves', () => {
+    const tiles = Infinite.cellsIn('inf_s', { minX: 0, minY: 0, maxX: 200, maxY: 200 });
+    const marked = tiles[3];
+    assert.equal(Infinite.isPainted(marked), false);
+    marked.start = '#c62828';
+    assert.equal(Infinite.isPainted(marked), true);
+    assert.deepEqual(plain(Infinite.paintedTiles(tiles).map((t) => t.id)), [marked.id]);
+});

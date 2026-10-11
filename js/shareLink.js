@@ -14,10 +14,17 @@
  */
 const ShareLink = (() => {
     /**
-     * Version of the link payload (not the project file format). 2 added infinite boards and 3 country
-     * boards; links of other boards are still written as version 1 so older apps can open them.
+     * Version of the link payload (not the project file format). 2 added infinite boards, 3 country
+     * boards and 4 players and start markers; links without any of these are still written as version 1
+     * so older apps can open them.
      */
-    const LINK_VERSION = 3;
+    const LINK_VERSION = 4;
+    const PLAYER_LINK_VERSION = 4;
+    // First project file format that has players and dice; links made before it get them from the migration.
+    const FORMAT_WITH_PLAYERS = 5;
+    const SEATS = ['bottom', 'top', 'left', 'right'];
+    const MAX_PLAYERS = 8;
+    const PIECE_KINDS = ['pawn', 'disc', 'cube', 'meeple'];
     // A country board is cut from a rectangle up to this wide and (derived from the outline) this tall.
     const COUNTRY_MAX_ACROSS = 120;
     const COUNTRY_MAX_SPAN = 201;
@@ -38,8 +45,11 @@ const ShareLink = (() => {
      * Compact payload for a board: { v, f, n, c, p, k, t, ob, o }
      *  k = distinct colours, t = per-tile colour index (base 36, dot separated),
      *  ob = distinct object ids, o = "tileIndex:objectIndex" pairs.
+     * Only when the design has them: pl = players as [colour, seat, [[kind, count], ...]],
+     *  sc = distinct start colours, s = "tileIndex:colourIndex" pairs of start markers.
+     * The dice set is not carried: every design has the standard set until it can be edited.
      */
-    function pack({ projectName, boardConfig, paletteId, polygons, formatVersion }) {
+    function pack({ projectName, boardConfig, paletteId, polygons, formatVersion, players }) {
         const colors = [];
         const colorIndex = new Map();
         const tiles = polygons.map((polygon) => {
@@ -61,9 +71,22 @@ const ShareLink = (() => {
             }
             placed.push(`${index.toString(36)}:${objectIndex.get(polygon.object).toString(36)}`);
         });
-        const infinite = Boolean(boardConfig && boardConfig.boardShape === 'infinite');
+        const startColors = [];
+        const startIndex = new Map();
+        const starts = [];
+        polygons.forEach((polygon, index) => {
+            if (!polygon.start) return;
+            const color = String(polygon.start).toLowerCase();
+            if (!startIndex.has(color)) {
+                startIndex.set(color, startColors.length);
+                startColors.push(color);
+            }
+            starts.push(`${index.toString(36)}:${startIndex.get(color).toString(36)}`);
+        });
+        const playerList = Array.isArray(players) ? players : [];
+        const hasPlayers = playerList.length > 0 || starts.length > 0;
         return {
-            v: LINK_VERSION_FOR_SHAPE[boardConfig && boardConfig.boardShape] || 1,
+            v: Math.max(LINK_VERSION_FOR_SHAPE[boardConfig && boardConfig.boardShape] || 1, hasPlayers ? PLAYER_LINK_VERSION : 1),
             f: formatVersion,
             n: projectName || '',
             c: boardConfig,
@@ -72,6 +95,10 @@ const ShareLink = (() => {
             t: tiles.join('.'),
             ob: objects,
             o: placed.join('.'),
+            ...(playerList.length
+                ? { pl: playerList.map((p) => [String(p.color).toLowerCase(), p.seat, (p.pieces || []).map((e) => [e.kind, e.count])]) }
+                : {}),
+            ...(starts.length ? { sc: startColors, s: starts.join('.') } : {}),
             ...(boardConfig && boardConfig.boardShape === 'infinite' ? { i: polygons.map((p) => p.id).join('.') } : {})
         };
     }
@@ -100,6 +127,7 @@ const ShareLink = (() => {
         if (!Number.isInteger(data.f) || data.f < 0) fail('Unrecognised link.');
         const needs = data.c && LINK_VERSION_FOR_SHAPE[data.c.boardShape];
         if (needs && data.v < needs) fail('Unrecognised link.');
+        if ((data.pl !== undefined || data.sc !== undefined || data.s !== undefined) && data.v < PLAYER_LINK_VERSION) fail('Unrecognised link.');
     }
 
     /** Rough tile count of a board's settings, high enough never to undercount (the exact check follows the build). */
@@ -138,6 +166,8 @@ const ShareLink = (() => {
             if (!target || !id) fail('The link places an item on a tile that does not exist.');
             target.object = id;
         }
+        startsFrom(data, result);
+        const players = playersFrom(data.pl);
         const paletteId = typeof data.p === 'string' ? data.p : '';
         return {
             version: data.f,
@@ -148,9 +178,52 @@ const ShareLink = (() => {
                 paletteId,
                 isEraserActive: false,
                 autoSaveEnabled: true,
-                polygons: result
+                polygons: result,
+                // Links of the format that has them carry players; the standard dice are implied (see pack).
+                ...(data.f >= FORMAT_WITH_PLAYERS ? { players, dice: standardDice() } : {})
             }
         };
+    }
+
+    /** The dice every design starts with: a copy, so nothing shared can be changed by accident. */
+    function standardDice() {
+        return Config.STANDARD_DICE.map((die) => ({ sides: die.sides }));
+    }
+
+    /** Puts the start markers of a payload onto the (already built) tiles. */
+    function startsFrom(data, tiles) {
+        if (data.sc === undefined && data.s === undefined) return 0;
+        if (!Array.isArray(data.sc) || !data.sc.every((c) => typeof c === 'string' && HEX_COLOR.test(c))) fail('The link has invalid start colours.');
+        const entries = typeof data.s === 'string' && data.s ? data.s.split('.') : [];
+        for (const entry of entries) {
+            const [tile, color] = entry.split(':');
+            const target = tiles[parseInt(tile, 36)];
+            const hex = data.sc[parseInt(color, 36)];
+            if (!target || !hex) fail('The link places a start marker on a tile that does not exist.');
+            target.start = hex;
+        }
+        return entries.length;
+    }
+
+    /** The players of a payload, checked for shape only; ProjectFormat.parse checks what they mean. */
+    function playersFrom(raw) {
+        if (raw === undefined) return [];
+        if (!Array.isArray(raw) || raw.length > MAX_PLAYERS) fail('The link has invalid players.');
+        return raw.map((entry) => {
+            if (!Array.isArray(entry) || entry.length !== 3) fail('The link has invalid players.');
+            const [color, seat, pieces] = entry;
+            if (typeof color !== 'string' || !HEX_COLOR.test(color) || !SEATS.includes(seat) || !Array.isArray(pieces) || pieces.length > PIECE_KINDS.length) {
+                fail('The link has invalid players.');
+            }
+            return {
+                color,
+                seat,
+                pieces: pieces.map((piece) => {
+                    if (!Array.isArray(piece) || piece.length !== 2 || !PIECE_KINDS.includes(piece[0]) || !Number.isInteger(piece[1])) fail('The link has invalid pieces.');
+                    return { kind: piece[0], count: piece[1] };
+                })
+            };
+        });
     }
 
     // ---- Pure: base64url and addresses ---------------------------------------------------------
@@ -246,7 +319,8 @@ const ShareLink = (() => {
             boardConfig: state.boardConfig,
             paletteId: state.currentPaletteId,
             polygons: Infinite.isActive() ? Infinite.paintedTiles(state.polygons) : state.polygons,
-            formatVersion: ProjectFormat.CURRENT_VERSION
+            formatVersion: ProjectFormat.CURRENT_VERSION,
+            players: state.players
         });
     }
 

@@ -36,6 +36,7 @@ function makeUI(extra = {}) {
         updateBoardControls() {},
         updateCanvasMessage() {},
         setEraserActive() {},
+        setPaletteSelection() {},
         ...extra
     };
 }

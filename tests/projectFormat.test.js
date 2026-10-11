@@ -490,3 +490,149 @@ test('country settings on other board shapes are ignored, not validated', () => 
     project.appState.boardConfig.countryParts = 'nonsense';
     assert.doesNotThrow(() => PF.validate(project), 'a hexagon board that once was a country board still loads');
 });
+
+// ---- v4 -> v5: players, start markers and dice ------------------------------------------------------------
+
+const v4Project = () => fixture('v4-space-arctic.protogames.json');
+const STANDARD_DICE = [3, 4, 6, 8, 10, 12, 20].map((sides) => ({ sides }));
+const RED = '#c62828';
+const BLUE = '#1565c0';
+
+/** A current project with the given players (and dice, by default the standard set). */
+function withPlayers(players, dice = STANDARD_DICE) {
+    const project = plain(PF.parse(JSON.stringify(v4Project())));
+    project.appState.players = players;
+    project.appState.dice = dice;
+    return project;
+}
+const twoPlayers = () => [
+    { color: RED, seat: 'bottom', pieces: [{ kind: 'pawn', count: 4 }, { kind: 'cube', count: 12 }] },
+    { color: BLUE, seat: 'top', pieces: [{ kind: 'meeple', count: 2 }] }
+];
+
+test('v4 to v5 adds no players and the standard dice, and changes nothing else', () => {
+    const source = v4Project();
+    const migrated = plain(PF.MIGRATIONS[4](source));
+    assert.equal(migrated.version, 5);
+    assert.deepEqual(migrated.appState.players, []);
+    assert.deepEqual(migrated.appState.dice, STANDARD_DICE);
+    const expected = JSON.parse(JSON.stringify(source));
+    expected.version = 5;
+    expected.appState.players = [];
+    expected.appState.dice = STANDARD_DICE;
+    assert.deepEqual(migrated, expected);
+    assert.equal(source.version, 4, 'the input is not mutated');
+    assert.equal(source.appState.players, undefined);
+});
+
+test('v4 to v5 keeps players and dice a file already has', () => {
+    const source = v4Project();
+    source.appState.players = twoPlayers();
+    source.appState.dice = [{ sides: 6 }];
+    const migrated = plain(PF.MIGRATIONS[4](source));
+    assert.deepEqual(migrated.appState.players, twoPlayers());
+    assert.deepEqual(migrated.appState.dice, [{ sides: 6 }]);
+});
+
+test('a v4 file loads through parse() as a current project with the standard dice', () => {
+    const loaded = plain(PF.parse(JSON.stringify(v4Project())));
+    assert.equal(loaded.version, PF.CURRENT_VERSION);
+    assert.equal(PF.CURRENT_VERSION, 5);
+    assert.deepEqual(loaded.appState.players, []);
+    assert.deepEqual(loaded.appState.dice, STANDARD_DICE);
+});
+
+test('older fixtures also arrive with players and dice', () => {
+    for (const name of ['v0-legacy-project.protogames.json', 'v1-space-arctic.protogames.json', 'v2-space-arctic.protogames.json', 'v3-space-arctic.protogames.json']) {
+        const loaded = plain(PF.parse(JSON.stringify(fixture(name))));
+        assert.deepEqual(loaded.appState.players, [], name);
+        assert.deepEqual(loaded.appState.dice, STANDARD_DICE, name);
+    }
+});
+
+test('players, start markers and dice survive saving and loading', () => {
+    const project = withPlayers(twoPlayers(), [{ sides: 6 }, { sides: 20 }]);
+    project.appState.polygons[0].start = RED;
+    project.appState.polygons[1].start = BLUE;
+    const saved = plain(PF.createProject({ projectName: 'game', appState: project.appState, now: 0 }));
+    const loaded = plain(PF.parse(JSON.stringify(saved)));
+    assert.deepEqual(loaded, saved);
+    assert.equal(loaded.appState.polygons[0].start, RED);
+    const autosave = plain(PF.createAutosave({ projectName: 'game', appState: project.appState, now: 7 }));
+    assert.deepEqual(plain(PF.parse(JSON.stringify(autosave))), autosave);
+});
+
+test('a project from a newer app than this one is still refused', () => {
+    const project = withPlayers(twoPlayers());
+    project.version = PF.CURRENT_VERSION + 1;
+    throwsFormatError(() => PF.parse(JSON.stringify(project)), 'newer-version');
+});
+
+test('a tile start marker must be a colour', () => {
+    const reject = (value) => {
+        const project = withPlayers([]);
+        project.appState.polygons[0].start = value;
+        throwsFormatError(() => PF.validate(project), 'invalid', /invalid start marker/);
+    };
+    [7, null, '', 'red', '#12', '#gggggg', '<script>', { color: RED }].forEach(reject);
+    const ok = withPlayers([]);
+    ok.appState.polygons[0].start = '#abc';
+    ok.appState.polygons[1].start = '#C62828';
+    assert.doesNotThrow(() => PF.validate(ok));
+});
+
+test('players are checked: count, colours, seats and pieces', () => {
+    const reject = (mutate, pattern) => {
+        const players = twoPlayers();
+        mutate(players);
+        throwsFormatError(() => PF.validate(withPlayers(players)), 'invalid', pattern);
+    };
+    assert.doesNotThrow(() => PF.validate(withPlayers(twoPlayers())));
+    assert.doesNotThrow(() => PF.validate(withPlayers([])));
+    reject((p) => { p[0].color = 'red'; }, /invalid colour/);
+    reject((p) => { p[0].color = 12; }, /invalid colour/);
+    reject((p) => { p[1].color = RED.toUpperCase(); }, /share the colour/);
+    reject((p) => { p[0].seat = 'diagonal'; }, /unknown seat/);
+    reject((p) => { p[0].seat = undefined; }, /unknown seat/);
+    reject((p) => { p[0].pieces = 'many'; }, /invalid piece set/);
+    reject((p) => { p[0].pieces = [{ kind: 'pawn', count: 1 }, { kind: 'disc', count: 1 }, { kind: 'cube', count: 1 }, { kind: 'meeple', count: 1 }, { kind: 'pawn', count: 1 }]; }, /invalid piece set/);
+    reject((p) => { p[0].pieces[0].kind = 'dragon'; }, /unknown kind/);
+    reject((p) => { p[0].pieces[1].kind = 'pawn'; }, /pawn twice/);
+    reject((p) => { p[0].pieces[0].count = 0; }, /invalid number of pawn/);
+    reject((p) => { p[0].pieces[0].count = 1.5; }, /invalid number of pawn/);
+    reject((p) => { p[0].pieces[0].count = '4'; }, /invalid number of pawn/);
+    reject((p) => { p[0].pieces[0].count = 501; }, /invalid number of pawn/);
+    reject((p) => { p[0] = 'player one'; }, /is not an object/);
+    reject((p) => { p[0].pieces = [{ kind: 'pawn', count: 300 }]; p[1].pieces = [{ kind: 'meeple', count: 201 }]; }, /too many pieces/);
+    const many = Array.from({ length: 9 }, (_, i) => ({ color: `#00000${i}`, seat: 'bottom', pieces: [] }));
+    throwsFormatError(() => PF.validate(withPlayers(many)), 'invalid', /too many players/);
+    const project = withPlayers(twoPlayers());
+    delete project.appState.players;
+    throwsFormatError(() => PF.validate(project), 'invalid', /no player list/);
+    project.appState.players = {};
+    throwsFormatError(() => PF.validate(project), 'invalid', /no player list/);
+});
+
+test('exactly 500 pieces and 8 players are allowed', () => {
+    const colors = ['#000001', '#000002', '#000003', '#000004', '#000005', '#000006', '#000007', '#000008'];
+    const players = colors.map((color, i) => ({ color, seat: 'left', pieces: [{ kind: 'cube', count: i === 0 ? 493 : 1 }] }));
+    assert.doesNotThrow(() => PF.validate(withPlayers(players)));
+});
+
+test('dice are checked: a list of different dice with 2 to 1000 sides', () => {
+    const reject = (dice, pattern) => throwsFormatError(() => PF.validate(withPlayers([], dice)), 'invalid', pattern);
+    assert.doesNotThrow(() => PF.validate(withPlayers([], [])), 'no dice at all is a valid design');
+    assert.doesNotThrow(() => PF.validate(withPlayers([], [{ sides: 2 }, { sides: 1000 }])));
+    reject([{ sides: 1 }], /whole number of sides/);
+    reject([{ sides: 1001 }], /whole number of sides/);
+    reject([{ sides: 6.5 }], /whole number of sides/);
+    reject([{ sides: '6' }], /whole number of sides/);
+    reject([{}], /whole number of sides/);
+    reject([6], /whole number of sides/);
+    reject([{ sides: 6 }, { sides: 6 }], /two dice with 6 sides/);
+    reject(Array.from({ length: 21 }, (_, i) => ({ sides: i + 2 })), /too many dice/);
+    const project = withPlayers([]);
+    delete project.appState.dice;
+    throwsFormatError(() => PF.validate(project), 'invalid', /no dice list/);
+    assert.doesNotThrow(() => PF.validate(withPlayers([], Array.from({ length: 20 }, (_, i) => ({ sides: i + 2 })))));
+});

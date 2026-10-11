@@ -35,10 +35,12 @@ function fresh({ hasWork = false } = {}) {
     AppState.recordHistory();
     AppState.setCurrentColor('#112233');
     const generateButton = { addEventListener: (type, fn) => generateHandlers.push(fn) };
-    Interactions.init({ canvas, generateButton });
+    const clearHandlers = [];
+    const clearButton = { addEventListener: (type, fn) => clearHandlers.push(fn) };
+    Interactions.init({ canvas, generateButton, clearButton });
     const state = AppState.getState();
     const at = (index) => state.polygons[index].center;
-    return { app, canvas, calls, state, AppState, Interactions, Config, at, ui, clickGenerate: () => generateHandlers.forEach((fn) => fn()) };
+    return { app, canvas, calls, state, AppState, Interactions, Config, at, ui, clickGenerate: () => generateHandlers.forEach((fn) => fn()), clickClear: () => clearHandlers.forEach((fn) => fn()) };
 }
 
 const press = (env, index, extra) => env.canvas.fire('pointerdown', pointer(env.at(index).x, env.at(index).y, extra));
@@ -121,4 +123,103 @@ test('Generate Board asks before replacing painted work, and goes straight ahead
     painted.calls.confirms[0].onConfirm();
     assert.notEqual(painted.state.polygons, before);
     assert.ok(painted.ui.notes.includes('Board generated'));
+});
+
+// ---- Start markers -----------------------------------------------------------------------------------------
+
+test('the start tool sets a marker in the chosen colour, replaces it with another colour and clears it with the same one', () => {
+    const env = fresh();
+    env.Interactions.selectStartTool('#c62828');
+    assert.equal(env.state.isStartToolActive, true);
+    press(env, 0);
+    release(env, 0);
+    assert.equal(env.state.polygons[0].start, '#c62828');
+    assert.equal(env.state.history.length, 2, 'one undo step');
+
+    env.Interactions.selectStartTool('#1565c0');
+    press(env, 0);
+    release(env, 0);
+    assert.equal(env.state.polygons[0].start, '#1565c0', 'another colour replaces it');
+
+    press(env, 0);
+    release(env, 0);
+    assert.equal(env.state.polygons[0].start, undefined, 'the same colour again takes it away');
+    assert.equal(env.state.history.length, 4);
+});
+
+test('the colour is compared without regard to case', () => {
+    const env = fresh();
+    env.state.polygons[1].start = '#C62828';
+    env.Interactions.selectStartTool('#c62828');
+    press(env, 1);
+    release(env, 1);
+    assert.equal(env.state.polygons[1].start, undefined);
+});
+
+test('a start marker does not touch the tile colour or object, and a drag does not spread it', () => {
+    const env = fresh();
+    env.state.polygons[0].color = '#445566';
+    env.state.polygons[0].object = 'castle';
+    env.Interactions.selectStartTool('#c62828');
+    press(env, 0);
+    env.canvas.fire('pointermove', pointer(env.at(1).x, env.at(1).y));
+    env.canvas.fire('pointermove', pointer(env.at(2).x, env.at(2).y));
+    release(env, 2);
+    assert.equal(env.state.polygons[0].color, '#445566');
+    assert.equal(env.state.polygons[0].object, 'castle');
+    assert.equal(env.state.polygons[0].start, '#c62828');
+    assert.equal(env.state.polygons[1].start, undefined);
+    assert.equal(env.state.polygons[2].start, undefined);
+});
+
+test('choosing any other tool leaves the start tool', () => {
+    const env = fresh();
+    env.Interactions.selectStartTool('#c62828');
+    env.Interactions.selectObjectTool('castle');
+    assert.equal(env.state.isStartToolActive, false);
+    env.Interactions.selectStartTool();
+    assert.equal(env.state.isObjectToolActive, false);
+    env.Interactions.toggleEraser();
+    assert.equal(env.state.isStartToolActive, false);
+    env.Interactions.selectStartTool();
+    env.ui.getElements = () => ({ paletteButtons: [{ dataset: { color: '#112233' } }] });
+    env.Interactions.selectColorTool();
+    assert.equal(env.state.isStartToolActive, false);
+});
+
+test('the eraser removes an object first, then a start marker, then the colour', () => {
+    const env = fresh();
+    Object.assign(env.state.polygons[0], { color: '#445566', object: 'castle', start: '#c62828' });
+    env.AppState.setEraserActive(true);
+    const click = () => { press(env, 0); release(env, 0); };
+    click();
+    assert.equal(env.state.polygons[0].object, undefined);
+    assert.equal(env.state.polygons[0].start, '#c62828');
+    click();
+    assert.equal(env.state.polygons[0].start, undefined);
+    assert.equal(env.state.polygons[0].color, '#445566');
+    click();
+    assert.equal(env.state.polygons[0].color, env.Config.DEFAULT_TILE_COLOR);
+});
+
+test('clearing the board clears start markers too, and undo brings them back', () => {
+    const env = fresh();
+    env.state.polygons[3].start = '#c62828';
+    env.state.polygons[3].color = '#445566';
+    env.AppState.recordHistory();
+    env.clickClear();
+    assert.equal(env.state.polygons[3].start, undefined);
+    assert.equal(env.state.polygons[3].color, env.Config.DEFAULT_TILE_COLOR);
+    env.Interactions.undo();
+    assert.equal(env.state.polygons[3].start, '#c62828');
+});
+
+test('regenerating a board with the same tiles keeps the start markers', () => {
+    const env = fresh();
+    env.state.polygons[4].start = '#1565c0';
+    env.AppState.recordHistory();
+    env.Interactions.generateBoard(env.state.boardConfig, { preserveColors: true, preserveHistory: true, skipDirtyFlag: true });
+    assert.equal(env.state.polygons[4].start, '#1565c0');
+    env.Interactions.generateBoard(env.state.boardConfig, { skipDirtyFlag: true });
+    assert.equal(env.state.polygons[4].start, undefined, 'a fresh board has none');
 });

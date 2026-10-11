@@ -120,7 +120,7 @@ const Infinite = (() => {
 
     const st = () => AppState.getState();
     const blank = () => String(Config.DEFAULT_FILL).toLowerCase();
-    const isPainted = (p) => Boolean(p.object) || (p.color && String(p.color).toLowerCase() !== blank());
+    const isPainted = (p) => Boolean(p.object) || Boolean(p.start) || (p.color && String(p.color).toLowerCase() !== blank());
 
     function isActive() {
         const polygons = st().polygons;
@@ -241,7 +241,7 @@ const Infinite = (() => {
             const ids = new Set(cells.map((c) => c.id));
             const extra = new Set();
             colorMap.forEach((color, id) => { if (familyOf(id) === family && !ids.has(id) && String(color).toLowerCase() !== blank()) extra.add(id); });
-            st().polygons.forEach((p) => { if (p.object && familyOf(p.id) === family && !ids.has(p.id)) extra.add(p.id); });
+            st().polygons.forEach((p) => { if ((p.object || p.start) && familyOf(p.id) === family && !ids.has(p.id)) extra.add(p.id); });
             extra.forEach((id) => { const p = fromId(id); if (p) cells.push(p); });
             cells.forEach((c) => { if (colorMap.has(c.id)) c.color = colorMap.get(c.id); });
             keepView = familyOf(st().polygons[0]?.id || '') === family;
@@ -278,7 +278,7 @@ const Infinite = (() => {
             const s = st();
             const have = new Set(s.polygons.map((p) => p.id));
             const missing = snapshot
-                .filter((e) => !have.has(e.id) && (e.object || String(e.color).toLowerCase() !== blank()))
+                .filter((e) => !have.has(e.id) && (e.object || e.start || String(e.color).toLowerCase() !== blank()))
                 .map((e) => fromId(e.id))
                 .filter(Boolean);
             if (missing.length) s.polygons = s.polygons.concat(missing);

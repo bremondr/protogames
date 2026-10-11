@@ -389,3 +389,11 @@ test('strokePoints copes with no start, a zero step and a huge jump', () => {
     assert.deepEqual(plain(ToolOps.strokePoints({ x: 0, y: 0 }, [{ x: 5, y: 5 }], 0)), [{ x: 5, y: 5 }]);
     assert.ok(ToolOps.strokePoints({ x: 0, y: 0 }, [{ x: 1e9, y: 0 }], 1).length <= 200);
 });
+
+test('the start tool counts as a tool of its own, places one marker per click and wins over the object tool', () => {
+    const base = { drawMode: 'fill', brushSize: 3, isEraserActive: false, isObjectToolActive: false, isStartToolActive: false };
+    assert.equal(ToolOps.activeTool({ ...base, isStartToolActive: true }), 'start');
+    assert.equal(ToolOps.activeTool({ ...base, isStartToolActive: true, isObjectToolActive: true }), 'start');
+    assert.equal(ToolOps.effectiveMode({ ...base, isStartToolActive: true }), 'brush', 'no fill or line for markers');
+    assert.equal(ToolOps.effectiveSize({ ...base, isStartToolActive: true }, 5), 1);
+});

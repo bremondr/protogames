@@ -17,7 +17,7 @@
  * read live app config inside them.
  */
 const ProjectFormat = (() => {
-    const CURRENT_VERSION = 4;
+    const CURRENT_VERSION = 5;
 
     const GRID_TYPES = ['hexagon', 'square', 'triangle'];
     const BOARD_SHAPES = ['hexagon', 'square', 'rectangle', 'triangle', 'circle', 'infinite', 'country'];
@@ -29,6 +29,14 @@ const ProjectFormat = (() => {
     const MAX_BOARD_SPAN = 2 * MAX_BOARD_DIMENSION + 1;
     const MAX_VERTICES = 64;
     const MAX_OBJECT_ID = 200;
+    // Playtest: players (a colour and a seat, with a piece set) and the dice of the design.
+    const PIECE_KIND_IDS = ['pawn', 'disc', 'cube', 'meeple'];
+    const SEATS = ['bottom', 'top', 'left', 'right'];
+    const MAX_PLAYERS = 8;
+    const MAX_PIECES = 500;
+    const MAX_DICE = 20;
+    const MIN_SIDES = 2;
+    const MAX_SIDES = 1000;
     // #rgb or #rrggbb: what palettes and the colour pickers produce. Anything else could end up in markup or CSS.
     const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
     const BOUND_KEYS = ['minX', 'maxX', 'minY', 'maxY'];
@@ -168,12 +176,30 @@ const ProjectFormat = (() => {
         return next;
     }
 
+    /**
+     * v4 -> v5: playtest. A design now lists its players (colour, seat, piece set), tiles may carry a
+     * start marker (`start`, a player colour) and the design holds its dice. Existing projects get no
+     * players and the standard dice. The list is a frozen copy: it must not follow later changes to
+     * the app's own standard set.
+     */
+    function migrateV4toV5(project) {
+        const next = clone(project);
+        next.version = 5;
+        const state = isObject(next.appState) ? next.appState : null;
+        if (state) {
+            if (!Array.isArray(state.players)) state.players = [];
+            if (!Array.isArray(state.dice)) state.dice = [3, 4, 6, 8, 10, 12, 20].map((sides) => ({ sides }));
+        }
+        return next;
+    }
+
     /** MIGRATIONS[n] upgrades a version-n project to version n + 1. */
     const MIGRATIONS = {
         0: migrateV0toV1,
         1: migrateV1toV2,
         2: migrateV2toV3,
-        3: migrateV3toV4
+        3: migrateV3toV4,
+        4: migrateV4toV5
     };
 
     /**
@@ -264,6 +290,55 @@ const ProjectFormat = (() => {
         if (polygon.object !== undefined && (typeof polygon.object !== 'string' || !polygon.object || polygon.object.length > MAX_OBJECT_ID)) {
             fail(`${named} has an invalid object.`);
         }
+        if (polygon.start !== undefined && (typeof polygon.start !== 'string' || !HEX_COLOR.test(polygon.start))) {
+            fail(`${named} has an invalid start marker.`);
+        }
+    }
+
+    /**
+     * Players: at most MAX_PLAYERS, each with a unique colour, a seat and a piece set (each kind once,
+     * a count from 1 up, MAX_PIECES in total).
+     */
+    function validatePlayers(players) {
+        if (!Array.isArray(players)) fail('The project has no player list (appState.players).');
+        if (players.length > MAX_PLAYERS) fail(`The project has too many players (at most ${MAX_PLAYERS}).`);
+        const colors = new Set();
+        let total = 0;
+        players.forEach((player, index) => {
+            const label = `Player ${index + 1}`;
+            if (!isObject(player)) fail(`${label} is not an object.`);
+            if (typeof player.color !== 'string' || !HEX_COLOR.test(player.color)) fail(`${label} has an invalid colour.`);
+            const color = player.color.toLowerCase();
+            if (colors.has(color)) fail(`Two players share the colour ${player.color}.`);
+            colors.add(color);
+            if (!SEATS.includes(player.seat)) fail(`${label} has an unknown seat (${JSON.stringify(player.seat)}).`);
+            if (!Array.isArray(player.pieces) || player.pieces.length > PIECE_KIND_IDS.length) fail(`${label} has an invalid piece set.`);
+            const kinds = new Set();
+            for (const entry of player.pieces) {
+                if (!isObject(entry) || !PIECE_KIND_IDS.includes(entry.kind)) fail(`${label} has a piece of an unknown kind.`);
+                if (kinds.has(entry.kind)) fail(`${label} lists the piece kind ${entry.kind} twice.`);
+                kinds.add(entry.kind);
+                if (!Number.isInteger(entry.count) || entry.count < 1 || entry.count > MAX_PIECES) {
+                    fail(`${label} has an invalid number of ${entry.kind} pieces (1 to ${MAX_PIECES}).`);
+                }
+                total += entry.count;
+            }
+        });
+        if (total > MAX_PIECES) fail(`The project has too many pieces (at most ${MAX_PIECES} in total).`);
+    }
+
+    /** Dice: at most MAX_DICE entries, each a whole number of sides from MIN_SIDES to MAX_SIDES, no repeats. An empty list means no dice. */
+    function validateDice(dice) {
+        if (!Array.isArray(dice)) fail('The project has no dice list (appState.dice).');
+        if (dice.length > MAX_DICE) fail(`The project has too many dice (at most ${MAX_DICE}).`);
+        const seen = new Set();
+        for (const die of dice) {
+            if (!isObject(die) || !Number.isInteger(die.sides) || die.sides < MIN_SIDES || die.sides > MAX_SIDES) {
+                fail(`A die must have a whole number of sides from ${MIN_SIDES} to ${MAX_SIDES}.`);
+            }
+            if (seen.has(die.sides)) fail(`The dice list has two dice with ${die.sides} sides.`);
+            seen.add(die.sides);
+        }
     }
 
     /**
@@ -299,6 +374,8 @@ const ProjectFormat = (() => {
         if (typeof state.autoSaveEnabled !== 'boolean') fail('The auto-save setting is not true/false.');
         if (!Array.isArray(state.polygons)) fail('The project has no tile list (appState.polygons).');
         state.polygons.forEach(validatePolygon);
+        validatePlayers(state.players);
+        validateDice(state.dice);
         // Infinite files keep at least one tile (the board type survives in it), see the specification.
         if (state.boardConfig.boardShape === 'infinite' && !state.polygons.length) fail('An infinite board needs at least one tile.');
         const ids = new Set(state.polygons.map((p) => p.id));

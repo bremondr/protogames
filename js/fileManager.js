@@ -37,10 +37,11 @@ const FileManager = (() => {
         });
     }
 
-    /** True when the board holds painted tiles or placed objects the user could lose. */
+    /** True when the board holds painted tiles, objects, start markers or players the user could lose. */
     function hasUserWork() {
-        return AppState.getState().polygons.some(
-            (polygon) => polygon.object || (polygon.color && polygon.color !== Config.DEFAULT_TILE_COLOR)
+        const state = AppState.getState();
+        return state.players.length > 0 || state.polygons.some(
+            (polygon) => polygon.object || polygon.start || (polygon.color && polygon.color !== Config.DEFAULT_TILE_COLOR)
         );
     }
 
@@ -105,6 +106,8 @@ const FileManager = (() => {
             paletteId: state.currentPaletteId,
             isEraserActive: state.isEraserActive,
             autoSaveEnabled: state.autoSaveEnabled,
+            players: Utils.clone(state.players),
+            dice: state.dice.map((die) => ({ sides: die.sides })),
             // An infinite board is regenerated around the view; only the painted tiles need saving.
             polygons: Utils.clonePolygons(Infinite.isActive() ? Infinite.paintedTiles(state.polygons) : state.polygons)
         };
@@ -413,6 +416,11 @@ const FileManager = (() => {
         AppState.setEraserActive(Boolean(statePayload.isEraserActive));
         UI.setEraserActive(statePayload.isEraserActive);
         AppState.setObjectToolActive(false);
+        AppState.setStartToolActive(false);
+        // A new design starts a new game: the running playtest (if any) belonged to the old one.
+        AppState.setPlayers(Utils.clone(statePayload.players || []));
+        AppState.setDice(Utils.clone(statePayload.dice || Config.STANDARD_DICE));
+        if (typeof Playtest !== 'undefined') Playtest.designChanged();
         window.dispatchEvent(new CustomEvent('pg:toolchange'));
         if (typeof statePayload.autoSaveEnabled === 'boolean') {
             AppState.setAutoSaveEnabled(statePayload.autoSaveEnabled);
