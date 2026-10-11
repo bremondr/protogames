@@ -490,3 +490,62 @@ test('country settings on other board shapes are ignored, not validated', () => 
     project.appState.boardConfig.countryParts = 'nonsense';
     assert.doesNotThrow(() => PF.validate(project), 'a hexagon board that once was a country board still loads');
 });
+
+// ---- v4 -> v5: square and rectangle boards united ----------------------------------------------------------
+
+const v4Project = () => fixture('v4-square-board.protogames.json');
+
+test('v4 to v5 turns a square board into a rectangle of size x size and leaves the tiles alone', () => {
+    const source = v4Project();
+    assert.equal(source.appState.boardConfig.boardShape, 'square');
+    const size = source.appState.boardConfig.size;
+    const migrated = plain(PF.MIGRATIONS[4](source));
+    assert.equal(migrated.version, 5);
+    assert.equal(migrated.appState.boardConfig.boardShape, 'rectangle');
+    assert.equal(migrated.appState.boardConfig.width, size);
+    assert.equal(migrated.appState.boardConfig.height, size);
+    assert.deepEqual(migrated.appState.polygons, plain(source.appState.polygons), 'the tiles are untouched');
+    assert.equal(source.appState.boardConfig.boardShape, 'square', 'the input is not mutated');
+});
+
+test('v4 to v5 only touches square boards, and copes with a missing size', () => {
+    const rectangle = v4Project();
+    rectangle.appState.boardConfig = { ...rectangle.appState.boardConfig, boardShape: 'rectangle', width: 7, height: 3 };
+    const kept = plain(PF.MIGRATIONS[4](rectangle)).appState.boardConfig;
+    assert.deepEqual([kept.boardShape, kept.width, kept.height], ['rectangle', 7, 3]);
+    for (const shape of ['hexagon', 'triangle', 'circle', 'infinite', 'country']) {
+        const project = v4Project();
+        project.appState.boardConfig = { ...project.appState.boardConfig, boardShape: shape, width: 9, height: 4, size: 5 };
+        const config = plain(PF.MIGRATIONS[4](project)).appState.boardConfig;
+        assert.deepEqual([config.boardShape, config.width, config.height], [shape, 9, 4], shape);
+    }
+    const noSize = v4Project();
+    delete noSize.appState.boardConfig.size;
+    noSize.appState.boardConfig.width = 6;
+    const migrated = plain(PF.MIGRATIONS[4](noSize)).appState.boardConfig;
+    assert.deepEqual([migrated.width, migrated.height], [6, 6], 'the width stands in for a missing size');
+    assert.equal(plain(PF.MIGRATIONS[4]({ version: 4 })).version, 5, 'incomplete data does not throw');
+    assert.equal(plain(PF.MIGRATIONS[4]({ version: 4, appState: { boardConfig: null } })).version, 5);
+});
+
+test('a v4 square-board file loads through parse() as a valid rectangle board', () => {
+    const loaded = plain(PF.parse(JSON.stringify(v4Project())));
+    assert.equal(loaded.version, PF.CURRENT_VERSION);
+    assert.equal(loaded.appState.boardConfig.boardShape, 'rectangle');
+    assert.doesNotThrow(() => PF.validate(loaded));
+});
+
+test('a current project can no longer be a "square" board; it is a rectangle', () => {
+    const project = plain(PF.parse(JSON.stringify(v4Project())));
+    project.appState.boardConfig.boardShape = 'square';
+    assert.throws(() => PF.validate(project), /unknown board shape/);
+});
+
+test('older files that name the square board go through every step to a rectangle', () => {
+    const old = plain(PF.parse(JSON.stringify(v3Project())));
+    const legacy = { ...old, version: 3, appState: { ...old.appState, boardConfig: { ...old.appState.boardConfig, boardShape: 'square', size: 5, width: 11, height: 11 } } };
+    const loaded = plain(PF.parse(JSON.stringify(legacy)));
+    assert.equal(loaded.appState.boardConfig.boardShape, 'rectangle');
+    assert.equal(loaded.appState.boardConfig.width, 5);
+    assert.equal(loaded.appState.boardConfig.height, 5);
+});

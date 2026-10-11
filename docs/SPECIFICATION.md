@@ -8,29 +8,30 @@ Projects are saved as `<name>.protogames.json` and the editor also keeps one cop
 
 ### Version
 
-Every file has a top-level integer `version`. The current version is **4**.
+Every file has a top-level integer `version`. The current version is **5**.
 
 | `version` in the file | Meaning |
 |---|---|
 | missing, or the string `"1.0"` | **v0**: written before versioning existed. Migrated to v1 on load. |
 | integer `1` | migrated to v2 on load (Space/Arctic colours, see below), then to v3 |
 | integer `2` | migrated to v3, then v4 on load (only the version number changes) |
-| integer `3` | migrated to v4 on load (only the version number changes) |
-| integer `4` | current format |
+| integer `3` | migrated to v4, then v5 on load |
+| integer `4` | migrated to v5 on load (a square board becomes a rectangle, see below) |
+| integer `5` | current format |
 | integer greater than the app's current version | rejected: "saved by a newer version of Protogames, update to open it" |
 | anything else (`1.5`, `-1`, `"abc"`, `null`, ...) | rejected as unreadable |
 
-### Project file (v4)
+### Project file (v5)
 
 ```jsonc
 {
-  "version": 4,
+  "version": 5,
   "projectName": "my board",
   "created": "2026-10-02T13:31:51.661Z",     // ISO time of the save
   "appState": {
     "boardConfig": {
       "gridType": "hexagon",                 // tile shape: hexagon | square | triangle
-      "boardShape": "hexagon",               // hexagon | square | rectangle | triangle | circle | infinite | country
+      "boardShape": "hexagon",               // hexagon | rectangle | triangle | circle | infinite | country
       "orientation": "pointy-top",           // pointy-top | flat-top (hexagon tiles / boards)
       "triangleOrientation": "point-up",     // point-up | point-down (triangle boards)
       "width": 11, "height": 11,             // columns / rows (derived from radius or size for some shapes)
@@ -88,6 +89,7 @@ Migrations are frozen history: do not edit one after it has been released, and d
 | 2 | The Space and Arctic palettes were redesigned. The structure is unchanged; migration remaps tile colours (and the selected colour) that no longer exist, see "v1 to v2 colour map". |
 | 3 | New board shape `infinite` (see "Infinite boards"). Nothing in existing projects changes; the bump makes an older app report "saved by a newer version" instead of an unknown board shape. |
 | 4 | New board shape `country` (see "Country boards"). Same kind of bump: nothing in existing projects changes. |
+| 5 | The board shapes `square` and `rectangle` were united: a square is a rectangle with equal sides. Migration turns `boardShape: "square"` into `"rectangle"` with `width` and `height` both set to the old `size`; the tiles are not touched. `square` is no longer a valid board shape (the **tile** shape `square` is unchanged). |
 
 ### Country boards
 
@@ -174,3 +176,7 @@ Tile geometry is not stored: the board is regenerated from `c`, which fixes the 
 Links are not capped, but the dialog warns about length: a note above 2,000 characters and a stronger one above 8,000 (rules of thumb for chat and email apps), always with a "Download project file instead" button. The link stays copyable at every size.
 
 When the link format changes, bump `v` (and keep reading the old one), or, if only the project format changed, nothing is needed here: `f` already routes old links through the project migrations. `tests/shareLink.test.js` covers both.
+
+## Square and rectangle boards
+
+There is one fixed-size board shape, `rectangle` (`width` columns by `height` rows); a square board is the case where both are equal. Before project format 5 a square board was a separate shape of `size` x `size` tiles. Old files are migrated on load (see the history above). Old **share links** that name `square` still open: the generator keeps understanding the old name as a `size` x `size` rectangle, and the link then goes through the same migration (so new links and files always say `rectangle`; links of both kinds are link version 1 and older apps can open the new ones).

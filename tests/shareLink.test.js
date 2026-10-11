@@ -188,3 +188,23 @@ test('a country board may be wider and taller than other boards, within its own 
     // Every other shape keeps the old limit.
     assert.throws(() => ShareLink.unpack(link({ ...CONFIG, width: 101 }), polygons), /width in the link is out of range/);
 });
+
+// ---- Square boards (united with rectangle boards in project format 5) -------------------------------------
+
+test('a share link made before the shapes were united still opens: the square board becomes a rectangle of size x size', () => {
+    const config = { ...Config.DEFAULT_BOARD_CONFIG, gridType: 'square', boardShape: 'square', size: 4, width: 4, height: 4 };
+    const polygons = Geometry.generateGrid(config, CANVAS, null);
+    assert.equal(polygons.length, 16, 'the old shape is still generated as size x size tiles');
+    const data = plain(ShareLink.pack({ projectName: 'Old', boardConfig: config, paletteId: 'landscape', polygons, formatVersion: 4 }));
+    assert.equal(data.v, 1, 'links of square boards were always version 1');
+    const project = plain(ProjectFormat.parse(ShareLink.unpack(data, polygons)));
+    assert.equal(project.version, ProjectFormat.CURRENT_VERSION);
+    assert.deepEqual([project.appState.boardConfig.boardShape, project.appState.boardConfig.width, project.appState.boardConfig.height], ['rectangle', 4, 4]);
+    assert.equal(project.appState.polygons.length, 16);
+});
+
+test('a link of a rectangle board is still version 1, so older apps open it', () => {
+    const config = { ...Config.DEFAULT_BOARD_CONFIG, gridType: 'square', boardShape: 'rectangle', width: 4, height: 4 };
+    const polygons = Geometry.generateGrid(config, CANVAS, null);
+    assert.equal(ShareLink.pack({ projectName: '', boardConfig: config, paletteId: 'landscape', polygons, formatVersion: ProjectFormat.CURRENT_VERSION }).v, 1);
+});

@@ -15,7 +15,7 @@ const generate = (config, canvas = CANVAS) => Geometry.generateGrid(config, canv
 
 test('geometry matrix: every valid board x tile x orientation combination is healthy', async (t) => {
     const combinations = Checks.allCombinations();
-    assert.ok(combinations.length >= 24, 'expected the full matrix of combinations');
+    assert.ok(combinations.length >= 20, 'expected the full matrix of combinations');
 
     for (const combo of combinations) {
         if (!combo.valid) continue;
@@ -54,11 +54,8 @@ test('hexagon board with hexagon tiles has 3R(R+1)+1 tiles', () => {
     }
 });
 
-test('square and rectangle boards with square tiles have cols x rows tiles', () => {
-    for (const size of [1, 2, 7, 12]) {
-        assert.equal(generate(Checks.makeConfig('square', 'square', 'pointy-top', 'point-up', { size })).length, size * size);
-    }
-    for (const [width, height] of [[1, 1], [3, 5], [9, 2], [10, 10]]) {
+test('rectangle boards with square tiles have cols x rows tiles, a square being the case of equal sides', () => {
+    for (const [width, height] of [[1, 1], [2, 2], [7, 7], [12, 12], [3, 5], [9, 2], [10, 10]]) {
         const config = Checks.makeConfig('rectangle', 'square', 'pointy-top', 'point-up', { width, height });
         assert.equal(generate(config).length, width * height);
     }
@@ -133,7 +130,7 @@ test('triangle tiles in a circle are symmetric left to right (regression for #4 
 
 test('rectangular hex layouts no longer overflow the canvas by the half-tile row shift', () => {
     for (const orientation of ['pointy-top', 'flat-top']) {
-        const config = Checks.makeConfig('square', 'hexagon', orientation, 'point-up', { size: 8 });
+        const config = Checks.makeConfig('rectangle', 'hexagon', orientation, 'point-up', { width: 8, height: 8 });
         const polygons = generate(config);
         const bounds = Checks.verticesBounds(polygons.flatMap((p) => p.vertices));
         assert.ok(bounds.minX >= Config.CANVAS_PADDING - 0.5, `${orientation} left`);
@@ -285,4 +282,24 @@ test('circle ids are stable for a given layout, so colours survive regeneration'
     const second = Geometry.generateGrid(config, SMALL_CANVAS, colors);
     assert.deepEqual(plain(second.map((p) => p.id)), plain(first.map((p) => p.id)));
     for (const p of second) assert.equal(p.color, colors.get(p.id));
+});
+
+test('a rectangle with equal sides is a square board, 4-fold symmetric for square tiles', () => {
+    for (const side of [2, 3, 5, 8]) {
+        const config = Checks.makeConfig('rectangle', 'square', 'pointy-top', 'point-up', { width: side, height: side });
+        assert.equal(Checks.expectedSymmetry(config), 4);
+        assert.equal(Checks.rotationMisses(generate(config), 4), 0, `side ${side}`);
+    }
+    // Unequal sides are only 2-fold symmetric, so no 4-fold symmetry is expected.
+    assert.equal(Checks.expectedSymmetry(Checks.makeConfig('rectangle', 'square', 'pointy-top', 'point-up', { width: 6, height: 4 })), null);
+});
+
+test('the old "square" board shape is still understood (old share links name it) and is exactly the rectangle of size x size', () => {
+    for (const gridType of ['square', 'hexagon', 'triangle']) {
+        for (const size of [1, 3, 6]) {
+            const legacy = generate({ ...Checks.makeConfig('rectangle', gridType, 'pointy-top', 'point-up', { size }), boardShape: 'square', size, width: 20, height: 20 });
+            const united = generate(Checks.makeConfig('rectangle', gridType, 'pointy-top', 'point-up', { width: size, height: size }));
+            assert.deepEqual(plain(legacy.map((p) => [p.id, p.center])), plain(united.map((p) => [p.id, p.center])), `${gridType} size ${size}`);
+        }
+    }
 });
