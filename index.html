@@ -146,6 +146,20 @@
             </section>
 
             <!-- --------------------------------------------
+                 PLAYERS
+                 Who plays: a colour, a seat at the screen edge and
+                 a set of pieces each. Used by playtest.
+                 -------------------------------------------- -->
+            <section class="panel" aria-labelledby="players-title">
+                <h2 id="players-title">Players</h2>
+                <p class="field-hint panel-intro">For playtest: each player has a colour, a seat at one edge of the screen and a set of pieces. Mark where a player starts with the Start tool.</p>
+                <div id="playersList" class="players-list"></div>
+                <p id="playersHints" class="field-hint players-hints" role="status"></p>
+                <button type="button" id="addPlayer" class="secondary-button add-player-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>Add player</button>
+                <p id="playersTotal" class="field-hint"></p>
+            </section>
+
+            <!-- --------------------------------------------
                  FILE MANAGEMENT
                  Allows saving/loading project JSON files and
                  placeholders for exporting to other formats.
@@ -249,9 +263,15 @@
             <div id="playtestPill" class="playtest-pill" role="status" hidden>
                 <span class="dot" aria-hidden="true"></span>
                 <strong>Playtest mode</strong>
-                <span class="muted">Editing is locked</span>
+                <span class="muted" id="playtestInfo">Editing is locked</span>
+                <button type="button" id="playtestReset" hidden>Reset</button>
                 <button type="button" id="playtestBack">Back to editing</button>
             </div>
+
+            <!-- Playtest trays: one per player, at the player's side of the board, facing outwards -->
+            <div id="trayLayer" class="tray-layer" hidden></div>
+            <ul id="boardPieceList" class="visually-hidden" aria-label="Pieces on the board"></ul>
+            <div id="playtestAnnouncer" class="visually-hidden" role="status" aria-live="polite"></div>
 
             <!-- Floating tool bar: drawing tool (brush/fill/line), objects, eraser, undo/redo, clear -->
             <div id="toolBar" class="tool-bar" role="toolbar" aria-label="Board tools">
@@ -310,6 +330,20 @@
                     <div id="objectGrid" class="object-grid" role="group" aria-label="Objects"></div>
                 </div>
 
+                <div id="startGroup" class="object-group start-group pg-tip" data-tip="Start markers" data-shortcut="tool-start" role="group" aria-label="Start marker tool">
+                    <button type="button" id="startButton" class="object-main" aria-label="Place start markers" aria-pressed="false">
+                        <span id="startThumb" class="start-thumb" aria-hidden="true"></span>
+                    </button>
+                    <button type="button" id="startChevron" class="object-chevron" aria-label="Choose player colour" aria-expanded="false">
+                        <svg id="startChevronIcon" class="chevron-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m18 15-6-6-6 6"></path></svg>
+                    </button>
+                </div>
+                <div id="startPopover" class="tool-popover" role="dialog" aria-label="Start markers">
+                    <span class="pop-title">Start marker colour</span>
+                    <div id="startColors" class="start-colors" role="group" aria-label="Player colours"></div>
+                    <p class="pop-note">Click a tile to mark where this colour starts; click it again to clear it. The eraser clears markers too.</p>
+                </div>
+
                 <div class="eraser-group">
                     <button type="button" id="eraserButton" data-shortcut="tool-eraser" class="eraser-button pg-tip" data-tip="Eraser" aria-pressed="false" aria-label="Eraser">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 21-4.3-4.3a1 1 0 0 1 0-1.4l10-10a1 1 0 0 1 1.4 0l5.6 5.6a1 1 0 0 1 0 1.4L11 21"></path><path d="M22 21H7"></path><path d="m5 11 9 9"></path></svg>
@@ -327,7 +361,7 @@
                             <button type="button" id="eraserLarger" aria-label="Larger eraser">+</button>
                         </div>
                     </div>
-                    <p class="pop-note">Removes objects first, then terrain. Separate from the brush size.</p>
+                    <p class="pop-note">Removes objects first, then start markers, then terrain. Separate from the brush size.</p>
                 </div>
                 <span class="tool-sep" aria-hidden="true"></span>
                 <button type="button" class="tool-button pg-tip" data-tip="Undo" data-action="undo" data-shortcut="undo" aria-label="Undo">
@@ -544,6 +578,10 @@
     <script src="js/utils.js"></script>
     <script src="js/focusUtils.js"></script>
     <script src="js/state.js"></script>
+    <script src="js/dice.js"></script>
+    <script src="js/players.js"></script>
+    <script src="js/play.js"></script>
+    <script src="js/pieces.js"></script>
     <script src="js/geometry/helpers.js"></script>
     <script src="js/geometry/hex.js"></script>
     <script src="js/geometry/triangle.js"></script>
@@ -564,6 +602,9 @@
     <script src="js/viewControls.js"></script>
     <script src="js/shortcuts.js"></script>
     <script src="js/toolbar.js"></script>
+    <script src="js/playersPanel.js"></script>
+    <script src="js/playtestTray.js"></script>
+    <script src="js/playtestDrag.js"></script>
     <script src="js/playtest.js"></script>
     <script src="js/themeEditor.js"></script>
     <script src="js/infinite.js"></script>

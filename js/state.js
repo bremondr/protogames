@@ -30,6 +30,10 @@ const AppState = (() => {
         dice: Config.STANDARD_DICE.map((die) => ({ sides: die.sides })),
         /** The running playtest game (pieces in trays or on tiles, rolls, move history). Never saved. */
         play: null,
+        /** Ids of the pieces being carried in playtest (or null); each is shown as a ghost that follows its pointer, not on the board. */
+        drag: null,
+        /** The piece with keyboard focus or last touched in playtest (gets a ring on the board). */
+        selectedPieceId: null,
         /**
          * How strokes are applied: 'brush' paints tiles under the pointer, 'fill'
          * floods the connected region, 'line' paints a tile path between two tiles.
@@ -177,6 +181,14 @@ const AppState = (() => {
 
     function setPlay(play) {
         state.play = play || null;
+    }
+
+    function setDrag(pieceIds) {
+        state.drag = pieceIds && pieceIds.length ? pieceIds : null;
+    }
+
+    function setSelectedPiece(id) {
+        state.selectedPieceId = id || null;
     }
 
     /** Sets the brush size, clamped to the allowed range. Returns the size now in effect. */
@@ -427,6 +439,8 @@ const AppState = (() => {
         setPlayers,
         setDice,
         setPlay,
+        setDrag,
+        setSelectedPiece,
         setDrawMode,
         setPlaytest,
         setBrushSize,

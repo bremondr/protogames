@@ -66,6 +66,9 @@ const Renderer = (() => {
      * @param {string|null} [scene.hoverPolygonId]  tile to outline (omit for exports)
      * @param {string[]} [scene.hoverIds]           tiles to outline when the brush covers several
      * @param {string[]} [scene.linePreviewIds]     line-tool preview tiles (omit for exports)
+     * @param {Array}  [scene.pieces]               playtest pieces: [{ id, kind, color, tileId }] (omit for exports)
+     * @param {string[]|null} [scene.hiddenPieceIds] pieces being carried (left out; a ghost follows each pointer)
+     * @param {string|null} [scene.selectedPieceId] piece that gets a selection ring
      * @returns {{drawn:number,total:number}} how many tiles were actually drawn (the rest were off-screen)
      */
     function paint(ctx, scene) {
@@ -94,6 +97,11 @@ const Renderer = (() => {
             drawn++;
         }
 
+        // Start markers: a coloured outline inside the tile, above the terrain and below objects and pieces.
+        for (const polygon of polygons) {
+            if (polygon.start && inView(polygon)) drawStartMarker(ctx, polygon, view.scale);
+        }
+
         // Object layer sits above all terrain; sorted top-to-bottom so lower objects overlap higher ones.
         // Objects reach up to about one tile beyond their tile, so cull with extra room.
         if (typeof Objects !== 'undefined') {
@@ -108,6 +116,11 @@ const Renderer = (() => {
                 .filter((p) => p.object && ViewMath.rectsIntersect(p.bounds, objectView))
                 .sort((a, b) => a.center?.y - b.center?.y)
                 .forEach((p) => Objects.drawOnPolygon(ctx, p));
+        }
+
+        // Playtest pieces stand on top of the objects.
+        if (scene.pieces && scene.pieces.length && typeof Pieces !== 'undefined') {
+            Pieces.drawAll(ctx, polygons, scene.pieces, view.scale, visible, scene.hiddenPieceIds || null, scene.selectedPieceId || null);
         }
 
         // Line tool preview: highlight the tiles the line would paint.
@@ -147,7 +160,7 @@ const Renderer = (() => {
      * Draws the board on the visible canvas with the current pan/zoom view.
      */
     function renderBoard() {
-        const { ctx, canvas, polygons, hoverPolygonId, hoverIds, linePreviewIds, view } = AppState.getState();
+        const { ctx, canvas, polygons, hoverPolygonId, hoverIds, linePreviewIds, view, playtest, play, drag, selectedPieceId } = AppState.getState();
         if (!ctx || !canvas) return;
         const stats = paint(ctx, {
             polygons,
@@ -156,7 +169,10 @@ const Renderer = (() => {
             view,
             hoverPolygonId,
             hoverIds,
-            linePreviewIds
+            linePreviewIds,
+            pieces: playtest && play ? play.pieces : null,
+            hiddenPieceIds: drag || null,
+            selectedPieceId
         });
         renderListeners.forEach((listener) => listener(stats));
     }
@@ -196,6 +212,33 @@ const Renderer = (() => {
             ? { polygons: scene.polygons, width: out.width, height: out.height, view: scene.view }
             : { polygons, width: out.width, height: out.height });
         return out;
+    }
+
+    /**
+     * Outlines a tile in its start colour: a thick coloured line a little inside the tile edge with a
+     * thin light line inside it, so the marker shows on dark terrain and on terrain of its own colour.
+     */
+    function drawStartMarker(ctx, polygon, scale) {
+        const centre = polygon.center;
+        const trace = (factor) => {
+            ctx.beginPath();
+            polygon.vertices.forEach((vertex, index) => {
+                const x = centre.x + (vertex.x - centre.x) * factor;
+                const y = centre.y + (vertex.y - centre.y) * factor;
+                if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            });
+            ctx.closePath();
+        };
+        ctx.save();
+        ctx.lineJoin = 'round';
+        trace(0.86);
+        ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+        ctx.lineWidth = 6 / scale;
+        ctx.stroke();
+        ctx.strokeStyle = polygon.start;
+        ctx.lineWidth = 3.5 / scale;
+        ctx.stroke();
+        ctx.restore();
     }
 
     /**

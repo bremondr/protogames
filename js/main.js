@@ -32,6 +32,9 @@ const Main = (() => {
         FileManager.init(uiRefs);
         Exporter.init(uiRefs);
         Toolbar.init();
+        PlayersPanel.init();
+        PlaytestTray.init();
+        PlaytestDrag.init();
         Playtest.init();
         ShareLink.init();
         PrintDialog.init();

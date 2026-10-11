@@ -174,6 +174,8 @@ const ViewControls = (() => {
         if (!state().polygons.length) return;
 
         if (event.pointerType === 'touch') {
+            // In playtest a finger that lands on a piece carries that piece; it is not part of a pan or zoom.
+            if (typeof PlaytestDrag !== 'undefined' && PlaytestDrag.wantsPointer(event)) return;
             touches.set(event.pointerId, toCanvas(event));
             if (touches.size === 2) {
                 startGesture();
