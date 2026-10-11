@@ -8,23 +8,24 @@ Projects are saved as `<name>.protogames.json` and the editor also keeps one cop
 
 ### Version
 
-Every file has a top-level integer `version`. The current version is **4**.
+Every file has a top-level integer `version`. The current version is **5**.
 
 | `version` in the file | Meaning |
 |---|---|
 | missing, or the string `"1.0"` | **v0**: written before versioning existed. Migrated to v1 on load. |
 | integer `1` | migrated to v2 on load (Space/Arctic colours, see below), then to v3 |
-| integer `2` | migrated to v3, then v4 on load (only the version number changes) |
-| integer `3` | migrated to v4 on load (only the version number changes) |
-| integer `4` | current format |
+| integer `2` | migrated to v3, v4, then v5 on load (only the version number changes until v5) |
+| integer `3` | migrated to v4, then v5 on load |
+| integer `4` | migrated to v5 on load: gets no players and the standard dice, see "Playtest data" |
+| integer `5` | current format |
 | integer greater than the app's current version | rejected: "saved by a newer version of Protogames, update to open it" |
 | anything else (`1.5`, `-1`, `"abc"`, `null`, ...) | rejected as unreadable |
 
-### Project file (v4)
+### Project file (v5)
 
 ```jsonc
 {
-  "version": 4,
+  "version": 5,
   "projectName": "my board",
   "created": "2026-10-02T13:31:51.661Z",     // ISO time of the save
   "appState": {
@@ -40,6 +41,10 @@ Every file has a top-level integer `version`. The current version is **4**.
     "paletteId": "landscape",                // selected palette
     "isEraserActive": false,
     "autoSaveEnabled": true,
+    "players": [                             // playtest: who plays, see "Playtest data"
+      { "color": "#c62828", "seat": "bottom", "pieces": [{ "kind": "pawn", "count": 4 }] }
+    ],
+    "dice": [{ "sides": 6 }],                // playtest: the dice of the design (the standard set d3 to d20 by default)
     "polygons": [                            // one entry per tile
       {
         "id": "hex_0_-5",                    // unique, stable for a given board layout
@@ -48,7 +53,8 @@ Every file has a top-level integer `version`. The current version is **4**.
         "vertices": [{ "x": 321.7, "y": 72.5 } /* ... at least 3 */],
         "bounds": { "minX": 0, "maxX": 0, "minY": 0, "maxY": 0 },
         "color": "#7CB342",                  // tile colour (also identifies its texture)
-        "object": "castle"                   // optional: placed object id
+        "object": "castle",                  // optional: placed object id
+        "start": "#c62828"                   // optional: start marker, a player colour (see "Playtest data")
       }
     ]
   }
@@ -88,6 +94,25 @@ Migrations are frozen history: do not edit one after it has been released, and d
 | 2 | The Space and Arctic palettes were redesigned. The structure is unchanged; migration remaps tile colours (and the selected colour) that no longer exist, see "v1 to v2 colour map". |
 | 3 | New board shape `infinite` (see "Infinite boards"). Nothing in existing projects changes; the bump makes an older app report "saved by a newer version" instead of an unknown board shape. |
 | 4 | New board shape `country` (see "Country boards"). Same kind of bump: nothing in existing projects changes. |
+| 5 | Playtest: `appState.players` and `appState.dice`, and the optional tile field `start` (see "Playtest data"). Migration adds `players: []` and the standard dice (a frozen copy of d3, d4, d6, d8, d10, d12, d20). |
+
+### Playtest data
+
+The design says *what* is played with and *where each player starts*; it never says where pieces are. Positions, rolls and the move history belong to the running game, which is never saved (see [PLAYTEST.md](PLAYTEST.md)).
+
+**`appState.players`**: an array of at most 8 players.
+
+| Field | Meaning |
+|---|---|
+| `color` | `#rgb` or `#rrggbb`; unique across players (compared without regard to case). The app offers the eight colours of `Config.PLAYER_COLORS`, but any hex colour is read. A player is identified by their colour, and start markers refer to it. |
+| `seat` | The screen edge the player sits at in playtest: `bottom`, `top`, `left` or `right`. Several players may share a seat. |
+| `pieces` | The player's piece set: at most four entries `{ kind, count }`, each kind (`pawn`, `disc`, `cube`, `meeple`) at most once, `count` a whole number from 1 to 500. Over all players there are at most 500 pieces. |
+
+**`appState.dice`**: an array of at most 20 `{ sides }`, each a whole number from 2 to 1000, no two alike. An empty array means the design has no dice. Every new design starts with the standard set (3, 4, 6, 8, 10, 12 and 20 sides); there is no editor for it yet, so every file written today carries that set.
+
+**Tile `start`** (optional): a `#rgb` or `#rrggbb` colour, normally a player's colour. One per tile; a tile may also have a terrain colour and an object. A start marker does not need a matching player (the Players panel only hints), and a tile that has one counts as drawn on an infinite board, so it is saved and kept when the view moves.
+
+Unknown kinds or seats, repeated colours or kinds, counts outside the ranges, and anything that is not a colour are refused with a readable message. These limits cannot be exceeded by the app, so they only turn away hand-edited or hostile files.
 
 ### Country boards
 
@@ -156,7 +181,7 @@ The payload is JSON, deflate-compressed (`deflate-raw`) and written as base64url
 
 | Key | Meaning |
 |---|---|
-| `v` | Link version: **1** for fixed boards, **2** for infinite boards, **3** for country boards (older apps can still open the links of the boards they know). A number higher than the app knows is rejected as "made by a newer version", and a link that describes a board shape newer than its version is refused. |
+| `v` | Link version: **1** for fixed boards, **2** for infinite boards, **3** for country boards, **4** for any board with players or start markers (older apps can still open the links of the boards they know). A number higher than the app knows is rejected as "made by a newer version", and a link that describes a board shape newer than its version is refused. |
 | `f` | **Project file format** the colours belong to. On opening, the link is turned into a project of this version and passed through `ProjectFormat.parse`, so a link made before a palette change migrates exactly like a saved file. |
 | `n` | Project name |
 | `c` | Board settings (`boardConfig`); every size must be an integer from 1 to 100 |
@@ -166,6 +191,11 @@ The payload is JSON, deflate-compressed (`deflate-raw`) and written as base64url
 | `ob` | Distinct object ids |
 | `o` | Tiles that hold an object: `tileIndex:objectIndex` pairs (base 36), dot separated |
 | `i` | Infinite boards only: the ids of the drawn tiles, dot separated, in the order of `t` and `o`. The tiles are rebuilt from the ids instead of regenerated from `c`. |
+| `pl` | Only with players: `[colour, seat, [[kind, count], ...]]` per player (colour as `#rrggbb`, lower case) |
+| `sc` | Only with start markers: the distinct start colours (`#rrggbb`) |
+| `s` | Only with start markers: `tileIndex:colourIndex` pairs (base 36, dot separated, same tile order as `t` and `o`) |
+
+The dice set is not in the link: every design has the standard set until it can be edited, so a link opens with it. When the dice become editable, add a key and bump `v`. A link with `pl`, `sc` or `s` but a `v` below 4 is refused, and the shapes of `pl`, `sc` and `s` are checked before the project format checks what they mean (unique colours, piece limits).
 
 A country board link carries the country settings in `c` and regenerates the tiles from the outlines, so opening it downloads them first (an offline or failed download refuses the link with a message). Limits for `c`: width up to 120 and height up to 201 for country boards, up to 100 for others.
 

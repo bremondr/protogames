@@ -417,10 +417,8 @@ const FileManager = (() => {
         UI.setEraserActive(statePayload.isEraserActive);
         AppState.setObjectToolActive(false);
         AppState.setStartToolActive(false);
-        // A new design starts a new game: the running playtest (if any) belonged to the old one.
         AppState.setPlayers(Utils.clone(statePayload.players || []));
         AppState.setDice(Utils.clone(statePayload.dice || Config.STANDARD_DICE));
-        if (typeof Playtest !== 'undefined') Playtest.designChanged();
         window.dispatchEvent(new CustomEvent('pg:toolchange'));
         if (typeof statePayload.autoSaveEnabled === 'boolean') {
             AppState.setAutoSaveEnabled(statePayload.autoSaveEnabled);
@@ -437,6 +435,9 @@ const FileManager = (() => {
         AppState.resetHistory();
         AppState.recordHistory();
         AppState.clearDirty();
+        // A new design starts a new game: the running playtest (if any) belonged to the old one. Told last,
+        // so the players panel and its hints see the new tiles.
+        if (typeof Playtest !== 'undefined') Playtest.designChanged();
 
         if (!options.skipNotification) {
             UI?.showNotification('Project loaded', 3500);
