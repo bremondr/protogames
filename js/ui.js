@@ -168,10 +168,6 @@ const UI = (() => {
         let height = readBoardNumber(elements.heightInput, Config.DEFAULT_BOARD_CONFIG.height, MAX_BOARD_SIDE);
 
         switch (boardShape) {
-            case 'square':
-                width = size;
-                height = size;
-                break;
             case 'triangle':
                 width = size;
                 height = size;
@@ -259,12 +255,12 @@ const UI = (() => {
     function applyBoardShapeVisibility() {
         const boardShape = elements.boardShapeSelect?.value || Config.DEFAULT_BOARD_CONFIG.boardShape;
         const showRadius = boardShape === 'hexagon' || boardShape === 'circle';
-        const showSize = boardShape === 'square' || boardShape === 'triangle';
+        const showSize = boardShape === 'triangle';
         const showTriangleOrientation = boardShape === 'triangle';
 
         elements.radiusField?.classList.toggle('hidden', !showRadius);
         elements.sizeField?.classList.toggle('hidden', !showSize);
-        elements.rectangularFields?.classList.toggle('hidden', showRadius || showSize || boardShape === 'square' || boardShape === 'infinite' || boardShape === 'country');
+        elements.rectangularFields?.classList.toggle('hidden', showRadius || showSize || boardShape === 'infinite' || boardShape === 'country');
         elements.triangleOrientationField?.classList.toggle('hidden', !showTriangleOrientation);
 
         if (elements.radiusLabel) {

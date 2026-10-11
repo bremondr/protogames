@@ -8,7 +8,7 @@
 (function (global) {
     const EPSILON = 1e-6;
 
-    const BOARD_SHAPES = ['hexagon', 'square', 'rectangle', 'triangle', 'circle'];
+    const BOARD_SHAPES = ['hexagon', 'rectangle', 'triangle', 'circle'];
     const TILE_SHAPES = ['hexagon', 'square', 'triangle'];
 
     /** Small default sizes so galleries and tests stay fast. */
@@ -29,7 +29,7 @@
             height: s.height,
             triangleOrientation: triangleOrientation || 'point-up'
         };
-        if (boardShape === 'square' || boardShape === 'triangle') {
+        if (boardShape === 'triangle') {
             config.width = s.size;
             config.height = s.size;
         } else if (boardShape === 'hexagon' || boardShape === 'circle') {
@@ -79,7 +79,6 @@
         if (boardShape === 'hexagon' && gridType === 'hexagon') return 3 * radius * (radius + 1) + 1;
         if (boardShape === 'hexagon' && gridType === 'triangle') return 6 * radius * radius;
         if (boardShape === 'triangle' && gridType === 'triangle') return size * size;
-        if (boardShape === 'square' && (gridType === 'square' || gridType === 'hexagon')) return size * size;
         if (boardShape === 'rectangle' && (gridType === 'square' || gridType === 'hexagon')) return width * height;
         return null;
     }
@@ -139,13 +138,13 @@
     /**
      * The n-fold rotational symmetry a board should have, or null when none is expected.
      * Circle and hexagon boards are centred on a tile (or lattice vertex), so hexagon and
-     * triangle tiles repeat every 60 degrees and square tiles every 90. A square board of
-     * square tiles repeats every 90 degrees.
+     * triangle tiles repeat every 60 degrees and square tiles every 90. A rectangle of
+     * square tiles with equal sides (a square board) repeats every 90 degrees.
      */
     function expectedSymmetry(config) {
         const { boardShape, gridType } = config;
         if (boardShape === 'circle' || boardShape === 'hexagon') return gridType === 'square' ? 4 : 6;
-        if (boardShape === 'square' && gridType === 'square') return 4;
+        if (boardShape === 'rectangle' && gridType === 'square' && config.width === config.height) return 4;
         return null;
     }
 

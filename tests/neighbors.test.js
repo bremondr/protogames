@@ -91,7 +91,7 @@ test('floodFill follows matching tiles only and stops at non-matching tiles', ()
 });
 
 test('floodFill on an unknown tile returns nothing', () => {
-    const polygons = generate(Checks.makeConfig('square', 'square', 'pointy-top', 'point-up', { size: 3 }));
+    const polygons = generate(Checks.makeConfig('rectangle', 'square', 'pointy-top', 'point-up', { width: 3, height: 3 }));
     assert.deepEqual(plain(Geometry.floodFill(Geometry.buildAdjacency(polygons), 'nope', () => true)), []);
 });
 

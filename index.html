@@ -63,7 +63,6 @@
                         <span class="field-label">Board Shape</span>
                         <select name="boardOutline" aria-label="Select board shape">
                             <option value="hexagon" selected>Hexagon</option>
-                            <option value="square">Square</option>
                             <option value="rectangle">Rectangle</option>
                             <option value="triangle">Triangle</option>
                             <option value="circle">Circle</option>
@@ -140,6 +139,7 @@
                             <span class="field-label" id="heightLabel">Height (rows)</span>
                             <input type="number" name="boardHeight" min="1" step="1" value="20" aria-label="Board height">
                         </label>
+                        <p class="field-hint rectangle-hint">The same number for both gives a square board.</p>
                     </div>
                     <button type="button" class="primary-button" data-action="generate-board">Generate Board</button>
                 </form>
