@@ -17,10 +17,10 @@
  * read live app config inside them.
  */
 const ProjectFormat = (() => {
-    const CURRENT_VERSION = 5;
+    const CURRENT_VERSION = 6;
 
     const GRID_TYPES = ['hexagon', 'square', 'triangle'];
-    const BOARD_SHAPES = ['hexagon', 'square', 'rectangle', 'triangle', 'circle', 'infinite', 'country'];
+    const BOARD_SHAPES = ['hexagon', 'rectangle', 'triangle', 'circle', 'infinite', 'country'];
     const COUNTRY_PARTS = ['main', 'nearby', 'all'];
     const MAX_COUNTRY_NAME = 100;
     const ORIENTATIONS = ['pointy-top', 'flat-top', 'orthogonal', 'diagonal'];
@@ -177,14 +177,32 @@ const ProjectFormat = (() => {
     }
 
     /**
-     * v4 -> v5: playtest. A design now lists its players (colour, seat, piece set), tiles may carry a
-     * start marker (`start`, a player colour) and the design holds its dice. Existing projects get no
-     * players and the standard dice. The list is a frozen copy: it must not follow later changes to
-     * the app's own standard set.
+     * v4 -> v5: the board shapes "square" and "rectangle" were united; a square is a rectangle whose
+     * width and height are equal. A square board of size n becomes a rectangle of n x n tiles (the tiles
+     * themselves are unchanged). Frozen history: it does not read the live app configuration.
      */
     function migrateV4toV5(project) {
         const next = clone(project);
         next.version = 5;
+        const config = isObject(next.appState) && isObject(next.appState.boardConfig) ? next.appState.boardConfig : null;
+        if (config && config.boardShape === 'square') {
+            const side = isFiniteNumber(config.size) && config.size >= 1 ? config.size : config.width;
+            config.boardShape = 'rectangle';
+            config.width = side;
+            config.height = side;
+        }
+        return next;
+    }
+
+    /**
+     * v5 -> v6: playtest. A design now lists its players (colour, seat, piece set), tiles may carry a
+     * start marker (`start`, a player colour) and the design holds its dice. Existing projects get no
+     * players and the standard dice. The list is a frozen copy: it must not follow later changes to
+     * the app's own standard set.
+     */
+    function migrateV5toV6(project) {
+        const next = clone(project);
+        next.version = 6;
         const state = isObject(next.appState) ? next.appState : null;
         if (state) {
             if (!Array.isArray(state.players)) state.players = [];
@@ -199,7 +217,8 @@ const ProjectFormat = (() => {
         1: migrateV1toV2,
         2: migrateV2toV3,
         3: migrateV3toV4,
-        4: migrateV4toV5
+        4: migrateV4toV5,
+        5: migrateV5toV6
     };
 
     /**

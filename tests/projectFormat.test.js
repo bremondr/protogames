@@ -491,16 +491,75 @@ test('country settings on other board shapes are ignored, not validated', () => 
     assert.doesNotThrow(() => PF.validate(project), 'a hexagon board that once was a country board still loads');
 });
 
-// ---- v4 -> v5: players, start markers and dice ------------------------------------------------------------
+// ---- v4 -> v5: square and rectangle boards united ----------------------------------------------------------
 
-const v4Project = () => fixture('v4-space-arctic.protogames.json');
+const v4Project = () => fixture('v4-square-board.protogames.json');
+
+test('v4 to v5 turns a square board into a rectangle of size x size and leaves the tiles alone', () => {
+    const source = v4Project();
+    assert.equal(source.appState.boardConfig.boardShape, 'square');
+    const size = source.appState.boardConfig.size;
+    const migrated = plain(PF.MIGRATIONS[4](source));
+    assert.equal(migrated.version, 5);
+    assert.equal(migrated.appState.boardConfig.boardShape, 'rectangle');
+    assert.equal(migrated.appState.boardConfig.width, size);
+    assert.equal(migrated.appState.boardConfig.height, size);
+    assert.deepEqual(migrated.appState.polygons, plain(source.appState.polygons), 'the tiles are untouched');
+    assert.equal(source.appState.boardConfig.boardShape, 'square', 'the input is not mutated');
+});
+
+test('v4 to v5 only touches square boards, and copes with a missing size', () => {
+    const rectangle = v4Project();
+    rectangle.appState.boardConfig = { ...rectangle.appState.boardConfig, boardShape: 'rectangle', width: 7, height: 3 };
+    const kept = plain(PF.MIGRATIONS[4](rectangle)).appState.boardConfig;
+    assert.deepEqual([kept.boardShape, kept.width, kept.height], ['rectangle', 7, 3]);
+    for (const shape of ['hexagon', 'triangle', 'circle', 'infinite', 'country']) {
+        const project = v4Project();
+        project.appState.boardConfig = { ...project.appState.boardConfig, boardShape: shape, width: 9, height: 4, size: 5 };
+        const config = plain(PF.MIGRATIONS[4](project)).appState.boardConfig;
+        assert.deepEqual([config.boardShape, config.width, config.height], [shape, 9, 4], shape);
+    }
+    const noSize = v4Project();
+    delete noSize.appState.boardConfig.size;
+    noSize.appState.boardConfig.width = 6;
+    const migrated = plain(PF.MIGRATIONS[4](noSize)).appState.boardConfig;
+    assert.deepEqual([migrated.width, migrated.height], [6, 6], 'the width stands in for a missing size');
+    assert.equal(plain(PF.MIGRATIONS[4]({ version: 4 })).version, 5, 'incomplete data does not throw');
+    assert.equal(plain(PF.MIGRATIONS[4]({ version: 4, appState: { boardConfig: null } })).version, 5);
+});
+
+test('a v4 square-board file loads through parse() as a valid rectangle board', () => {
+    const loaded = plain(PF.parse(JSON.stringify(v4Project())));
+    assert.equal(loaded.version, PF.CURRENT_VERSION);
+    assert.equal(loaded.appState.boardConfig.boardShape, 'rectangle');
+    assert.doesNotThrow(() => PF.validate(loaded));
+});
+
+test('a current project can no longer be a "square" board; it is a rectangle', () => {
+    const project = plain(PF.parse(JSON.stringify(v4Project())));
+    project.appState.boardConfig.boardShape = 'square';
+    assert.throws(() => PF.validate(project), /unknown board shape/);
+});
+
+test('older files that name the square board go through every step to a rectangle', () => {
+    const old = plain(PF.parse(JSON.stringify(v3Project())));
+    const legacy = { ...old, version: 3, appState: { ...old.appState, boardConfig: { ...old.appState.boardConfig, boardShape: 'square', size: 5, width: 11, height: 11 } } };
+    const loaded = plain(PF.parse(JSON.stringify(legacy)));
+    assert.equal(loaded.appState.boardConfig.boardShape, 'rectangle');
+    assert.equal(loaded.appState.boardConfig.width, 5);
+    assert.equal(loaded.appState.boardConfig.height, 5);
+});
+
+// ---- v5 -> v6: players, start markers and dice ------------------------------------------------------------
+
+const v5Project = () => fixture('v5-space-arctic.protogames.json');
 const STANDARD_DICE = [3, 4, 6, 8, 10, 12, 20].map((sides) => ({ sides }));
 const RED = '#c62828';
 const BLUE = '#1565c0';
 
 /** A current project with the given players (and dice, by default the standard set). */
 function withPlayers(players, dice = STANDARD_DICE) {
-    const project = plain(PF.parse(JSON.stringify(v4Project())));
+    const project = plain(PF.parse(JSON.stringify(v5Project())));
     project.appState.players = players;
     project.appState.dice = dice;
     return project;
@@ -510,40 +569,40 @@ const twoPlayers = () => [
     { color: BLUE, seat: 'top', pieces: [{ kind: 'meeple', count: 2 }] }
 ];
 
-test('v4 to v5 adds no players and the standard dice, and changes nothing else', () => {
-    const source = v4Project();
-    const migrated = plain(PF.MIGRATIONS[4](source));
-    assert.equal(migrated.version, 5);
+test('v5 to v6 adds no players and the standard dice, and changes nothing else', () => {
+    const source = v5Project();
+    const migrated = plain(PF.MIGRATIONS[5](source));
+    assert.equal(migrated.version, 6);
     assert.deepEqual(migrated.appState.players, []);
     assert.deepEqual(migrated.appState.dice, STANDARD_DICE);
     const expected = JSON.parse(JSON.stringify(source));
-    expected.version = 5;
+    expected.version = 6;
     expected.appState.players = [];
     expected.appState.dice = STANDARD_DICE;
     assert.deepEqual(migrated, expected);
-    assert.equal(source.version, 4, 'the input is not mutated');
+    assert.equal(source.version, 5, 'the input is not mutated');
     assert.equal(source.appState.players, undefined);
 });
 
-test('v4 to v5 keeps players and dice a file already has', () => {
-    const source = v4Project();
+test('v5 to v6 keeps players and dice a file already has', () => {
+    const source = v5Project();
     source.appState.players = twoPlayers();
     source.appState.dice = [{ sides: 6 }];
-    const migrated = plain(PF.MIGRATIONS[4](source));
+    const migrated = plain(PF.MIGRATIONS[5](source));
     assert.deepEqual(migrated.appState.players, twoPlayers());
     assert.deepEqual(migrated.appState.dice, [{ sides: 6 }]);
 });
 
-test('a v4 file loads through parse() as a current project with the standard dice', () => {
-    const loaded = plain(PF.parse(JSON.stringify(v4Project())));
+test('a v5 file loads through parse() as a current project with the standard dice', () => {
+    const loaded = plain(PF.parse(JSON.stringify(v5Project())));
     assert.equal(loaded.version, PF.CURRENT_VERSION);
-    assert.equal(PF.CURRENT_VERSION, 5);
+    assert.equal(PF.CURRENT_VERSION, 6);
     assert.deepEqual(loaded.appState.players, []);
     assert.deepEqual(loaded.appState.dice, STANDARD_DICE);
 });
 
 test('older fixtures also arrive with players and dice', () => {
-    for (const name of ['v0-legacy-project.protogames.json', 'v1-space-arctic.protogames.json', 'v2-space-arctic.protogames.json', 'v3-space-arctic.protogames.json']) {
+    for (const name of ['v0-legacy-project.protogames.json', 'v1-space-arctic.protogames.json', 'v2-space-arctic.protogames.json', 'v3-space-arctic.protogames.json', 'v4-space-arctic.protogames.json', 'v4-square-board.protogames.json', 'v5-space-arctic.protogames.json']) {
         const loaded = plain(PF.parse(JSON.stringify(fixture(name))));
         assert.deepEqual(loaded.appState.players, [], name);
         assert.deepEqual(loaded.appState.dice, STANDARD_DICE, name);

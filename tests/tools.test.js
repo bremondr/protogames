@@ -123,7 +123,7 @@ test('fill with the colour a region already has does nothing', () => {
 });
 
 test('fill ignores unknown tiles', () => {
-    const b = board(Checks.makeConfig('square', 'square', 'pointy-top', 'point-up', { size: 3 }));
+    const b = board(Checks.makeConfig('rectangle', 'square', 'pointy-top', 'point-up', { width: 3, height: 3 }));
     assert.deepEqual(plain(ToolOps.planFill(b.polygons, b.adjacency, 'nope', color('#fff000'))), []);
 });
 
@@ -145,7 +145,7 @@ test('the eraser fill resets a coloured region to blank and removes its objects'
 });
 
 test('the object fill covers the connected tiles that share the start tile\'s object', () => {
-    const b = board(Checks.makeConfig('square', 'square', 'pointy-top', 'point-up', { size: 4 }));
+    const b = board(Checks.makeConfig('rectangle', 'square', 'pointy-top', 'point-up', { width: 4, height: 4 }));
     const first = b.polygons[0].id;
     ToolOps.applyToTiles(b.polygons, b.adjacency, [first], object('tower'));
     // Filling from a tile without an object spreads over every tile without one, skipping the tower.
@@ -233,7 +233,7 @@ test('line paths follow the straight line between tile centres', () => {
 });
 
 test('a line to the same tile is just that tile, and an unknown tile yields nothing', () => {
-    const b = board(Checks.makeConfig('square', 'hexagon', 'pointy-top', 'point-up', { size: 5 }));
+    const b = board(Checks.makeConfig('rectangle', 'hexagon', 'pointy-top', 'point-up', { width: 5, height: 5 }));
     const id = b.polygons[3].id;
     assert.deepEqual(plain(pathFor(b, id, id)), [id]);
     assert.deepEqual(plain(pathFor(b, id, 'nope')), []);

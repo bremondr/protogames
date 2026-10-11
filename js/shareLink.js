@@ -21,7 +21,7 @@ const ShareLink = (() => {
     const LINK_VERSION = 4;
     const PLAYER_LINK_VERSION = 4;
     // First project file format that has players and dice; links made before it get them from the migration.
-    const FORMAT_WITH_PLAYERS = 5;
+    const FORMAT_WITH_PLAYERS = 6;
     const SEATS = ['bottom', 'top', 'left', 'right'];
     const MAX_PLAYERS = 8;
     const PIECE_KINDS = ['pawn', 'disc', 'cube', 'meeple'];

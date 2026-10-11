@@ -161,6 +161,8 @@
         const radius = Math.max(0, Math.round(config.radius ?? 0));
 
         switch (config.boardShape) {
+            // Legacy: before project format 5 a square board was its own shape (size x size). Old share links
+            // still name it, so it is still understood here; everything saved or generated now says 'rectangle'.
             case 'square':
                 return { cols: size, rows: size };
             case 'triangle':

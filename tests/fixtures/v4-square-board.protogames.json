@@ -1,0 +1,552 @@
+{
+  "version": 4,
+  "projectName": "square-board",
+  "created": "2026-10-04T12:00:00.000Z",
+  "appState": {
+    "boardConfig": {
+      "gridType": "square",
+      "orientation": "pointy-top",
+      "boardShape": "square",
+      "width": 4,
+      "height": 4,
+      "radius": 5,
+      "size": 4,
+      "triangleOrientation": "point-up"
+    },
+    "currentColor": "#7CB342",
+    "paletteId": "landscape",
+    "isEraserActive": false,
+    "autoSaveEnabled": true,
+    "polygons": [
+      {
+        "id": "square_0_0",
+        "type": "square",
+        "center": {
+          "x": 232,
+          "y": 104
+        },
+        "vertices": [
+          {
+            "x": 176,
+            "y": 48
+          },
+          {
+            "x": 288,
+            "y": 48
+          },
+          {
+            "x": 288,
+            "y": 160
+          },
+          {
+            "x": 176,
+            "y": 160
+          }
+        ],
+        "color": "#7CB342",
+        "bounds": {
+          "minX": 176,
+          "maxX": 288,
+          "minY": 48,
+          "maxY": 160
+        }
+      },
+      {
+        "id": "square_0_1",
+        "type": "square",
+        "center": {
+          "x": 344,
+          "y": 104
+        },
+        "vertices": [
+          {
+            "x": 288,
+            "y": 48
+          },
+          {
+            "x": 400,
+            "y": 48
+          },
+          {
+            "x": 400,
+            "y": 160
+          },
+          {
+            "x": 288,
+            "y": 160
+          }
+        ],
+        "color": "#ffffff",
+        "bounds": {
+          "minX": 288,
+          "maxX": 400,
+          "minY": 48,
+          "maxY": 160
+        }
+      },
+      {
+        "id": "square_0_2",
+        "type": "square",
+        "center": {
+          "x": 456,
+          "y": 104
+        },
+        "vertices": [
+          {
+            "x": 400,
+            "y": 48
+          },
+          {
+            "x": 512,
+            "y": 48
+          },
+          {
+            "x": 512,
+            "y": 160
+          },
+          {
+            "x": 400,
+            "y": 160
+          }
+        ],
+        "color": "#ffffff",
+        "bounds": {
+          "minX": 400,
+          "maxX": 512,
+          "minY": 48,
+          "maxY": 160
+        }
+      },
+      {
+        "id": "square_0_3",
+        "type": "square",
+        "center": {
+          "x": 568,
+          "y": 104
+        },
+        "vertices": [
+          {
+            "x": 512,
+            "y": 48
+          },
+          {
+            "x": 624,
+            "y": 48
+          },
+          {
+            "x": 624,
+            "y": 160
+          },
+          {
+            "x": 512,
+            "y": 160
+          }
+        ],
+        "color": "#7CB342",
+        "bounds": {
+          "minX": 512,
+          "maxX": 624,
+          "minY": 48,
+          "maxY": 160
+        }
+      },
+      {
+        "id": "square_1_0",
+        "type": "square",
+        "center": {
+          "x": 232,
+          "y": 216
+        },
+        "vertices": [
+          {
+            "x": 176,
+            "y": 160
+          },
+          {
+            "x": 288,
+            "y": 160
+          },
+          {
+            "x": 288,
+            "y": 272
+          },
+          {
+            "x": 176,
+            "y": 272
+          }
+        ],
+        "color": "#ffffff",
+        "bounds": {
+          "minX": 176,
+          "maxX": 288,
+          "minY": 160,
+          "maxY": 272
+        }
+      },
+      {
+        "id": "square_1_1",
+        "type": "square",
+        "center": {
+          "x": 344,
+          "y": 216
+        },
+        "vertices": [
+          {
+            "x": 288,
+            "y": 160
+          },
+          {
+            "x": 400,
+            "y": 160
+          },
+          {
+            "x": 400,
+            "y": 272
+          },
+          {
+            "x": 288,
+            "y": 272
+          }
+        ],
+        "color": "#ffffff",
+        "bounds": {
+          "minX": 288,
+          "maxX": 400,
+          "minY": 160,
+          "maxY": 272
+        },
+        "object": "castle"
+      },
+      {
+        "id": "square_1_2",
+        "type": "square",
+        "center": {
+          "x": 456,
+          "y": 216
+        },
+        "vertices": [
+          {
+            "x": 400,
+            "y": 160
+          },
+          {
+            "x": 512,
+            "y": 160
+          },
+          {
+            "x": 512,
+            "y": 272
+          },
+          {
+            "x": 400,
+            "y": 272
+          }
+        ],
+        "color": "#7CB342",
+        "bounds": {
+          "minX": 400,
+          "maxX": 512,
+          "minY": 160,
+          "maxY": 272
+        }
+      },
+      {
+        "id": "square_1_3",
+        "type": "square",
+        "center": {
+          "x": 568,
+          "y": 216
+        },
+        "vertices": [
+          {
+            "x": 512,
+            "y": 160
+          },
+          {
+            "x": 624,
+            "y": 160
+          },
+          {
+            "x": 624,
+            "y": 272
+          },
+          {
+            "x": 512,
+            "y": 272
+          }
+        ],
+        "color": "#ffffff",
+        "bounds": {
+          "minX": 512,
+          "maxX": 624,
+          "minY": 160,
+          "maxY": 272
+        }
+      },
+      {
+        "id": "square_2_0",
+        "type": "square",
+        "center": {
+          "x": 232,
+          "y": 328
+        },
+        "vertices": [
+          {
+            "x": 176,
+            "y": 272
+          },
+          {
+            "x": 288,
+            "y": 272
+          },
+          {
+            "x": 288,
+            "y": 384
+          },
+          {
+            "x": 176,
+            "y": 384
+          }
+        ],
+        "color": "#ffffff",
+        "bounds": {
+          "minX": 176,
+          "maxX": 288,
+          "minY": 272,
+          "maxY": 384
+        }
+      },
+      {
+        "id": "square_2_1",
+        "type": "square",
+        "center": {
+          "x": 344,
+          "y": 328
+        },
+        "vertices": [
+          {
+            "x": 288,
+            "y": 272
+          },
+          {
+            "x": 400,
+            "y": 272
+          },
+          {
+            "x": 400,
+            "y": 384
+          },
+          {
+            "x": 288,
+            "y": 384
+          }
+        ],
+        "color": "#7CB342",
+        "bounds": {
+          "minX": 288,
+          "maxX": 400,
+          "minY": 272,
+          "maxY": 384
+        }
+      },
+      {
+        "id": "square_2_2",
+        "type": "square",
+        "center": {
+          "x": 456,
+          "y": 328
+        },
+        "vertices": [
+          {
+            "x": 400,
+            "y": 272
+          },
+          {
+            "x": 512,
+            "y": 272
+          },
+          {
+            "x": 512,
+            "y": 384
+          },
+          {
+            "x": 400,
+            "y": 384
+          }
+        ],
+        "color": "#ffffff",
+        "bounds": {
+          "minX": 400,
+          "maxX": 512,
+          "minY": 272,
+          "maxY": 384
+        }
+      },
+      {
+        "id": "square_2_3",
+        "type": "square",
+        "center": {
+          "x": 568,
+          "y": 328
+        },
+        "vertices": [
+          {
+            "x": 512,
+            "y": 272
+          },
+          {
+            "x": 624,
+            "y": 272
+          },
+          {
+            "x": 624,
+            "y": 384
+          },
+          {
+            "x": 512,
+            "y": 384
+          }
+        ],
+        "color": "#ffffff",
+        "bounds": {
+          "minX": 512,
+          "maxX": 624,
+          "minY": 272,
+          "maxY": 384
+        }
+      },
+      {
+        "id": "square_3_0",
+        "type": "square",
+        "center": {
+          "x": 232,
+          "y": 440
+        },
+        "vertices": [
+          {
+            "x": 176,
+            "y": 384
+          },
+          {
+            "x": 288,
+            "y": 384
+          },
+          {
+            "x": 288,
+            "y": 496
+          },
+          {
+            "x": 176,
+            "y": 496
+          }
+        ],
+        "color": "#7CB342",
+        "bounds": {
+          "minX": 176,
+          "maxX": 288,
+          "minY": 384,
+          "maxY": 496
+        }
+      },
+      {
+        "id": "square_3_1",
+        "type": "square",
+        "center": {
+          "x": 344,
+          "y": 440
+        },
+        "vertices": [
+          {
+            "x": 288,
+            "y": 384
+          },
+          {
+            "x": 400,
+            "y": 384
+          },
+          {
+            "x": 400,
+            "y": 496
+          },
+          {
+            "x": 288,
+            "y": 496
+          }
+        ],
+        "color": "#ffffff",
+        "bounds": {
+          "minX": 288,
+          "maxX": 400,
+          "minY": 384,
+          "maxY": 496
+        }
+      },
+      {
+        "id": "square_3_2",
+        "type": "square",
+        "center": {
+          "x": 456,
+          "y": 440
+        },
+        "vertices": [
+          {
+            "x": 400,
+            "y": 384
+          },
+          {
+            "x": 512,
+            "y": 384
+          },
+          {
+            "x": 512,
+            "y": 496
+          },
+          {
+            "x": 400,
+            "y": 496
+          }
+        ],
+        "color": "#ffffff",
+        "bounds": {
+          "minX": 400,
+          "maxX": 512,
+          "minY": 384,
+          "maxY": 496
+        }
+      },
+      {
+        "id": "square_3_3",
+        "type": "square",
+        "center": {
+          "x": 568,
+          "y": 440
+        },
+        "vertices": [
+          {
+            "x": 512,
+            "y": 384
+          },
+          {
+            "x": 624,
+            "y": 384
+          },
+          {
+            "x": 624,
+            "y": 496
+          },
+          {
+            "x": 512,
+            "y": 496
+          }
+        ],
+        "color": "#7CB342",
+        "bounds": {
+          "minX": 512,
+          "maxX": 624,
+          "minY": 384,
+          "maxY": 496
+        }
+      }
+    ]
+  }
+}

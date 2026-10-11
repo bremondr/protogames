@@ -52,7 +52,7 @@ test('without a board there is nothing to print', () => {
 });
 
 test('the tile size in mm is what the board is scaled to, for every tile shape', () => {
-    for (const [gridType, overrides] of [['hexagon', {}], ['square', { boardShape: 'square', size: 6 }], ['triangle', { boardShape: 'triangle', size: 4 }]]) {
+    for (const [gridType, overrides] of [['hexagon', {}], ['square', { boardShape: 'rectangle', width: 6, height: 6 }], ['triangle', { boardShape: 'triangle', size: 4 }]]) {
         useBoard({ gridType, ...overrides });
         const p = Print.plan({ tileMm: 30 });
         const first = p.board.polygons[0];
