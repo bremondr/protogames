@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { loadApp, plain } = require('./support/load');
 
-const app = loadApp(['js/config.js', 'js/players.js']);
+const app = loadApp(['app/js/config.js', 'app/js/players.js']);
 const Players = app.run('Players');
 const Config = app.run('Config');
 const add = (players) => plain(Players.addPlayer(players));

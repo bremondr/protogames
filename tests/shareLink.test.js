@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { loadApp, GEOMETRY_SCRIPTS, plain } = require('./support/load');
 
-const app = loadApp([...GEOMETRY_SCRIPTS, 'js/projectFormat.js', 'js/shareLink.js'], {
+const app = loadApp([...GEOMETRY_SCRIPTS, 'app/js/projectFormat.js', 'app/js/shareLink.js'], {
     btoa, atob, TextEncoder, TextDecoder, CompressionStream, DecompressionStream, Response, Blob
 });
 const ShareLink = app.run('ShareLink');

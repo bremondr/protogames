@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { loadApp, GEOMETRY_SCRIPTS, plain } = require('./support/load');
 
-const app = loadApp([...GEOMETRY_SCRIPTS, 'js/viewMath.js', 'js/state.js', 'js/infinite.js']);
+const app = loadApp([...GEOMETRY_SCRIPTS, 'app/js/viewMath.js', 'app/js/state.js', 'app/js/infinite.js']);
 const Infinite = app.run('Infinite');
 const Geometry = app.context.Geometry;
 const AppState = app.run('AppState');

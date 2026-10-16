@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { loadApp } = require('./support/load');
 
-const Dice = loadApp(['js/dice.js']).run('Dice');
+const Dice = loadApp(['app/js/dice.js']).run('Dice');
 // Errors made inside the script context are of another realm, so instanceof cannot be used.
 const isRangeError = (error) => error.name === 'RangeError';
 
@@ -81,8 +81,8 @@ test('labels read like the dice on a table', () => {
 });
 
 test('the default random source works with and without the secure generator', () => {
-    const plain = loadApp(['js/dice.js'], { crypto: undefined }).run('Dice');
+    const plain = loadApp(['app/js/dice.js'], { crypto: undefined }).run('Dice');
     for (let i = 0; i < 50; i++) assert.ok(plain.roll(6) >= 1);
-    const secure = loadApp(['js/dice.js'], { crypto: { getRandomValues: (array) => { array[0] = 41; return array; } } }).run('Dice');
+    const secure = loadApp(['app/js/dice.js'], { crypto: { getRandomValues: (array) => { array[0] = 41; return array; } } }).run('Dice');
     assert.equal(secure.roll(20), (41 % 20) + 1);
 });

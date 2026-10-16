@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { loadApp, plain } = require('./support/load');
 
-const app = loadApp(['js/focusUtils.js', 'js/shortcuts.js']);
+const app = loadApp(['app/js/focusUtils.js', 'app/js/shortcuts.js']);
 const S = app.run('Shortcuts');
 
 /** A KeyboardEvent stand-in. `mods` is any of 'ctrl', 'meta', 'shift', 'alt'. */

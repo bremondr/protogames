@@ -22,7 +22,7 @@ function recordingContext() {
 }
 
 function setup(appStateOverride) {
-    const scripts = [...GEOMETRY_SCRIPTS, 'js/viewMath.js', 'js/renderer.js'];
+    const scripts = [...GEOMETRY_SCRIPTS, 'app/js/viewMath.js', 'app/js/renderer.js'];
     const created = [];
     const globals = {
         // Renderer.createExportCanvas needs a document to make a canvas and AppState for the tiles.

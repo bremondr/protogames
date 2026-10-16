@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { loadApp, plain } = require('./support/load');
 
-const app = loadApp(['js/config.js', 'js/dice.js', 'js/play.js']);
+const app = loadApp(['app/js/config.js', 'app/js/dice.js', 'app/js/play.js']);
 const Play = app.run('Play');
 
 const RED = '#c62828';

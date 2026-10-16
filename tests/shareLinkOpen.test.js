@@ -20,7 +20,7 @@ function fresh({ hasWork = false, hash = '#b=AAAA', modals = [] } = {}) {
     const calls = { confirms: [], restores: [], replaced: [] };
     const location = { hash, pathname: '/app/', search: '' };
     const document = { querySelectorAll: () => modals.filter((m) => !m.hidden && !m.removed) };
-    const app = loadApp([...GEOMETRY_SCRIPTS, 'js/projectFormat.js', 'js/shareLink.js'], {
+    const app = loadApp([...GEOMETRY_SCRIPTS, 'app/js/projectFormat.js', 'app/js/shareLink.js'], {
         btoa, atob, TextEncoder, TextDecoder, CompressionStream, DecompressionStream, Response, Blob,
         location,
         document,

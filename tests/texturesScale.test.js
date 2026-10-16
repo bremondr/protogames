@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { loadApp, GEOMETRY_SCRIPTS } = require('./support/load');
 
-const app = loadApp([...GEOMETRY_SCRIPTS, 'js/viewMath.js', 'js/state.js', 'js/textureUtils.js', 'js/textures.js']);
+const app = loadApp([...GEOMETRY_SCRIPTS, 'app/js/viewMath.js', 'app/js/state.js', 'app/js/textureUtils.js', 'app/js/textures.js']);
 const Textures = app.run('Textures');
 const AppState = app.run('AppState');
 const ViewMath = app.run('ViewMath');

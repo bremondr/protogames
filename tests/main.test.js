@@ -6,7 +6,7 @@ const { makeUI } = require('./support/fakes');
 
 function fresh({ hasLink = false, linkResult = true, autosave = null } = {}) {
     const log = [];
-    const app = loadApp(['js/main.js'], {
+    const app = loadApp(['app/js/main.js'], {
         document: { addEventListener() {} },
         window: { addEventListener() {} },
         Utils: { debounce: (fn) => fn },
