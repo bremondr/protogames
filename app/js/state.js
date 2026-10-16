@@ -21,6 +21,19 @@ const AppState = (() => {
         /** When true, clicks place the current object instead of painting terrain. */
         isObjectToolActive: false,
         currentObject: 'castle',
+        /** When true, clicks set (or clear) a start marker in the current player colour instead of painting. */
+        isStartToolActive: false,
+        currentStartColor: Config.PLAYER_COLORS[0].hex,
+        /** Players of the design: [{ color, seat, pieces: [{ kind, count }] }]. Saved with the board. */
+        players: [],
+        /** Dice of the design: [{ sides }]. Saved with the board; always the standard set until there is an editor. */
+        dice: Config.STANDARD_DICE.map((die) => ({ sides: die.sides })),
+        /** The running playtest game (pieces in trays or on tiles, rolls, move history). Never saved. */
+        play: null,
+        /** Ids of the pieces being carried in playtest (or null); each is shown as a ghost that follows its pointer, not on the board. */
+        drag: null,
+        /** The piece with keyboard focus or last touched in playtest (gets a ring on the board). */
+        selectedPieceId: null,
         /**
          * How strokes are applied: 'brush' paints tiles under the pointer, 'fill'
          * floods the connected region, 'line' paints a tile path between two tiles.
@@ -147,6 +160,35 @@ const AppState = (() => {
 
     function setCurrentObject(id) {
         state.currentObject = id;
+    }
+
+    function setStartToolActive(active) {
+        state.isStartToolActive = Boolean(active);
+    }
+
+    function setCurrentStartColor(color) {
+        state.currentStartColor = color;
+    }
+
+    /** Replaces the players of the design (a board file or link, or the players panel). */
+    function setPlayers(players) {
+        state.players = Array.isArray(players) ? players : [];
+    }
+
+    function setDice(dice) {
+        state.dice = Array.isArray(dice) ? dice : Config.STANDARD_DICE.map((die) => ({ sides: die.sides }));
+    }
+
+    function setPlay(play) {
+        state.play = play || null;
+    }
+
+    function setDrag(pieceIds) {
+        state.drag = pieceIds && pieceIds.length ? pieceIds : null;
+    }
+
+    function setSelectedPiece(id) {
+        state.selectedPieceId = id || null;
     }
 
     /** Sets the brush size, clamped to the allowed range. Returns the size now in effect. */
@@ -297,7 +339,8 @@ const AppState = (() => {
         const snapshot = state.polygons.map((polygon) => ({
             id: polygon.id,
             color: polygon.color,
-            object: polygon.object || null
+            object: polygon.object || null,
+            start: polygon.start || null
         }));
 
         if (state.historyIndex < state.history.length - 1) {
@@ -324,6 +367,7 @@ const AppState = (() => {
             if (entry) {
                 polygon.color = entry.color;
                 if (entry.object) polygon.object = entry.object; else delete polygon.object;
+                if (entry.start) polygon.start = entry.start; else delete polygon.start;
             }
         });
     }
@@ -390,6 +434,13 @@ const AppState = (() => {
         setEraserActive,
         setObjectToolActive,
         setCurrentObject,
+        setStartToolActive,
+        setCurrentStartColor,
+        setPlayers,
+        setDice,
+        setPlay,
+        setDrag,
+        setSelectedPiece,
         setDrawMode,
         setPlaytest,
         setBrushSize,

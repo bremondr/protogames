@@ -11,6 +11,8 @@ const Toolbar = (() => {
     let brushOpen = false;
     let objOpen = false;
     let eraserOpen = false;
+    let startOpen = false;
+    let startSignature = '';
     let objTheme = 'medieval';
 
     function init() {
@@ -38,6 +40,13 @@ const Toolbar = (() => {
             objPop: $('objectPopover'),
             objThemeSelect: $('objectThemeSelect'),
             objGrid: $('objectGrid'),
+            startGroup: $('startGroup'),
+            startButton: $('startButton'),
+            startThumb: $('startThumb'),
+            startChevron: $('startChevron'),
+            startChevronIcon: $('startChevronIcon'),
+            startPop: $('startPopover'),
+            startColors: $('startColors'),
             tileList: $('tileThemeList'),
             itemList: $('itemThemeList'),
             tileInput: $('tileThemeInput'),
@@ -53,6 +62,14 @@ const Toolbar = (() => {
         el.modeButtons.forEach((b) => b.addEventListener('click', () => Interactions.setDrawMode(b.dataset.mode)));
         el.brushChevron?.addEventListener('click', () => setPopovers(!brushOpen, false, false));
         el.eraserChevron?.addEventListener('click', () => setPopovers(false, false, !eraserOpen));
+        el.startButton?.addEventListener('click', () => Interactions.selectStartTool());
+        el.startChevron?.addEventListener('click', () => setPopovers(false, false, false, !startOpen));
+        el.startColors?.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-color]');
+            if (!btn) return;
+            Interactions.selectStartTool(btn.dataset.color);
+            setPopovers(false, false, false, false);
+        });
         el.paletteGrid?.addEventListener('click', (e) => {
             if (e.target.closest('.palette-swatch')) setTimeout(() => setPopovers(false, objOpen, eraserOpen), 120);
         });
@@ -80,6 +97,7 @@ const Toolbar = (() => {
         }, true);
 
         window.addEventListener('pg:playtest', () => setPopovers(false, false, false));
+        window.addEventListener('pg:playerschange', sync);
         bindThemePanel();
         bindFocusMode();
         // The aria-modal dialogs keep Tab inside and hand focus back when they close.
@@ -116,16 +134,17 @@ const Toolbar = (() => {
     }
 
     function anyPopoverOpen() {
-        return brushOpen || objOpen || eraserOpen;
+        return brushOpen || objOpen || eraserOpen || startOpen;
     }
 
-    function setPopovers(brush, obj, eraser) {
+    function setPopovers(brush, obj, eraser, start) {
         brushOpen = brush;
         objOpen = obj;
         eraserOpen = Boolean(eraser);
+        startOpen = Boolean(start);
         sync();
         // The bar is a column and popovers open to its left: line each one up with its own tool.
-        [[el.brushPop, el.brushChevron], [el.objPop, el.objGroup], [el.eraserPop, el.eraserGroup]].forEach(([popover, anchor]) => {
+        [[el.brushPop, el.brushChevron], [el.objPop, el.objGroup], [el.eraserPop, el.eraserGroup], [el.startPop, el.startGroup]].forEach(([popover, anchor]) => {
             const group = anchor?.closest('.tool-split, .object-group, .eraser-group') || anchor;
             if (popover && group) popover.style.top = `${group.offsetTop}px`;
         });
@@ -183,6 +202,37 @@ const Toolbar = (() => {
         el.objPop.classList.toggle('open', objOpen);
 
         renderObjects(s.currentObject);
+        syncStart(s, tool);
+    }
+
+    /** The start tool: highlighted while active, its thumbnail shows the chosen player colour. */
+    function syncStart(s, tool) {
+        if (!el.startGroup) return;
+        el.startGroup.classList.toggle('active', tool === 'start');
+        el.startButton.setAttribute('aria-pressed', String(tool === 'start'));
+        el.startThumb.style.setProperty('--start-color', s.currentStartColor);
+        el.startChevron.setAttribute('aria-expanded', String(startOpen));
+        el.startChevronIcon.classList.toggle('flipped', startOpen);
+        el.startPop.classList.toggle('open', startOpen);
+        const signature = [s.currentStartColor, ...s.players.map((p) => p.color)].join('|').toLowerCase();
+        if (signature === startSignature) return;
+        startSignature = signature;
+        el.startColors.innerHTML = '';
+        Config.PLAYER_COLORS.forEach((c) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'start-color';
+            btn.dataset.color = c.hex;
+            const current = String(c.hex).toLowerCase() === String(s.currentStartColor).toLowerCase();
+            const player = s.players.some((p) => Players.same(p.color, c.hex));
+            btn.setAttribute('aria-pressed', String(current));
+            btn.classList.toggle('selected', current);
+            btn.title = player ? `${c.name} (a player)` : `${c.name} (no player yet)`;
+            btn.innerHTML = '<span class="start-color-dot" aria-hidden="true"></span><span class="start-color-name"></span>';
+            btn.querySelector('.start-color-dot').style.background = c.hex;
+            btn.querySelector('.start-color-name').textContent = player ? c.name : `${c.name} · no player`;
+            el.startColors.appendChild(btn);
+        });
     }
 
     function renderObjects(current) {

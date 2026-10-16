@@ -25,6 +25,7 @@ const Shortcuts = (() => {
         { id: 'tool-line', group: 'Tools', label: 'Line', keys: ['l'] },
         { id: 'tool-select', group: 'Tools', label: 'Select (not available yet)', keys: ['v'], available: false },
         { id: 'tool-eraser', group: 'Tools', label: 'Toggle eraser', keys: ['e'] },
+        { id: 'tool-start', group: 'Tools', label: 'Start markers on/off', keys: ['m'] },
         { id: 'brush-smaller', group: 'Tools', label: 'Smaller brush / eraser', keys: ['bracketleft'], repeat: true },
         { id: 'brush-larger', group: 'Tools', label: 'Larger brush / eraser', keys: ['bracketright'], repeat: true },
 
@@ -115,9 +116,9 @@ const Shortcuts = (() => {
 
     // ---- Playtest ------------------------------------------------------------------------------------------
 
-    /** While editing is locked only navigation and help shortcuts stay on. */
+    /** While editing is locked only navigation and help shortcuts stay on, and undo/redo step through piece moves. */
     function allowedInPlaytest(binding) {
-        return binding.group === 'View' || binding.group === 'Help';
+        return binding.group === 'View' || binding.group === 'Help' || binding.id === 'undo' || binding.id === 'redo';
     }
 
     // ---- Which events to leave alone --------------------------------------------------------------------
@@ -212,8 +213,10 @@ const Shortcuts = (() => {
 
     /** What each binding does. Keys are binding ids from BINDINGS. */
     const ACTIONS = {
-        'undo': () => { if (!Interactions.isStrokeActive()) Interactions.undo(); },
-        'redo': () => { if (!Interactions.isStrokeActive()) Interactions.redo(); },
+        // In playtest the same keys step through piece moves instead of painting.
+        'undo': () => { if (AppState.getState().playtest) Playtest.undoMove(); else if (!Interactions.isStrokeActive()) Interactions.undo(); },
+        'redo': () => { if (AppState.getState().playtest) Playtest.redoMove(); else if (!Interactions.isStrokeActive()) Interactions.redo(); },
+        'tool-start': () => { if (AppState.getState().isStartToolActive) Interactions.selectColorTool(); else Interactions.selectStartTool(); },
         'tool-brush': () => Interactions.setDrawMode('brush'),
         'tool-fill': () => Interactions.setDrawMode('fill'),
         'tool-line': () => Interactions.setDrawMode('line'),
@@ -231,7 +234,7 @@ const Shortcuts = (() => {
     for (let i = 1; i <= 9; i++) ACTIONS[`swatch-${i}`] = () => Interactions.pickSwatch(i - 1);
 
     function announceSize({ tool, size }) {
-        const text = tool === 'object' ? 'Objects are placed one tile at a time' : `${tool === 'eraser' ? 'Eraser' : 'Brush'} size ${size}`;
+        const text = tool === 'object' || tool === 'start' ? (tool === 'start' ? 'Start markers' : 'Objects') + ' are placed one tile at a time' : `${tool === 'eraser' ? 'Eraser' : 'Brush'} size ${size}`;
         UI.showNotification(text, 1200);
     }
 

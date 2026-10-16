@@ -207,3 +207,43 @@ test('setBoardConfig keeps the country board\'s own settings, and does not inher
     assert.equal(next.country, undefined, 'a board of another shape does not carry the country along');
     assert.equal(next.countryParts, undefined);
 });
+
+test('undo/redo snapshots keep start markers, and restoring them deletes stale ones', () => {
+    const env = fresh();
+    const { AppState } = env;
+    AppState.setPolygons(tiles(env));
+    AppState.recordHistory();
+    const polygons = AppState.getState().polygons;
+    polygons[2].start = '#c62828';
+    AppState.recordHistory();
+    AppState.restoreSnapshot(AppState.undo());
+    assert.equal(polygons[2].start, undefined);
+    AppState.restoreSnapshot(AppState.redo());
+    assert.equal(polygons[2].start, '#c62828');
+});
+
+test('a new board has no players, the standard dice and no running game', () => {
+    const { AppState, Config } = fresh();
+    const state = AppState.getState();
+    assert.deepEqual(plain(state.players), []);
+    assert.deepEqual(plain(state.dice), [3, 4, 6, 8, 10, 12, 20].map((sides) => ({ sides })));
+    assert.equal(state.play, null);
+    assert.equal(state.isStartToolActive, false);
+    assert.equal(state.currentStartColor, Config.PLAYER_COLORS[0].hex);
+});
+
+test('players, dice and the running game can be replaced, and bad values fall back', () => {
+    const { AppState } = fresh();
+    AppState.setPlayers([{ color: '#c62828', seat: 'top', pieces: [] }]);
+    assert.equal(AppState.getState().players.length, 1);
+    AppState.setPlayers('nope');
+    assert.deepEqual(plain(AppState.getState().players), []);
+    AppState.setDice([{ sides: 6 }]);
+    assert.deepEqual(plain(AppState.getState().dice), [{ sides: 6 }]);
+    AppState.setDice(null);
+    assert.equal(AppState.getState().dice.length, 7, 'back to the standard set');
+    AppState.setPlay({ pieces: [] });
+    assert.deepEqual(plain(AppState.getState().play), { pieces: [] });
+    AppState.setPlay(undefined);
+    assert.equal(AppState.getState().play, null);
+});

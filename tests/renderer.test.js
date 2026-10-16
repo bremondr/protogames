@@ -151,3 +151,59 @@ test('a 100 x 100 board redraws fast when zoomed in (culling)', () => {
     assert.ok(stats.drawn < 400, `drew ${stats.drawn} tiles`);
     assert.ok(ms < 100, `zoomed redraw took ${ms.toFixed(1)} ms`);
 });
+
+test('a start marker is outlined twice on its tile (light under colour), at a constant width on screen', () => {
+    const env = setup();
+    const polygons = board(env);
+    const view = { scale: 2, x: 0, y: 0 };
+    const plainCtx = recordingContext();
+    env.Renderer.paint(plainCtx, { polygons, ...CANVAS, view });
+    polygons[3].start = '#c62828';
+    const ctx = recordingContext();
+    env.Renderer.paint(ctx, { polygons, ...CANVAS, view });
+    assert.equal(ctx.strokes.length, plainCtx.strokes.length + 2, 'one marker is two strokes');
+    const [light, colour] = ctx.strokes.slice(-2);
+    assert.ok(light.lineWidth * light.scale > colour.lineWidth * colour.scale, 'the light line is the wider one, so it frames the colour');
+    assert.equal(Math.round(colour.lineWidth * colour.scale * 10) / 10, 3.5, 'a constant 3.5 px whatever the zoom');
+});
+
+test('start markers outside the visible area are not drawn', () => {
+    const env = setup();
+    const polygons = board(env);
+    polygons.forEach((p) => { p.start = '#c62828'; });
+    const ctx = recordingContext();
+    env.Renderer.paint(ctx, { polygons, ...CANVAS, view: { scale: 12, x: -6000, y: -4000 } });
+    const reference = recordingContext();
+    const withoutMarkers = polygons.map((p) => ({ ...p, start: undefined }));
+    env.Renderer.paint(reference, { polygons: withoutMarkers, ...CANVAS, view: { scale: 12, x: -6000, y: -4000 } });
+    const visibleTiles = reference.strokes.length;
+    assert.equal(ctx.strokes.length, visibleTiles * 3, 'each visible tile has its grid line and a two-stroke marker');
+    assert.ok(visibleTiles < polygons.length);
+});
+
+test('exports and the screen both show start markers, but pieces only appear when the scene has them', () => {
+    const env = setup();
+    env.app.run('var Pieces = { drawAll: (ctx, polygons, pieces, scale, visible, hidden, selected) => { globalThis.__drawn = { count: pieces.length, hidden, selected }; } }; void 0;');
+    const polygons = board(env);
+    env.Renderer.paint(recordingContext(), { polygons, ...CANVAS });
+    assert.equal(env.app.context.__drawn, undefined, 'no pieces in an export');
+    env.Renderer.paint(recordingContext(), { polygons, ...CANVAS, pieces: [] });
+    assert.equal(env.app.context.__drawn, undefined, 'an empty list draws nothing');
+    env.Renderer.paint(recordingContext(), { polygons, ...CANVAS, pieces: [{ id: 'a' }], hiddenPieceIds: ['a'], selectedPieceId: 'a' });
+    assert.deepEqual(plain(env.app.context.__drawn), { count: 1, hidden: ['a'], selected: 'a' });
+});
+
+test('the board on screen passes the running game, the carried pieces and the selection on only during playtest', () => {
+    const env = setup();
+    env.app.run('var Pieces = { drawAll: (ctx, polygons, pieces, scale, visible, hidden, selected) => { globalThis.__drawn = { ids: pieces.map((p) => p.id), hidden, selected }; } }; void 0;');
+    const polygons = board(env);
+    const ctx = recordingContext();
+    const canvas = { width: CANVAS.width, height: CANVAS.height };
+    const base = { ctx, canvas, polygons, view: { scale: 1, x: 0, y: 0 }, hoverIds: [], linePreviewIds: [], play: { pieces: [{ id: 'a' }, { id: 'b' }] }, drag: ['b'], selectedPieceId: 'a' };
+    env.setState({ ...base, playtest: false });
+    env.Renderer.renderBoard();
+    assert.equal(env.app.context.__drawn, undefined, 'not while editing');
+    env.setState({ ...base, playtest: true });
+    env.Renderer.renderBoard();
+    assert.deepEqual(plain(env.app.context.__drawn), { ids: ['a', 'b'], hidden: ['b'], selected: 'a' });
+});

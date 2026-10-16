@@ -173,7 +173,6 @@ test('a country board link is version 3, so older apps say "newer version" inste
     assert.equal(data.v, 3);
     assert.equal(data.c.country, 'Czechia');
     assert.equal(data.i, undefined, 'the tiles are regenerated from the settings, not named');
-    assert.equal(ShareLink.LINK_VERSION, 3);
     // A link that claims an older version but describes a country board is refused.
     assert.throws(() => ShareLink.unpack({ ...data, v: 2 }, blankBoard()), /Unrecognised/);
 });
@@ -207,4 +206,105 @@ test('a link of a rectangle board is still version 1, so older apps open it', ()
     const config = { ...Config.DEFAULT_BOARD_CONFIG, gridType: 'square', boardShape: 'rectangle', width: 4, height: 4 };
     const polygons = Geometry.generateGrid(config, CANVAS, null);
     assert.equal(ShareLink.pack({ projectName: '', boardConfig: config, paletteId: 'landscape', polygons, formatVersion: ProjectFormat.CURRENT_VERSION }).v, 1);
+});
+
+// ---- Players and start markers ---------------------------------------------------------------------------
+
+const RED = '#c62828';
+const BLUE = '#1565c0';
+const PLAYERS = [
+    { color: RED, seat: 'bottom', pieces: [{ kind: 'pawn', count: 4 }, { kind: 'cube', count: 2 }] },
+    { color: BLUE, seat: 'top', pieces: [{ kind: 'meeple', count: 1 }] }
+];
+const packWith = (polygons, players) =>
+    plain(ShareLink.pack({ projectName: 'Game', boardConfig: CONFIG, paletteId: 'landscape', polygons, formatVersion: ProjectFormat.CURRENT_VERSION, players }));
+const STANDARD = [3, 4, 6, 8, 10, 12, 20].map((sides) => ({ sides }));
+
+test('a link without players or start markers is still version 1 and carries no extra keys', () => {
+    const data = packWith(painted(), []);
+    assert.equal(data.v, 1);
+    for (const key of ['pl', 'sc', 's']) assert.equal(data[key], undefined, key);
+    assert.equal(plain(ShareLink.pack({ projectName: 'x', boardConfig: CONFIG, paletteId: 'landscape', polygons: painted(), formatVersion: 5 })).v, 1, 'players left out entirely');
+});
+
+test('players and start markers make a link version 4 and come back unchanged', () => {
+    const polygons = painted();
+    polygons[0].start = RED;
+    polygons[7].start = RED.toUpperCase();
+    polygons[8].start = BLUE;
+    const data = packWith(polygons, PLAYERS);
+    assert.equal(data.v, 4, 'older apps say "newer version" instead of dropping the players');
+    assert.equal(ShareLink.LINK_VERSION, 4);
+    assert.deepEqual(data.pl, [[RED, 'bottom', [['pawn', 4], ['cube', 2]]], [BLUE, 'top', [['meeple', 1]]]]);
+    assert.deepEqual(data.sc, [RED, BLUE], 'start colours are kept once each, in lower case');
+
+    const project = plain(ShareLink.unpack(data, blankBoard()));
+    assert.deepEqual(project.appState.players, PLAYERS);
+    assert.equal(project.appState.polygons[0].start, RED);
+    assert.equal(project.appState.polygons[7].start, RED);
+    assert.equal(project.appState.polygons[8].start, BLUE);
+    assert.equal(project.appState.polygons[1].start, undefined);
+    assert.deepEqual(project.appState.dice, STANDARD, 'the standard dice are implied');
+    assert.doesNotThrow(() => ProjectFormat.parse(project));
+    assert.deepEqual(plain(ProjectFormat.parse(project)).appState.players, PLAYERS);
+});
+
+test('start markers alone, without players, also make a version 4 link', () => {
+    const polygons = painted();
+    polygons[2].start = BLUE;
+    const data = packWith(polygons, []);
+    assert.equal(data.v, 4);
+    assert.equal(data.pl, undefined);
+    const project = plain(ShareLink.unpack(data, blankBoard()));
+    assert.equal(project.appState.polygons[2].start, BLUE);
+    assert.deepEqual(project.appState.players, []);
+});
+
+test('an infinite or country board with players is at least version 4', () => {
+    const config = { ...CONFIG, boardShape: 'infinite' };
+    const data = plain(ShareLink.pack({ projectName: 'x', boardConfig: config, paletteId: 'landscape', polygons: painted().slice(0, 2), formatVersion: ProjectFormat.CURRENT_VERSION, players: PLAYERS }));
+    assert.equal(data.v, 4);
+    assert.equal(typeof data.i, 'string');
+});
+
+test('a link made before players existed opens with no players and the standard dice through the migration', () => {
+    const data = packOf(painted(), 5);
+    const project = plain(ShareLink.unpack(data, blankBoard()));
+    assert.equal(project.appState.players, undefined, 'the file format of that link has none yet');
+    const loaded = plain(ProjectFormat.parse(project));
+    assert.deepEqual(loaded.appState.players, []);
+    assert.deepEqual(loaded.appState.dice, STANDARD);
+});
+
+test('links with unusable players or start markers are refused', () => {
+    const polygons = painted();
+    polygons[0].start = RED;
+    const good = () => packWith(polygons, PLAYERS);
+    const reject = (mutate, pattern) => {
+        const data = good();
+        mutate(data);
+        assert.throws(() => ShareLink.unpack(data, blankBoard()), pattern);
+    };
+    assert.doesNotThrow(() => ShareLink.unpack(good(), blankBoard()));
+    reject((d) => { d.v = 3; }, /Unrecognised/);
+    reject((d) => { d.pl = 'players'; }, /invalid players/);
+    reject((d) => { d.pl = Array.from({ length: 9 }, () => [RED, 'bottom', []]); }, /invalid players/);
+    reject((d) => { d.pl = [[RED, 'bottom']]; }, /invalid players/);
+    reject((d) => { d.pl = [['red', 'bottom', []]]; }, /invalid players/);
+    reject((d) => { d.pl = [[RED, 'middle', []]]; }, /invalid players/);
+    reject((d) => { d.pl = [[RED, 'bottom', 'pawns']]; }, /invalid players/);
+    reject((d) => { d.pl = [[RED, 'bottom', [['dragon', 1]]]]; }, /invalid pieces/);
+    reject((d) => { d.pl = [[RED, 'bottom', [['pawn', 1.5]]]]; }, /invalid pieces/);
+    reject((d) => { d.pl = [[RED, 'bottom', [['pawn']]]]; }, /invalid pieces/);
+    reject((d) => { d.sc = ['red']; }, /invalid start colours/);
+    reject((d) => { d.sc = 'red'; }, /invalid start colours/);
+    reject((d) => { d.s = '99999:0'; }, /start marker on a tile that does not exist/);
+    reject((d) => { d.s = '0:9'; }, /start marker on a tile that does not exist/);
+    // Meaning (unique colours, piece caps) is checked by the project format after unpacking.
+    const duplicate = good();
+    duplicate.pl = [[RED, 'bottom', []], [RED, 'top', []]];
+    assert.throws(() => ProjectFormat.parse(ShareLink.unpack(duplicate, blankBoard())), /share the colour/);
+    const tooMany = good();
+    tooMany.pl = [[RED, 'bottom', [['pawn', 501]]]];
+    assert.throws(() => ProjectFormat.parse(ShareLink.unpack(tooMany, blankBoard())), /invalid number of pawn/);
 });

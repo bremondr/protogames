@@ -73,6 +73,7 @@ const Interactions = (() => {
         AppState.setCurrentColor(color);
         AppState.setEraserActive(false);
         AppState.setObjectToolActive(false);
+        AppState.setStartToolActive(false);
         UI?.setPaletteSelection(button);
         UI?.setEraserActive(false);
         notifyToolChange();
@@ -96,6 +97,7 @@ const Interactions = (() => {
         UI.setPaletteByColor(resolved.color);
         UI.setEraserActive(false);
         AppState.setObjectToolActive(false);
+        AppState.setStartToolActive(false);
         notifyToolChange();
         AppState.markDirty();
         FileManager.autoSaveToLocalStorage(true);
@@ -107,6 +109,7 @@ const Interactions = (() => {
     function handleEraserSelect() {
         AppState.setEraserActive(true);
         AppState.setObjectToolActive(false);
+        AppState.setStartToolActive(false);
         UI?.setEraserActive(true);
         notifyToolChange();
     }
@@ -115,6 +118,18 @@ const Interactions = (() => {
     function selectObjectTool(objectId) {
         if (objectId) AppState.setCurrentObject(objectId);
         AppState.setObjectToolActive(true);
+        AppState.setStartToolActive(false);
+        AppState.setEraserActive(false);
+        UI?.setEraserActive(false);
+        UI?.setPaletteSelection(null);
+        notifyToolChange();
+    }
+
+    /** Activates the start tool: a click sets a start marker in a player colour, or clears it. */
+    function selectStartTool(color) {
+        if (color) AppState.setCurrentStartColor(color);
+        AppState.setStartToolActive(true);
+        AppState.setObjectToolActive(false);
         AppState.setEraserActive(false);
         UI?.setEraserActive(false);
         UI?.setPaletteSelection(null);
@@ -160,10 +175,21 @@ const Interactions = (() => {
 
     /**
      * Applies the active tool to a polygon. Returns true when something changed.
-     * Eraser removes an object first; a second pass clears the terrain.
+     * Eraser removes an object first, then a start marker; a further pass clears the terrain.
      */
     function applyToolToPolygon(polygon, isStrokeStart) {
         const state = AppState.getState();
+        if (state.isStartToolActive) {
+            // The same colour again takes the marker away; another colour replaces it.
+            const wanted = String(state.currentStartColor).toLowerCase();
+            if (String(polygon.start || '').toLowerCase() === wanted) {
+                if (!isStrokeStart) return false;
+                delete polygon.start;
+            } else {
+                polygon.start = state.currentStartColor;
+            }
+            return true;
+        }
         if (state.isObjectToolActive) {
             if (polygon.object === state.currentObject) {
                 if (!isStrokeStart) return false;
@@ -175,6 +201,7 @@ const Interactions = (() => {
         }
         if (state.isEraserActive) {
             if (polygon.object) { delete polygon.object; return true; }
+            if (polygon.start) { delete polygon.start; return true; }
             if (polygon.color === Config.DEFAULT_TILE_COLOR) return false;
             polygon.color = Config.DEFAULT_TILE_COLOR;
             return true;
@@ -221,6 +248,7 @@ const Interactions = (() => {
         state.polygons.forEach((polygon) => {
             polygon.color = Config.DEFAULT_TILE_COLOR;
             delete polygon.object;
+            delete polygon.start;
         });
         Renderer.renderBoard();
         AppState.recordHistory();
@@ -430,7 +458,7 @@ const Interactions = (() => {
     function changeActiveSize(delta) {
         const tool = ToolOps.activeTool(AppState.getState());
         if (tool === 'eraser') return { tool, size: changeEraserSize(delta) };
-        if (tool === 'object') return { tool, size: 1 };
+        if (tool === 'object' || tool === 'start') return { tool, size: 1 };
         return { tool, size: changeBrushSize(delta) };
     }
 
@@ -506,8 +534,8 @@ const Interactions = (() => {
         }
 
         if (state.isDrawing) {
-            // An object is placed (or removed) by a click, never dragged across tiles.
-            if (state.isObjectToolActive) return;
+            // An object or a start marker is placed (or removed) by a click, never dragged across tiles.
+            if (state.isObjectToolActive || state.isStartToolActive) return;
             const now = performance.now();
             if (now - lastMoveTimestamp < MOVE_THROTTLE_MS) {
                 return;
@@ -616,8 +644,10 @@ const Interactions = (() => {
                 ? new Map(state.polygons.map((polygon) => [polygon.id, polygon.color]))
                 : null;
         const objectMap = colorMap ? new Map(state.polygons.filter((p) => p.object).map((p) => [p.id, p.object])) : null;
+        const startMap = colorMap ? new Map(state.polygons.filter((p) => p.start).map((p) => [p.id, p.start])) : null;
         const polygons = Geometry.generateGrid(config, state.canvas, colorMap);
         if (objectMap) polygons.forEach((p) => { if (objectMap.has(p.id)) p.object = objectMap.get(p.id); });
+        if (startMap) polygons.forEach((p) => { if (startMap.has(p.id)) p.start = startMap.get(p.id); });
         AppState.setPolygons(polygons);
         AppState.updateBoardConfig(config);
         Renderer.renderBoard();
@@ -643,6 +673,7 @@ const Interactions = (() => {
         init,
         generateBoard,
         selectObjectTool,
+        selectStartTool,
         undo: handleUndo,
         redo: handleRedo,
         isStrokeActive,

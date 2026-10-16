@@ -91,10 +91,11 @@ const ToolOps = (() => {
     }
 
     /**
-     * Which tool is active: 'object', 'eraser' or 'brush' (painting with a colour).
-     * Object wins, as in sourceFromState.
+     * Which tool is active: 'start' (start markers), 'object', 'eraser' or 'brush' (painting with a colour).
+     * Start and object win, as in sourceFromState.
      */
     function activeTool(state) {
+        if (state.isStartToolActive) return 'start';
         if (state.isObjectToolActive) return 'object';
         if (state.isEraserActive) return 'eraser';
         return 'brush';
@@ -111,7 +112,7 @@ const ToolOps = (() => {
     /** Brush size that applies: the eraser has its own size, an object is always one tile. */
     function effectiveSize(state, eraserSize) {
         const tool = activeTool(state);
-        if (tool === 'object') return 1;
+        if (tool === 'object' || tool === 'start') return 1;
         return tool === 'eraser' ? eraserSize : state.brushSize;
     }
 

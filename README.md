@@ -19,7 +19,7 @@ Protogames lets designers sketch and iterate on board layouts quickly—no build
 - File ops: Save/load JSON projects; export PNG and SVG (SVG is a flat-colour outline of the tiles: no textures or objects)
 - Print: **Print…** makes a PDF at a real-world tile size (in mm): split across A4 / Letter / A3 home-printer pages with overlap, page labels and assembly hints, or one large sheet (fit to board, A3–A0) with crop marks; objects on the board, as cut-out tokens, or both; optional legend of the terrains and objects used; a live preview shows how the board sits on the paper. Settings are remembered per browser.
 - Sharing: **Share Link** puts the whole board in the address (nothing is uploaded); whoever opens it gets their own copy
-- Playtest: the play button locks editing (painting, tools, side panel and editing shortcuts) so the board can be played on; pan and zoom keep working, **Esc** or the pill returns to editing
+- Playtest: the play button locks editing so the board can be played on; pan and zoom keep working, **Esc** or the pill returns to editing. With **players** defined (a colour, a seat at one screen edge and a set of pieces each) and **start markers** painted on the map, every player gets a tray at their seat, turned to face outwards: click a piece to send it to a free start, drag it anywhere, roll the design's dice (d3 to d20) from the tray, undo moves, reset the game. Several people can move pieces at once on a touch screen. See [docs/PLAYTEST.md](docs/PLAYTEST.md)
 - Layout: the tools sit in a column at the right edge, under the full screen and playtest buttons; their settings open to the left
 - Input: Mouse, touch, stylus; responsive layout
 - View: a button in the zoom cluster switches between textured tiles and plain colours (remembered; PNG export follows it and the Print dialog starts from it; SVG export always draws flat colours without textures or objects)
@@ -33,6 +33,7 @@ Press **?** (or use the keyboard button in the bottom-right corner) for the full
 | Undo / Redo | Ctrl+Z / Ctrl+Shift+Z or Ctrl+Y |
 | Brush / Fill / Line | B / G / L |
 | Eraser on/off | E |
+| Start markers on/off | M |
 | Smaller / larger brush or eraser (1-7) | [ / ] |
 | Pick swatch | 1 - 9, or Tab / Shift+Tab to cycle |
 | Zoom in / out / fit | + / - / 0 |
@@ -83,7 +84,14 @@ protogames/
 │  │  ├─ autosaveSlots.js   (per-tab autosave slots)
 │  │  ├─ fileManager.js     (save/load, autosave)
 │  │  ├─ shareLink.js       (share links: board in the address hash)
-│  │  ├─ playtest.js        (locks editing)
+│  │  ├─ playtest.js        (locks editing, runs the game)
+│  │  ├─ playtestTray.js    (player trays and dice)
+│  │  ├─ playtestDrag.js    (moving pieces by pointer and keyboard)
+│  │  ├─ playersPanel.js    (the Players panel)
+│  │  ├─ players.js         (player list helpers)
+│  │  ├─ play.js            (game state: pieces, moves, rolls)
+│  │  ├─ pieces.js          (drawing and hit-testing of pieces)
+│  │  ├─ dice.js            (dice rolling)
 │  │  ├─ infinite.js        (infinite canvas board shape)
 │  │  ├─ countryBoard.js    (country board shape, cut to a real outline)
 │  │  ├─ countryRegions.js  (multi-country regions and their borders)

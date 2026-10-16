@@ -48,6 +48,11 @@ const Utils = (() => {
      * @param {Array<Object>} polygons - Source polygon list.
      * @returns {Array<Object>} Deep copy of the polygons.
      */
+    /** Deep copy of any plain JSON value. */
+    function clone(value) {
+        return JSON.parse(JSON.stringify(value));
+    }
+
     function clonePolygons(polygons = []) {
         return polygons.map((polygon) => JSON.parse(JSON.stringify(polygon)));
     }
@@ -100,6 +105,7 @@ const Utils = (() => {
         debounce,
         sanitizeFileName,
         escapeAttribute,
+        clone,
         clonePolygons,
         triggerBlobDownload,
         triggerDataUrlDownload,

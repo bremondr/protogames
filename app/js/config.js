@@ -127,6 +127,32 @@ const Config = (() => {
     ];
     const DEFAULT_PALETTE_ID = 'landscape';
 
+    /** Playtest: the kinds of piece a player can have. Drawn by js/pieces.js. */
+    const PIECE_KINDS = Object.freeze([
+        { id: 'pawn', label: 'Pawn' },
+        { id: 'disc', label: 'Disc' },
+        { id: 'cube', label: 'Cube' },
+        { id: 'meeple', label: 'Meeple' }
+    ]);
+    /** A player is a colour; these are the colours to choose from (start outlines and pieces use the same hex). */
+    const PLAYER_COLORS = Object.freeze([
+        { name: 'Red', hex: '#c62828' },
+        { name: 'Blue', hex: '#1565c0' },
+        { name: 'Green', hex: '#2e7d32' },
+        { name: 'Yellow', hex: '#f9a825' },
+        { name: 'Purple', hex: '#6a1b9a' },
+        { name: 'Orange', hex: '#ef6c00' },
+        { name: 'Teal', hex: '#00838f' },
+        { name: 'Grey', hex: '#546e7a' }
+    ]);
+    /** The edge of the screen a player sits at, in the order new players are given one. */
+    const SEATS = Object.freeze(['bottom', 'top', 'left', 'right']);
+    const MAX_PLAYERS = 8;
+    /** Most pieces in a design, over all players. */
+    const MAX_PIECES = 500;
+    /** Dice every design starts with (there is no editor for the set yet). */
+    const STANDARD_DICE = Object.freeze([3, 4, 6, 8, 10, 12, 20].map((sides) => Object.freeze({ sides })));
+
     /**
      * Showcase boards shipped with the app: project files in /showcases that
      * every user can open from the Showcase panel. Add an entry (and the file)
@@ -193,6 +219,12 @@ const Config = (() => {
         DEFAULT_BOARD_CONFIG,
         COLOR_PALETTES,
         DEFAULT_PALETTE_ID,
+        PIECE_KINDS,
+        PLAYER_COLORS,
+        SEATS,
+        MAX_PLAYERS,
+        MAX_PIECES,
+        STANDARD_DICE,
         SHOWCASES,
         getPaletteById,
         getAllPalettes,

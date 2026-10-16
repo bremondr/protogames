@@ -2250,3 +2250,541 @@ kbd {
     height: 16px;
     accent-color: var(--color-accent);
 }
+
+/* ==============================================================
+   Players, start markers, playtest trays and dice
+   ============================================================== */
+
+/* Players panel (sidebar) */
+.players-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-bottom: 0.6rem;
+}
+
+.players-list:empty {
+    display: none;
+}
+
+.player-card {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--radius-md);
+    padding: 0.55rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.player-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.player-head select {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 0.3rem 0.45rem;
+    min-height: 36px;
+    font-size: 0.85rem;
+}
+
+.player-head select option {
+    background: #151b26;
+    color: #f5f5f5;
+}
+
+.player-dot {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.9);
+}
+
+.player-remove {
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: #f4f4f4;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.player-remove:hover {
+    background: rgba(214, 69, 69, 0.35);
+}
+
+.player-remove svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+}
+
+.player-pieces {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem;
+}
+
+.piece-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.piece-field input {
+    min-height: 34px;
+    padding: 0.25rem 0.5rem;
+}
+
+.players-hints {
+    margin-bottom: 0.6rem;
+    color: #ffd28a;
+}
+
+.players-hints[hidden] {
+    display: none;
+}
+
+.add-player-button {
+    width: 100%;
+    margin-bottom: 0.5rem;
+}
+
+.add-player-button svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+}
+
+/* Start tool in the tool bar */
+.start-thumb {
+    display: block;
+    width: 24px;
+    height: 24px;
+    box-sizing: border-box;
+    border-radius: 6px;
+    border: 4px solid var(--start-color, #c62828);
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.85);
+}
+
+.start-colors {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.start-color {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: transparent;
+    color: #f4f4f4;
+    font-size: 0.75rem;
+    text-align: left;
+    min-height: 34px;
+}
+
+.start-color:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.start-color.selected {
+    border-color: #ffffff;
+    background: rgba(47, 111, 237, 0.4);
+}
+
+.start-color-dot {
+    flex: 0 0 auto;
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    border: 2px solid rgba(255, 255, 255, 0.9);
+}
+
+/* Playtest layout: the board gives up room on every edge where a player sits */
+.workspace {
+    --tray-band: 10.5rem;
+    --tray-band-collapsed: 3.1rem;
+}
+
+.playtest .canvas-wrapper {
+    position: absolute;
+    height: auto;
+    top: var(--tray-top, 0px);
+    right: var(--tray-right, 0px);
+    bottom: var(--tray-bottom, 0px);
+    left: var(--tray-left, 0px);
+}
+
+.playtest .focus-button,
+.playtest .play-button {
+    right: calc(1rem + var(--tray-right, 0px));
+}
+
+.playtest .focus-button {
+    top: calc(1rem + var(--tray-top, 0px));
+}
+
+.playtest .play-button {
+    top: calc(1rem + 56px + var(--tray-top, 0px));
+}
+
+.playtest .zoom-controls {
+    right: calc(1rem + var(--tray-right, 0px));
+    bottom: calc(1rem + var(--tray-bottom, 0px));
+}
+
+.playtest .minimap {
+    right: calc(1rem + var(--tray-right, 0px));
+    bottom: calc(1rem + 44px + var(--tray-bottom, 0px));
+}
+
+.playtest .notification {
+    bottom: calc(1rem + var(--tray-bottom, 0px));
+}
+
+.playtest .playtest-pill {
+    left: calc(1rem + var(--tray-left, 0px));
+    top: calc(1rem + var(--tray-top, 0px));
+    transform: none;
+}
+
+/* Trays: one per player, centred on the player's edge and turned to face outwards (the screen flat on a table) */
+.tray-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    container-type: size;
+    pointer-events: none;
+}
+
+.tray-layer[hidden] {
+    display: none;
+}
+
+.tray-seat {
+    --band: var(--tray-band);
+    position: absolute;
+    display: flex;
+    gap: 0.5rem;
+    pointer-events: none;
+    height: calc(var(--band) - 1rem);
+}
+
+.tray-seat.collapsed {
+    --band: var(--tray-band-collapsed);
+}
+
+.tray-seat > * {
+    pointer-events: auto;
+}
+
+.seat-bottom,
+.seat-top {
+    left: 50%;
+    width: min(calc(100cqw - 2rem - var(--tray-left, 0px) - var(--tray-right, 0px)), 48rem);
+    max-width: calc(100cqw - 1rem);
+}
+
+.seat-bottom {
+    bottom: 0.5rem;
+    transform: translateX(-50%);
+}
+
+.seat-top {
+    top: 0.5rem;
+    transform: translateX(-50%) rotate(180deg);
+}
+
+.seat-left,
+.seat-right {
+    --length: min(calc(100cqh - 2rem - var(--tray-top, 0px) - var(--tray-bottom, 0px)), 48rem);
+    width: var(--length);
+    transform-origin: 0 0;
+}
+
+.seat-left {
+    left: calc(var(--band) - 0.5rem);
+    top: calc(50% - var(--length) / 2);
+    transform: rotate(90deg);
+}
+
+.seat-right {
+    left: calc(100% - var(--band) + 0.5rem);
+    top: calc(50% + var(--length) / 2);
+    transform: rotate(-90deg);
+}
+
+.tray {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 26rem;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    padding: 0.4rem 0.6rem 0.5rem;
+    background: #151b26;
+    color: #f4f4f4;
+    border: 2px solid var(--player, #888);
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(16, 24, 40, 0.28), 0 2px 6px rgba(16, 24, 40, 0.14);
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.tray.drop-target {
+    outline: 3px dashed #ffffff;
+    outline-offset: 2px;
+}
+
+.tray-head {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-height: 26px;
+}
+
+.tray-dot {
+    flex: 0 0 auto;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--player, #888);
+    border: 2px solid rgba(255, 255, 255, 0.85);
+}
+
+.tray-name {
+    flex: 1 1 auto;
+    margin: 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.tray-toggle {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 26px;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #f4f4f4;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tray-toggle:hover {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+.tray-toggle svg {
+    width: 16px;
+    height: 16px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.4;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.tray-seat.collapsed .tray-toggle svg {
+    transform: rotate(180deg);
+}
+
+.tray-seat.collapsed .tray-body {
+    display: none;
+}
+
+.tray-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-height: 0;
+}
+
+.tray-pieces {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 52px;
+}
+
+.tray-empty {
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+.tray-piece {
+    position: relative;
+    flex: 0 0 auto;
+    width: 50px;
+    height: 52px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.07);
+    cursor: grab;
+    touch-action: none;
+}
+
+.tray-piece:hover {
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.tray-piece-img {
+    width: 42px;
+    height: 42px;
+    display: block;
+    margin: 0 auto;
+    pointer-events: none;
+}
+
+.tray-count {
+    position: absolute;
+    right: -4px;
+    bottom: -4px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    box-sizing: border-box;
+    border-radius: 9px;
+    background: #ffffff;
+    color: #111111;
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+}
+
+.tray-dice {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.die {
+    min-width: 36px;
+    height: 32px;
+    padding: 0 6px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.die:hover {
+    background: rgba(255, 255, 255, 0.22);
+}
+
+.roll-result {
+    margin-left: auto;
+    display: flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    min-width: 3.2rem;
+    justify-content: flex-end;
+}
+
+.roll-result:empty {
+    display: none;
+}
+
+.roll-die {
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.roll-value {
+    font-size: 1.7rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.roll-result.rolled .roll-value {
+    animation: dice-tumble 0.5s ease-out;
+}
+
+@keyframes dice-tumble {
+    0% { transform: rotate(-200deg) scale(0.4); opacity: 0.2; }
+    60% { transform: rotate(20deg) scale(1.25); opacity: 1; }
+    100% { transform: rotate(0) scale(1); }
+}
+
+.tray-note {
+    margin: 0;
+    font-size: 0.75rem;
+    color: #ffd28a;
+}
+
+.tray-note[hidden] {
+    display: none;
+}
+
+.drag-ghost {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 1000;
+    pointer-events: none;
+    filter: drop-shadow(0 8px 6px rgba(0, 0, 0, 0.35));
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .roll-result.rolled .roll-value {
+        animation: none;
+    }
+}
+
+@media (pointer: coarse) {
+    .die {
+        min-width: 42px;
+        height: 40px;
+    }
+
+    .tray-toggle {
+        width: 40px;
+        height: 32px;
+    }
+}
+
+@media (max-width: 760px) {
+    .workspace {
+        --tray-band: 9.6rem;
+    }
+
+    .tray {
+        padding: 0.3rem 0.45rem 0.4rem;
+    }
+
+    .roll-value {
+        font-size: 1.4rem;
+    }
+}
