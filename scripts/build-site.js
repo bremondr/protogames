@@ -19,7 +19,7 @@ const { execFileSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 /** What makes up the app; everything else in the repo (tests, docs, dev tools) is not published. */
-const APP_PATHS = ['index.html', 'styles.css', 'js', 'images', 'showcases', 'data'];
+const APP_PATHS = ['index.html', 'styles.css', 'js', 'images', 'showcases', 'data', 'home'];
 const MAX_PREVIEWS = 20;
 const ANALYTICS_PATTERN = /^[ \t]*<script[^>]*simpleanalyticscdn[^>]*><\/script>[ \t]*\r?\n?/m;
 
