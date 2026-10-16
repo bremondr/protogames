@@ -54,51 +54,54 @@ Painting and navigating never share a gesture, so you cannot pan by accident whi
 The cluster in the bottom-right corner has zoom out / in, the zoom level (click it for **actual size**, where a typical tile is 64 px wide), **fit to screen**, and a **minimap** toggle. The minimap shows the whole board with the visible area outlined; click or drag on it to move the view. Zoom is clamped between 25% of the fitted size and 24x, and the board can never be panned completely out of sight.
 
 ## Deployment and previews
-`main` is published as the production site; every open pull request from this repository is published as a preview under `/preview/pr-<number>/`, with its own saved data and a badge, and the link is commented on the pull request. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+`main` is published as the production site (landing page at the root, the editor at `/app/`); every open pull request from this repository is published as a preview under `/preview/pr-<number>/` (editor at `/preview/pr-<number>/app/`), with its own saved data and a badge, and the link is commented on the pull request. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Project Structure
 ```
 protogames/
-├─ index.html
-├─ styles.css
+├─ index.html            (landing page; landing.js forwards old share links to the app)
+├─ landing.js
 ├─ package.json
-├─ js/
-│  ├─ config.js          (constants, palettes, defaults)
-│  ├─ state.js           (application state, undo/redo)
-│  ├─ geometry/          (helpers.js, hex.js, triangle.js, square.js, neighbors.js) + geometry.js (aggregator)
-│  ├─ viewMath.js        (pure zoom/pan maths)
-│  ├─ viewControls.js    (zoom, pan, fit, minimap, texture toggle)
-│  ├─ renderer.js
-│  ├─ textureUtils.js    (colour helpers and blob-URL cache shared by textures and objects)
-│  ├─ textures.js        (procedural tile textures)
-│  ├─ objects.js         (placeable map objects)
-│  ├─ interactions.js
-│  ├─ toolOps.js         (fill and line tool logic)
-│  ├─ toolbar.js         (the tool column and its settings popovers)
-│  ├─ shortcuts.js       (keyboard bindings)
-│  ├─ projectFormat.js   (project file format: versions, migrations, validation)
-│  ├─ autosaveSlots.js   (per-tab autosave slots)
-│  ├─ fileManager.js     (save/load, autosave)
-│  ├─ shareLink.js       (share links: board in the address hash)
-│  ├─ playtest.js        (locks editing)
-│  ├─ infinite.js        (infinite canvas board shape)
-│  ├─ countryBoard.js    (country board shape, cut to a real outline)
-│  ├─ countryRegions.js  (multi-country regions and their borders)
-│  ├─ themeManager.js    (custom tile themes and item sets)
-│  ├─ themeEditor.js     (theme editor dialog)
-│  ├─ print.js           (print layout at real-world scale + PDF writer)
-│  ├─ printDialog.js     (the Print… dialog)
-│  ├─ exporter.js        (PNG and SVG export)
-│  ├─ ui.js
-│  ├─ utils.js
-│  └─ main.js
+├─ app/                  (the editor: open or serve this folder)
+│  ├─ index.html
+│  ├─ styles.css
+│  ├─ js/
+│  │  ├─ config.js          (constants, palettes, defaults)
+│  │  ├─ state.js           (application state, undo/redo)
+│  │  ├─ geometry/          (helpers.js, hex.js, triangle.js, square.js, neighbors.js) + geometry.js (aggregator)
+│  │  ├─ viewMath.js        (pure zoom/pan maths)
+│  │  ├─ viewControls.js    (zoom, pan, fit, minimap, texture toggle)
+│  │  ├─ renderer.js
+│  │  ├─ textureUtils.js    (colour helpers and blob-URL cache shared by textures and objects)
+│  │  ├─ textures.js        (procedural tile textures)
+│  │  ├─ objects.js         (placeable map objects)
+│  │  ├─ interactions.js
+│  │  ├─ toolOps.js         (fill and line tool logic)
+│  │  ├─ toolbar.js         (the tool column and its settings popovers)
+│  │  ├─ shortcuts.js       (keyboard bindings)
+│  │  ├─ projectFormat.js   (project file format: versions, migrations, validation)
+│  │  ├─ autosaveSlots.js   (per-tab autosave slots)
+│  │  ├─ fileManager.js     (save/load, autosave)
+│  │  ├─ shareLink.js       (share links: board in the address hash)
+│  │  ├─ playtest.js        (locks editing)
+│  │  ├─ infinite.js        (infinite canvas board shape)
+│  │  ├─ countryBoard.js    (country board shape, cut to a real outline)
+│  │  ├─ countryRegions.js  (multi-country regions and their borders)
+│  │  ├─ themeManager.js    (custom tile themes and item sets)
+│  │  ├─ themeEditor.js     (theme editor dialog)
+│  │  ├─ print.js           (print layout at real-world scale + PDF writer)
+│  │  ├─ printDialog.js     (the Print… dialog)
+│  │  ├─ exporter.js        (PNG and SVG export)
+│  │  ├─ ui.js
+│  │  ├─ utils.js
+│  │  └─ main.js
+│  ├─ showcases/         (example .protogames.json projects)
+│  ├─ images/            (logo and tile-shape illustrations)
+│  └─ data/              (countries-50m.json: outlines for the Country shape)
 ├─ tests/                (node:test suites, fixtures/ of old file formats, support/load.js)
 ├─ dev/                  (geometry-gallery.html, geometry-checks.js)
-├─ showcases/            (example .protogames.json projects)
-├─ images/               (logo and tile-shape illustrations)
 ├─ scripts/              (build-site.js: assembles production + previews for Pages)
 ├─ .github/workflows/    (test.yml, pages.yml)
-├─ data/                 (countries-50m.json: outlines for the Country shape)
 └─ docs/
    ├─ SPECIFICATION.md   (file, autosave and share-link formats)
    ├─ DEPLOYMENT.md
@@ -114,7 +117,7 @@ protogames/
 - Autosave/load preserves palette and eraser state
 
 ## Usage
-1. Open `index.html` in a modern browser.
+1. Open `app/index.html` in a modern browser (or serve the repository, for example `python -m http.server`, and open `/` for the landing page or `/app/` for the editor).
 2. Choose board shape, grid type, and parameters in the sidebar; click **Generate Board**.
 3. Pick a palette theme, select a color (or click **Eraser**), then click or drag on tiles. Switch the tool to **Fill** to repaint a whole connected region of one colour, or **Line** to drag out a straight path of tiles (Esc cancels a line in progress).
 4. Save projects as `.protogames.json`; export PNG/SVG, or print a PDF at real-world scale, as needed.

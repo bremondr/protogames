@@ -10,7 +10,7 @@ function fresh(stored) {
     class FileReader {
         readAsText(file) { setTimeout(() => { this.result = file.text; this.onload(); }); }
     }
-    const app = loadApp(['js/config.js', 'js/viewMath.js', 'js/state.js', 'js/themeManager.js'], {
+    const app = loadApp(['app/js/config.js', 'app/js/viewMath.js', 'app/js/state.js', 'app/js/themeManager.js'], {
         localStorage: storage,
         FileReader,
         window: { dispatchEvent() {} },

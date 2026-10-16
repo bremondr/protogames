@@ -4,7 +4,7 @@
  * vm context so they can be unit-tested in Node without a DOM or a bundler.
  *
  * Usage:
- *   const app = loadApp(['js/config.js', 'js/geometry/helpers.js', ...]);
+ *   const app = loadApp(['app/js/config.js', 'app/js/geometry/helpers.js', ...]);
  *   app.run('Config.CANVAS_PADDING');      // evaluate an expression in the context
  *   app.context.Geometry                  // globals assigned to window/globalThis
  */
@@ -16,13 +16,13 @@ const ROOT = path.resolve(__dirname, '..', '..');
 
 /** Scripts that make up the pure geometry layer, in load order. */
 const GEOMETRY_SCRIPTS = [
-    'js/config.js',
-    'js/geometry/helpers.js',
-    'js/geometry/hex.js',
-    'js/geometry/triangle.js',
-    'js/geometry/square.js',
-    'js/geometry/neighbors.js',
-    'js/geometry.js',
+    'app/js/config.js',
+    'app/js/geometry/helpers.js',
+    'app/js/geometry/hex.js',
+    'app/js/geometry/triangle.js',
+    'app/js/geometry/square.js',
+    'app/js/geometry/neighbors.js',
+    'app/js/geometry.js',
     'dev/geometry-checks.js'
 ];
 

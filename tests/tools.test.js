@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { loadApp, GEOMETRY_SCRIPTS, plain } = require('./support/load');
 
-const app = loadApp([...GEOMETRY_SCRIPTS, 'js/toolOps.js']);
+const app = loadApp([...GEOMETRY_SCRIPTS, 'app/js/toolOps.js']);
 const Geometry = app.context.Geometry;
 const Checks = app.context.GeometryChecks;
 const Helpers = app.context.GeometryHelpers;

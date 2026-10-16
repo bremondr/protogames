@@ -25,7 +25,7 @@ function fresh(saveTheme) {
         addEventListener() {},
         activeElement: null
     };
-    const app = loadApp(['js/themeEditor.js'], {
+    const app = loadApp(['app/js/themeEditor.js'], {
         document,
         UI: ui,
         Config: { getAllPalettes: () => [], getPaletteById: () => null },

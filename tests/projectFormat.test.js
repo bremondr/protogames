@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { ROOT, loadApp, plain } = require('./support/load');
 
-const app = loadApp(['js/projectFormat.js']);
+const app = loadApp(['app/js/projectFormat.js']);
 const PF = app.run('ProjectFormat');
 const fixture = (name) => JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', name), 'utf8'));
 const legacyProject = () => fixture('v0-legacy-project.protogames.json');
@@ -75,7 +75,7 @@ test('a file without any version is treated as v0 and loads', () => {
 });
 
 test('the bundled showcase board loads', () => {
-    const text = fs.readFileSync(path.join(ROOT, 'showcases', 'fantasy-landscape.protogames.json'), 'utf8');
+    const text = fs.readFileSync(path.join(ROOT, 'app', 'showcases', 'fantasy-landscape.protogames.json'), 'utf8');
     const loaded = plain(PF.parse(text));
     assert.equal(loaded.version, PF.CURRENT_VERSION);
     assert.ok(loaded.appState.polygons.length > 0);
@@ -367,7 +367,7 @@ const hostile = () => JSON.parse(JSON.stringify(plain(PF.parse(JSON.stringify(v2
 test('every existing fixture and showcase still loads under the stricter rules', () => {
     const files = [
         ...fs.readdirSync(path.join(__dirname, 'fixtures')).map((name) => path.join(__dirname, 'fixtures', name)),
-        ...fs.readdirSync(path.join(ROOT, 'showcases')).filter((name) => name.endsWith('.json')).map((name) => path.join(ROOT, 'showcases', name))
+        ...fs.readdirSync(path.join(ROOT, 'app', 'showcases')).filter((name) => name.endsWith('.json')).map((name) => path.join(ROOT, 'app', 'showcases', name))
     ];
     assert.ok(files.length >= 5);
     for (const file of files) assert.doesNotThrow(() => PF.parse(fs.readFileSync(file, 'utf8')), file);

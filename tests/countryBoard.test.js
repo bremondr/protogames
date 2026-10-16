@@ -45,7 +45,7 @@ function load({ fetchImpl } = {}) {
         fetched.push(url);
         return { ok: true, json: async () => fakeTopology() };
     });
-    const app = loadApp([...GEOMETRY_SCRIPTS, 'js/viewMath.js', 'js/countryBoard.js'], { document, fetch });
+    const app = loadApp([...GEOMETRY_SCRIPTS, 'app/js/viewMath.js', 'app/js/countryBoard.js'], { document, fetch });
     return { app, fetched, CountryBoard: app.run('CountryBoard'), Geometry: app.context.Geometry, Config: app.run('Config') };
 }
 
@@ -184,7 +184,7 @@ test('colours painted on the rectangle carry over onto the cut board', async () 
 test('the outlines file that ships with the app decodes, and has the countries the app relies on', async () => {
     const fs = require('node:fs');
     const path = require('node:path');
-    const real = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'data', 'countries-50m.json'), 'utf8'));
+    const real = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'app', 'data', 'countries-50m.json'), 'utf8'));
     const { CountryBoard } = load({ fetchImpl: async () => ({ ok: true, json: async () => real }) });
     assert.equal(await CountryBoard.ready(), true);
     const names = CountryBoard.names();
