@@ -34,3 +34,12 @@ test('an old share link addressed to the site root is forwarded to the app with 
 test('ordinary visits and in-page anchors stay on the landing page', () => {
     for (const hash of ['', '#features', '#how', '#bx']) assert.equal(visit(hash), null, hash || '(none)');
 });
+
+test('the logo in the editor header links back to the landing page', () => {
+    const app = fs.readFileSync(path.join(ROOT, 'app', 'index.html'), 'utf8');
+    const brand = /<a class="brand" href="([^"]*)"[^>]*>[\s\S]*?<\/a>/.exec(app);
+    assert.ok(brand, 'the brand is a link');
+    assert.equal(path.posix.normalize(`/app/${brand[1]}`), '/', 'it points at the site root, where the landing page is');
+    assert.ok(/class="brand-mark"/.test(brand[0]) && /Protogames<\/span>/.test(brand[0]), 'the logo and the name are both inside it');
+    assert.match(brand[0], /aria-label="[^"]+"/, 'it has an accessible name');
+});

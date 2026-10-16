@@ -58,6 +58,8 @@ The cluster in the bottom-right corner has zoom out / in, the zoom level (click 
 `main` is published as the production site (landing page at the root, the editor at `/app/`); every open pull request from this repository is published as a preview under `/preview/pr-<number>/` (editor at `/preview/pr-<number>/app/`), with its own saved data and a badge, and the link is commented on the pull request. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## Project Structure
+File paths such as `js/shortcuts.js` in this README and in `docs/` are relative to `app/`, where the editor lives.
+
 ```
 protogames/
 ├─ index.html            (landing page; landing.js forwards old share links to the app)
