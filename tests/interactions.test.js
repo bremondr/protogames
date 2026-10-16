@@ -14,7 +14,7 @@ function fresh({ hasWork = false } = {}) {
         hasUserWork: () => hasWork,
         confirmReplace: (onConfirm, options) => calls.confirms.push({ onConfirm, options })
     };
-    const app = loadApp([...GEOMETRY_SCRIPTS, 'js/viewMath.js', 'js/toolOps.js', 'js/state.js', 'js/interactions.js'], {
+    const app = loadApp([...GEOMETRY_SCRIPTS, 'app/js/viewMath.js', 'app/js/toolOps.js', 'app/js/state.js', 'app/js/interactions.js'], {
         document: { addEventListener() {} },
         CustomEvent: class {},
         performance: { now: () => Date.now() + 1000 },

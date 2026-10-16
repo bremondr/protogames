@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const html = fs.readFileSync(path.resolve(__dirname, '..', 'index.html'), 'utf8');
+const html = fs.readFileSync(path.resolve(__dirname, '..', 'app', 'index.html'), 'utf8');
 
 /** Tags that never have a closing tag. */
 const VOID = new Set(['meta', 'link', 'input', 'img', 'br', 'hr', 'source', 'wbr']);
@@ -72,7 +72,7 @@ test('the page has favicons (small .ico and the logo png), and they are files th
     const hrefs = [...html.matchAll(/<link rel="icon"[^>]*href="([^"]+)"/g)].map((m) => m[1]);
     assert.ok(hrefs.some((h) => h.endsWith('.ico')), 'a .ico favicon');
     assert.ok(hrefs.some((h) => h.endsWith('.png')), 'a .png favicon');
-    for (const href of hrefs) assert.ok(fs.existsSync(path.resolve(__dirname, '..', decodeURIComponent(href))), `${href} exists`);
+    for (const href of hrefs) assert.ok(fs.existsSync(path.resolve(__dirname, '..', 'app', decodeURIComponent(href))), `${href} exists`);
 });
 
 test('the main regions of the page are direct children of the right containers', () => {
@@ -88,7 +88,7 @@ test('the main regions of the page are direct children of the right containers',
 test('every element id the scripts look up by getElementById or a local $ helper exists in index.html', () => {
     // shortcutHelp is created by shortcuts.js when the overlay opens.
     const allowed = new Set(['shortcutHelp']);
-    const jsDir = path.resolve(__dirname, '..', 'js');
+    const jsDir = path.resolve(__dirname, '..', 'app', 'js');
     const pageIds = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
     const missing = [];
     for (const file of fs.readdirSync(jsDir).filter((f) => f.endsWith('.js'))) {

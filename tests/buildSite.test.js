@@ -25,17 +25,17 @@ test('buildInfo gives every preview its own storage prefix and relative links', 
     assert.equal(a.sha, 'abcdef0');
     assert.notEqual(a.storagePrefix, b.storagePrefix);
     assert.ok(a.storagePrefix.endsWith(':'));
-    assert.equal(a.productionUrl, '../../');
-    assert.equal(a.indexUrl, '../');
+    assert.equal(a.productionUrl, '../../../app/');
+    assert.equal(a.indexUrl, '../../');
 });
 
 test('a preview page gets the runtime first and loses analytics; the rest is untouched', () => {
-    const html = '<!doctype html>\n<html>\n<head>\n    <title>x</title>\n</head>\n<body>\n<script src="js/config.js"></script>\n<script async src="https://scripts.simpleanalyticscdn.com/latest.js"></script>\n</body>\n</html>\n';
+    const html = '<!doctype html>\n<html>\n<head>\n    <title>x</title>\n</head>\n<body>\n<script src="app/js/config.js"></script>\n<script async src="https://scripts.simpleanalyticscdn.com/latest.js"></script>\n</body>\n</html>\n';
     const out = Site.previewIndexHtml(html);
     assert.match(out, /<head>\n    <meta name="robots" content="noindex">\n    <script src="preview-runtime.js"><\/script>/);
-    assert.ok(out.indexOf('preview-runtime.js') < out.indexOf('js/config.js'), 'runtime runs before the app');
+    assert.ok(out.indexOf('preview-runtime.js') < out.indexOf('app/js/config.js'), 'runtime runs before the app');
     assert.ok(!out.includes('simpleanalytics'));
-    assert.ok(out.includes('<script src="js/config.js"></script>') && out.includes('<title>x</title>'));
+    assert.ok(out.includes('<script src="app/js/config.js"></script>') && out.includes('<title>x</title>'));
     assert.throws(() => Site.previewIndexHtml('<body></body>'), /no <head>/);
 });
 
@@ -154,34 +154,37 @@ test('the badge names the preview and links back to production and the list', ()
     const badge = body.children[0];
     assert.equal(badge.children[0].textContent, 'Preview: PR #12 (abcdef0)');
     const links = badge.children.filter((c) => c.tag === 'a').map((c) => [c.textContent, c.href]);
-    assert.deepEqual(links, [['production', '../../'], ['all previews', '../']]);
+    assert.deepEqual(links, [['production', '../../../app/'], ['all previews', '../../']]);
     badge.children.find((c) => c.tag === 'button').listeners.click();
     assert.equal(badge.removed, true, 'the badge can be dismissed');
 });
 
 // ---- Building the site from git ----------------------------------------------------------------------------------
 
-test('a site build puts production at the root and previews under /preview/<name>/', () => {
+test('a site build puts production at the root (landing page, app in app/) and previews under /preview/<name>/ with the same layout', () => {
     const out = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-site-'));
     try {
         const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT }).toString().trim();
         const summary = Site.build({ out, main: head, previews: [{ number: 66, title: 'Experiment', ref: head, isDraft: false }, { number: 70, ref: head, isCrossRepository: true }], repo: 'owner/repo' });
         assert.equal(summary.previews.length, 1);
 
-        const production = fs.readFileSync(path.join(out, 'index.html'), 'utf8');
-        const preview = fs.readFileSync(path.join(out, 'preview', 'pr-66', 'index.html'), 'utf8');
+        const production = fs.readFileSync(path.join(out, 'app', 'index.html'), 'utf8');
+        const preview = fs.readFileSync(path.join(out, 'preview', 'pr-66', 'app', 'index.html'), 'utf8');
         assert.ok(!production.includes('preview-runtime'), 'production is the app exactly as committed');
         assert.ok(preview.includes('preview-runtime.js') && !/<script[^>]*simpleanalytics/.test(preview), 'no analytics script (the CSP meta still names its host, which is harmless)');
-        assert.ok(fs.existsSync(path.join(out, 'js', 'config.js')) && fs.existsSync(path.join(out, 'preview', 'pr-66', 'js', 'config.js')));
-        assert.ok(fs.existsSync(path.join(out, 'preview', 'pr-66', 'preview-runtime.js')));
-        assert.ok(!fs.existsSync(path.join(out, 'preview-runtime.js')), 'the runtime is not in production');
+        assert.ok(fs.existsSync(path.join(out, 'app', 'js', 'config.js')) && fs.existsSync(path.join(out, 'preview', 'pr-66', 'app', 'js', 'config.js')));
+        for (const dir of [out, path.join(out, 'preview', 'pr-66')]) {
+            assert.ok(fs.existsSync(path.join(dir, 'index.html')) && fs.existsSync(path.join(dir, 'landing.js')), 'the landing page is part of production and of every preview');
+        }
+        assert.ok(fs.existsSync(path.join(out, 'preview', 'pr-66', 'app', 'preview-runtime.js')));
+        assert.ok(!fs.existsSync(path.join(out, 'app', 'preview-runtime.js')), 'the runtime is not in production');
         assert.ok(!fs.existsSync(path.join(out, 'preview', 'pr-70')), 'a fork is not published');
         assert.ok(!fs.existsSync(path.join(out, 'tests')) && !fs.existsSync(path.join(out, 'scripts')), 'only the app is published');
-        assert.ok(fs.existsSync(path.join(out, 'data', 'countries-50m.json')) && fs.existsSync(path.join(out, 'preview', 'pr-66', 'data', 'countries-50m.json')), 'the country outlines are published with production and every preview');
+        assert.ok(fs.existsSync(path.join(out, 'app', 'data', 'countries-50m.json')) && fs.existsSync(path.join(out, 'preview', 'pr-66', 'app', 'data', 'countries-50m.json')), 'the country outlines are published with production and every preview');
         assert.ok(fs.existsSync(path.join(out, '.nojekyll')));
         assert.ok(fs.readFileSync(path.join(out, 'preview', 'index.html'), 'utf8').includes('pr-66'));
         // Binary files survive the trip through git.
-        assert.deepEqual(fs.readFileSync(path.join(out, 'images', 'protogames proto logo.png')), fs.readFileSync(path.join(ROOT, 'images', 'protogames proto logo.png')));
+        assert.deepEqual(fs.readFileSync(path.join(out, 'app', 'images', 'protogames proto logo.png')), fs.readFileSync(path.join(ROOT, 'app', 'images', 'protogames proto logo.png')));
     } finally {
         fs.rmSync(out, { recursive: true, force: true });
     }
@@ -213,15 +216,16 @@ test('a pull request that cannot become a preview is skipped and never aborts th
         const identity = { GIT_AUTHOR_NAME: 'test', GIT_AUTHOR_EMAIL: 'test@example.com', GIT_COMMITTER_NAME: 'test', GIT_COMMITTER_EMAIL: 'test@example.com' };
         const run = (args, input) => execFileSync('git', args, { cwd: ROOT, input, env: { ...process.env, ...identity } }).toString().trim();
         const head = run(['rev-parse', 'HEAD']);
-        // Unreferenced commits: one without index.html, one whose index.html has no <head>.
+        // Unreferenced commits: one without app/index.html, one whose app/index.html has no <head>.
         const commitOf = (tree) => run(['commit-tree', tree, '-m', 'test']);
         const noIndex = commitOf(run(['mktree'], ''));
         const blob = run(['hash-object', '-w', '--stdin'], '<p>no head here</p>');
-        const noHead = commitOf(run(['mktree'], `100644 blob ${blob}\tindex.html\n`));
+        const appTree = run(['mktree'], `100644 blob ${blob}\tindex.html\n`);
+        const noHead = commitOf(run(['mktree'], `040000 tree ${appTree}\tapp\n`));
         const summary = Site.build({ out, main: head, previews: [{ number: 1, ref: noIndex }, { number: 2, ref: noHead }, { number: 3, ref: head }] });
         assert.deepEqual(summary.previews.map((p) => p.name), ['pr-3']);
         assert.deepEqual(summary.skipped, [1, 2]);
-        assert.ok(fs.existsSync(path.join(out, 'index.html')), 'production is still published');
+        assert.ok(fs.existsSync(path.join(out, 'app', 'index.html')), 'production is still published');
         assert.ok(!fs.existsSync(path.join(out, 'preview', 'pr-1')) && !fs.existsSync(path.join(out, 'preview', 'pr-2')));
         const list = fs.readFileSync(path.join(out, 'preview', 'index.html'), 'utf8');
         assert.ok(list.includes('pr-3') && !list.includes('pr-1/') && !list.includes('pr-2/'));
@@ -231,7 +235,7 @@ test('a pull request that cannot become a preview is skipped and never aborts th
     }
 });
 
-test('the folders that make up the app are published, including data/ (the country outlines)', () => {
-    for (const name of ['index.html', 'styles.css', 'js', 'images', 'showcases', 'data', 'home']) assert.ok(Site.APP_PATHS.includes(name), name);
+test('the landing page and the app folder (which holds data/, the country outlines) are published', () => {
+    for (const name of ['index.html', 'landing.js', 'app']) assert.ok(Site.APP_PATHS.includes(name), name);
     for (const name of ['tests', 'scripts', 'docs', '.github', 'dev']) assert.ok(!Site.APP_PATHS.includes(name), `${name} is not part of the app`);
 });

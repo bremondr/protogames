@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { loadApp, GEOMETRY_SCRIPTS, plain } = require('./support/load');
 
-const app = loadApp([...GEOMETRY_SCRIPTS, 'js/viewMath.js', 'js/state.js', 'js/print.js'], { TextEncoder, Blob });
+const app = loadApp([...GEOMETRY_SCRIPTS, 'app/js/viewMath.js', 'app/js/state.js', 'app/js/print.js'], { TextEncoder, Blob });
 const Print = app.run('Print');
 const AppState = app.run('AppState');
 const Geometry = app.context.Geometry;

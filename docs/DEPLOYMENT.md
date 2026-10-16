@@ -4,8 +4,8 @@ Protogames is a static site (no build step), so any version of the repository ca
 
 | Version | Address | Built from |
 |---|---|---|
-| **Production** | `https://bremondr.github.io/protogames/` | `main` |
-| **Preview** | `https://bremondr.github.io/protogames/preview/pr-<number>/` | the head of open pull request `<number>` |
+| **Production** | `https://bremondr.github.io/protogames/` (landing page) and `.../app/` (the editor) | `main` |
+| **Preview** | `https://bremondr.github.io/protogames/preview/pr-<number>/` (landing page) and `.../preview/pr-<number>/app/` (the editor) | the head of open pull request `<number>` |
 | Index of previews | `https://bremondr.github.io/protogames/preview/` | all open pull requests |
 
 ## How to try something out
@@ -20,10 +20,10 @@ A preview shows a small **Preview: PR #n (commit)** badge with links to producti
 
 1. checks out `main` and runs the unit tests on every run, whatever started it (a failing `main` is never published, not even by a pull request event);
 2. lists the open pull requests of this repository and fetches their heads;
-3. writes production at the root and each pull request under `preview/pr-<number>/`, reading every version straight from git (only `index.html`, `styles.css`, `js/`, `images/`, `showcases/` and `data/` are published);
+3. writes production at the root and each pull request under `preview/pr-<number>/`, reading every version straight from git (only `index.html`, `landing.js` and `app/` are published; `app/` holds the editor with its `js/`, `images/`, `showcases/` and `data/`);
 4. deploys the folder with the official Pages actions and comments the preview link.
 
-Runs are serialised and the latest one wins (the concurrency group is on the deploy job, so a skipped fork pull request cannot cancel a deploy in flight). A pull request that cannot be built into a preview (for example it has no `index.html`) is skipped with a warning and never blocks production. Actions are referenced by version tag, not pinned to a commit. At most 20 previews are published. The workflow and the build script that run are always the ones on `main` (see Security), so a change to what is published, such as adding a folder to the list in `scripts/build-site.js`, only shows up in previews once it has been merged.
+Runs are serialised and the latest one wins (the concurrency group is on the deploy job, so a skipped fork pull request cannot cancel a deploy in flight). A pull request that cannot be built into a preview (for example it has no `app/index.html`) is skipped with a warning and never blocks production. Actions are referenced by version tag, not pinned to a commit. At most 20 previews are published. The workflow and the build script that run are always the ones on `main` (see Security), so a change to what is published, such as adding a folder to the list in `scripts/build-site.js`, only shows up in previews once it has been merged.
 
 You can build the same folder locally from any git refs:
 
@@ -35,9 +35,9 @@ python -m http.server 8000 --bind 127.0.0.1 --directory _site
 
 ## What is different in a preview
 
-Production is the app exactly as committed. A preview differs in three ways, all added by the build and none present in the source:
+Production is the site exactly as committed (landing page at the root, the editor in `app/`), and a preview has the same layout. A preview differs in three ways, all added by the build and none present in the source:
 
-- **Separate saved data.** All versions share one browser origin, so without care a preview would read and overwrite production's autosave, themes and settings (and the project format is versioned, so an experiment may write data production cannot read). `preview-runtime.js` is the first script of a preview and gives every storage key a `preview:pr-<n>:` prefix, so a preview never sees or touches production's data or another preview's.
+- **Separate saved data.** All versions share one browser origin, so without care a preview would read and overwrite production's autosave, themes and settings (and the project format is versioned, so an experiment may write data production cannot read). `preview-runtime.js` is the first script of a preview's `app/index.html` and gives every storage key a `preview:pr-<n>:` prefix, so a preview never sees or touches production's data or another preview's.
 - **A badge**, so a preview is not mistaken for the real thing.
 - **No analytics, and `noindex`**, so experiments do not count as visits or show up in search.
 
@@ -51,7 +51,7 @@ All versions are served from one origin, so code in a preview could read product
 - the workflow uses `pull_request_target`, so the workflow that runs is always the one on `main`, and a pull request's files are only copied out of git, never executed in CI;
 - preview code can still read production's storage if it wants to (the prefixing protects against accidents, not against malicious code), so only open pull requests you trust from people with write access.
 
-**Content-Security-Policy and analytics (accepted risk).** `index.html` carries a CSP `<meta>` that allows scripts only from the site itself and from `scripts.simpleanalyticscdn.com`, so injected markup cannot load other code. The analytics script is the one third-party script in production: it is loaded from a "latest" address, so it cannot be pinned with Subresource Integrity, and whoever controls that address could run code on the page. This is accepted for a static, secret-free app (the original requirement that no user data leaves the browser is therefore relaxed for anonymous page views), and previews do not load it. Styles allow `'unsafe-inline'` and images allow `https:` (themes may name images by web address); a meta tag cannot set `frame-ancestors`.
+**Content-Security-Policy and analytics (accepted risk).** `app/index.html` carries a CSP `<meta>` that allows scripts only from the site itself and from `scripts.simpleanalyticscdn.com`, so injected markup cannot load other code. The analytics script is the one third-party script in production: it is loaded from a "latest" address, so it cannot be pinned with Subresource Integrity, and whoever controls that address could run code on the page. This is accepted for a static, secret-free app (the original requirement that no user data leaves the browser is therefore relaxed for anonymous page views), and previews do not load it. Styles allow `'unsafe-inline'` and images allow `https:` (themes may name images by web address); a meta tag cannot set `frame-ancestors`.
 
 ## Setting it up (once)
 
@@ -60,3 +60,7 @@ All versions are served from one origin, so code in a preview could read product
 3. If the `github-pages` environment restricts deployment branches, it must allow `main` (the default); pull request runs also deploy as `main`.
 
 To go back, set the source to "Deploy from a branch" and choose `main`; the site then contains only production.
+
+## The landing page
+
+`index.html` at the root is a static landing page (no build step, inline styles, its own Content-Security-Policy that allows only scripts from the site itself) and the editor lives in `app/`. Before the editor moved, share links pointed at the site root (`.../#b=...`); `landing.js` forwards any root address whose hash starts with `#b=` to `app/` with the hash intact, so those links keep working. Saved data (autosave, themes, settings) is stored per browser origin, not per path, so it is still there after the move.

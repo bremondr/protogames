@@ -8,7 +8,7 @@ function fresh() {
     const calls = { saves: [], renders: 0, events: 0 };
     const storage = makeStorage();
     const ui = makeUI();
-    const app = loadApp([...GEOMETRY_SCRIPTS.slice(0, 7), 'js/viewMath.js', 'js/state.js', 'js/themeManager.js'], {
+    const app = loadApp([...GEOMETRY_SCRIPTS.slice(0, 7), 'app/js/viewMath.js', 'app/js/state.js', 'app/js/themeManager.js'], {
         localStorage: storage,
         window: { dispatchEvent: () => { calls.events++; } },
         CustomEvent: class { constructor(type) { this.type = type; } },

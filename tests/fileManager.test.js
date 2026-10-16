@@ -31,7 +31,7 @@ function fresh({ storage = makeStorage() } = {}) {
         body: { appendChild() {} },
         getElementById: () => null
     };
-    const app = loadApp(['js/config.js', 'js/utils.js', 'js/projectFormat.js', 'js/viewMath.js', 'js/state.js', 'js/focusUtils.js', 'js/fileManager.js'], {
+    const app = loadApp(['app/js/config.js', 'app/js/utils.js', 'app/js/projectFormat.js', 'app/js/viewMath.js', 'app/js/state.js', 'app/js/focusUtils.js', 'app/js/fileManager.js'], {
         document,
         localStorage: storage,
         CustomEvent: class {},

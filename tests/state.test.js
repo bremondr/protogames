@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const { loadApp, GEOMETRY_SCRIPTS, plain } = require('./support/load');
 
 function fresh() {
-    const app = loadApp([...GEOMETRY_SCRIPTS, 'js/viewMath.js', 'js/state.js']);
+    const app = loadApp([...GEOMETRY_SCRIPTS, 'app/js/viewMath.js', 'app/js/state.js']);
     return { AppState: app.run('AppState'), Config: app.run('Config'), Geometry: app.context.Geometry, Checks: app.context.GeometryChecks };
 }
 

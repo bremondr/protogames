@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { loadApp, plain } = require('./support/load');
 
-const app = loadApp(['js/config.js', 'js/autosaveSlots.js']);
+const app = loadApp(['app/js/config.js', 'app/js/autosaveSlots.js']);
 const Slots = app.run('AutosaveSlots');
 
 const NOW = Date.UTC(2026, 9, 3, 12, 0, 0);
@@ -94,7 +94,7 @@ function tab({ held = new Set(), locks = true, session = makeStorage(), local = 
             query: async () => ({ held: [...held].map((name) => ({ name })) })
         } }
         : {};
-    const loaded = loadApp(['js/config.js', 'js/autosaveSlots.js'], { navigator, sessionStorage: session, localStorage: local, crypto: { randomUUID: (() => { let n = 0; return () => `uuid-${++n}-${Math.random().toString(36).slice(2, 6)}`; })() } });
+    const loaded = loadApp(['app/js/config.js', 'app/js/autosaveSlots.js'], { navigator, sessionStorage: session, localStorage: local, crypto: { randomUUID: (() => { let n = 0; return () => `uuid-${++n}-${Math.random().toString(36).slice(2, 6)}`; })() } });
     loaded.context.window = { localStorage: local };
     return { Slots: loaded.run('AutosaveSlots'), held, session, local, loaded };
 }

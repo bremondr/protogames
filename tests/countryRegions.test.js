@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { loadApp, GEOMETRY_SCRIPTS, plain } = require('./support/load');
 
-const real = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'data', 'countries-50m.json'), 'utf8'));
+const real = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', 'app', 'data', 'countries-50m.json'), 'utf8'));
 
 /** Two countries that share a border: the east side of Squareland is the west side of Next door. */
 function fakeTopology() {
@@ -40,7 +40,7 @@ async function load(topology) {
     const Renderer = { onRender() {}, paint() { return { drawn: 0, total: 0 }; }, createExportCanvas() { return null; } };
     const document = { addEventListener() {}, getElementById() { return null; }, querySelector() { return null; }, querySelectorAll() { return []; } };
     const fetch = async () => ({ ok: true, json: async () => topology });
-    const app = loadApp([...GEOMETRY_SCRIPTS, 'js/viewMath.js', 'js/state.js', 'js/countryBoard.js', 'js/countryRegions.js'], { document, fetch, Renderer });
+    const app = loadApp([...GEOMETRY_SCRIPTS, 'app/js/viewMath.js', 'app/js/state.js', 'app/js/countryBoard.js', 'app/js/countryRegions.js'], { document, fetch, Renderer });
     const CountryBoard = app.run('CountryBoard');
     await CountryBoard.ready();
     return { app, CountryBoard, CountryRegions: app.run('CountryRegions'), Renderer, Geometry: app.context.Geometry, AppState: app.run('AppState'), Config: app.run('Config') };

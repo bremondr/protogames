@@ -9,17 +9,19 @@
  *
  * previews.json: [{ "number": 66, "title": "...", "ref": "refs/previews/pr-66", "isDraft": false }, ...]
  *
- * Production is the app exactly as committed. Previews get one change: a generated
- * preview-runtime.js (own browser storage + a badge) is the first script of their index.html, and
- * the analytics script is removed so experiments do not count as visits. See docs/DEPLOYMENT.md.
+ * Production is the site exactly as committed (landing page at the root, app in app/). Previews have the same
+ * layout and get one change: a generated preview-runtime.js (own browser storage + a badge) is the first
+ * script of their app/index.html, and the analytics script is removed so experiments do not count as visits. See docs/DEPLOYMENT.md.
  */
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..');
-/** What makes up the app; everything else in the repo (tests, docs, dev tools) is not published. */
-const APP_PATHS = ['index.html', 'styles.css', 'js', 'images', 'showcases', 'data', 'home'];
+/** What makes up the site: the landing page at the root and the app in app/. Everything else in the repo (tests, docs, dev tools) is not published. */
+const APP_PATHS = ['index.html', 'landing.js', 'app'];
+/** The app's page inside the site; the only page that gets the preview runtime. */
+const APP_PAGE = 'app/index.html';
 const MAX_PREVIEWS = 20;
 const ANALYTICS_PATTERN = /^[ \t]*<script[^>]*simpleanalyticscdn[^>]*><\/script>[ \t]*\r?\n?/m;
 
@@ -38,16 +40,16 @@ function buildInfo({ name, label, sha }) {
         sha: sha ? String(sha).slice(0, 7) : '',
         // Keys are namespaced per preview, so previews never touch production or each other.
         storagePrefix: `preview:${name}:`,
-        // A preview lives at /preview/<name>/, so these hold wherever the site is hosted.
-        productionUrl: '../../',
-        indexUrl: '../'
+        // The app of a preview lives at /preview/<name>/app/, so these hold wherever the site is hosted.
+        productionUrl: '../../../app/',
+        indexUrl: '../../'
     };
 }
 
 /** The page of a preview: analytics off, the runtime first so storage is isolated before the app starts. */
 function previewIndexHtml(html) {
     const withoutAnalytics = html.replace(ANALYTICS_PATTERN, '');
-    if (!/<head[^>]*>/i.test(withoutAnalytics)) throw new Error('index.html has no <head> to add the preview runtime to.');
+    if (!/<head[^>]*>/i.test(withoutAnalytics)) throw new Error('The app page has no <head> to add the preview runtime to.');
     return withoutAnalytics.replace(/<head[^>]*>/i, (open) => `${open}\n    <meta name="robots" content="noindex">\n    <script src="preview-runtime.js"></script>`);
 }
 
@@ -109,7 +111,7 @@ const sha = (ref) => git(['rev-parse', '--verify', `${ref}^{commit}`]).toString(
 /** Writes the app as it is at `ref` into `dir` and returns what was written. */
 function exportApp(ref, dir) {
     const listed = git(['ls-tree', '-r', '--name-only', '-z', ref, '--', ...APP_PATHS]).toString().split('\0').filter(Boolean);
-    if (!listed.includes('index.html')) throw new Error(`${ref} does not contain index.html`);
+    if (!listed.includes(APP_PAGE)) throw new Error(`${ref} does not contain ${APP_PAGE}`);
     for (const file of listed) {
         const target = path.join(dir, file);
         fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -146,12 +148,12 @@ function build({ out, main, previews = [], repo = '' }) {
         try {
             exportApp(preview.ref, dir);
             const info = buildInfo({ name, label: `PR #${preview.number}`, sha: commit });
-            fs.writeFileSync(path.join(dir, 'preview-runtime.js'), runtimeSource(template, info));
-            const indexFile = path.join(dir, 'index.html');
+            fs.writeFileSync(path.join(dir, 'app', 'preview-runtime.js'), runtimeSource(template, info));
+            const indexFile = path.join(dir, APP_PAGE);
             fs.writeFileSync(indexFile, previewIndexHtml(fs.readFileSync(indexFile, 'utf8')));
             summary.previews.push({ name, sha: info.sha });
         } catch (error) {
-            // A pull request without index.html or <head> must not stop production from being published.
+            // A pull request without app/index.html or <head> must not stop production from being published.
             console.warn(`Skipping ${name}: ${error.message}`);
             fs.rmSync(dir, { recursive: true, force: true });
             skipped.push(preview.number);
@@ -182,4 +184,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { APP_PATHS, MAX_PREVIEWS, escapeHtml, previewName, buildInfo, previewIndexHtml, runtimeSource, previewsIndexHtml, selectPreviews, build };
+module.exports = { APP_PATHS, APP_PAGE, MAX_PREVIEWS, escapeHtml, previewName, buildInfo, previewIndexHtml, runtimeSource, previewsIndexHtml, selectPreviews, build };

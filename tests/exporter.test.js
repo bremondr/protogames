@@ -7,7 +7,7 @@ const { makeUI } = require('./support/fakes');
 function fresh(state) {
     const ui = makeUI();
     const downloads = [];
-    const app = loadApp(['js/config.js', 'js/utils.js', 'js/exporter.js'], {
+    const app = loadApp(['app/js/config.js', 'app/js/utils.js', 'app/js/exporter.js'], {
         AppState: { getState: () => state },
         UI: ui,
         Infinite: { isActive: () => false },
