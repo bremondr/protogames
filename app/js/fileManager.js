@@ -108,6 +108,7 @@ const FileManager = (() => {
             autoSaveEnabled: state.autoSaveEnabled,
             players: Utils.clone(state.players),
             dice: state.dice.map((die) => ({ sides: die.sides })),
+            labels: Utils.clone(state.labels),
             // An infinite board is regenerated around the view; only the painted tiles need saving.
             polygons: Utils.clonePolygons(Infinite.isActive() ? Infinite.paintedTiles(state.polygons) : state.polygons)
         };
@@ -419,6 +420,8 @@ const FileManager = (() => {
         AppState.setStartToolActive(false);
         AppState.setPlayers(Utils.clone(statePayload.players || []));
         AppState.setDice(Utils.clone(statePayload.dice || Config.STANDARD_DICE));
+        AppState.setLabels(Labels.normalize(statePayload.labels));
+        window.dispatchEvent(new CustomEvent('pg:labelschange'));
         window.dispatchEvent(new CustomEvent('pg:toolchange'));
         if (typeof statePayload.autoSaveEnabled === 'boolean') {
             AppState.setAutoSaveEnabled(statePayload.autoSaveEnabled);

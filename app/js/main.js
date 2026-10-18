@@ -33,6 +33,7 @@ const Main = (() => {
         Exporter.init(uiRefs);
         Toolbar.init();
         PlayersPanel.init();
+        LabelsPanel.init();
         PlaytestTray.init();
         PlaytestDrag.init();
         Playtest.init();

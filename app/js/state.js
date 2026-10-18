@@ -28,6 +28,8 @@ const AppState = (() => {
         players: [],
         /** Dice of the design: [{ sides }]. Saved with the board; always the standard set until there is an editor. */
         dice: Config.STANDARD_DICE.map((die) => ({ sides: die.sides })),
+        /** Coordinate labels of the design (see labels.js). Saved with the board; not part of the tile undo history. */
+        labels: JSON.parse(JSON.stringify(Config.DEFAULT_LABELS)),
         /** The running playtest game (pieces in trays or on tiles, rolls, move history). Never saved. */
         play: null,
         /** Ids of the pieces being carried in playtest (or null); each is shown as a ghost that follows its pointer, not on the board. */
@@ -173,6 +175,11 @@ const AppState = (() => {
     /** Replaces the players of the design (a board file or link, or the players panel). */
     function setPlayers(players) {
         state.players = Array.isArray(players) ? players : [];
+    }
+
+    /** Replaces the coordinate label settings of the design (already normalised by the caller). */
+    function setLabels(labels) {
+        state.labels = labels && typeof labels === 'object' ? labels : JSON.parse(JSON.stringify(Config.DEFAULT_LABELS));
     }
 
     function setDice(dice) {
@@ -438,6 +445,7 @@ const AppState = (() => {
         setCurrentStartColor,
         setPlayers,
         setDice,
+        setLabels,
         setPlay,
         setDrag,
         setSelectedPiece,

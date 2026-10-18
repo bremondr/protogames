@@ -596,7 +596,7 @@ test('v5 to v6 keeps players and dice a file already has', () => {
 test('a v5 file loads through parse() as a current project with the standard dice', () => {
     const loaded = plain(PF.parse(JSON.stringify(v5Project())));
     assert.equal(loaded.version, PF.CURRENT_VERSION);
-    assert.equal(PF.CURRENT_VERSION, 6);
+    assert.equal(PF.CURRENT_VERSION, 7);
     assert.deepEqual(loaded.appState.players, []);
     assert.deepEqual(loaded.appState.dice, STANDARD_DICE);
 });
@@ -694,4 +694,108 @@ test('dice are checked: a list of different dice with 2 to 1000 sides', () => {
     delete project.appState.dice;
     throwsFormatError(() => PF.validate(project), 'invalid', /no dice list/);
     assert.doesNotThrow(() => PF.validate(withPlayers([], Array.from({ length: 20 }, (_, i) => ({ sides: i + 2 })))));
+});
+
+// ---- v6 -> v7: coordinate labels ---------------------------------------------------------------------------------
+
+const v6Project = () => fixture('v6-space-arctic.protogames.json');
+const NO_LABELS = {
+    enabled: false,
+    columns: { symbols: 'letters', custom: '', skip: '', start: 1, reverse: false, top: false, bottom: true },
+    rows: { symbols: 'numbers', custom: '', skip: '', start: 1, reverse: true, left: true, right: false },
+    placement: 'straight'
+};
+const withLabels = (labels) => {
+    const project = plain(PF.parse(JSON.stringify(v6Project())));
+    project.appState.labels = labels;
+    return project;
+};
+const labelsOf = (patch) => ({ ...JSON.parse(JSON.stringify(NO_LABELS)), ...patch });
+
+test('v6 to v7 adds coordinate labels that are switched off, and changes nothing else', () => {
+    const source = v6Project();
+    const migrated = plain(PF.MIGRATIONS[6](source));
+    assert.equal(migrated.version, 7);
+    assert.deepEqual(migrated.appState.labels, NO_LABELS);
+    const expected = JSON.parse(JSON.stringify(source));
+    expected.version = 7;
+    expected.appState.labels = NO_LABELS;
+    assert.deepEqual(migrated, expected);
+    assert.equal(source.version, 6, 'the input is not mutated');
+    assert.equal(source.appState.labels, undefined);
+});
+
+test('v6 to v7 keeps labels a file already has, and does not share the default object between projects', () => {
+    const source = v6Project();
+    source.appState.labels = labelsOf({ enabled: true, placement: 'outline' });
+    const migrated = plain(PF.MIGRATIONS[6](source));
+    assert.equal(migrated.appState.labels.enabled, true);
+    assert.equal(migrated.appState.labels.placement, 'outline');
+    const a = PF.MIGRATIONS[6](v6Project());
+    const b = PF.MIGRATIONS[6](v6Project());
+    a.appState.labels.columns.symbols = 'greek';
+    assert.equal(b.appState.labels.columns.symbols, 'letters');
+});
+
+test('every older fixture arrives with coordinate labels switched off', () => {
+    for (const name of ['v0-legacy-project.protogames.json', 'v1-space-arctic.protogames.json', 'v2-space-arctic.protogames.json', 'v3-space-arctic.protogames.json', 'v4-space-arctic.protogames.json', 'v4-square-board.protogames.json', 'v5-space-arctic.protogames.json', 'v6-space-arctic.protogames.json']) {
+        const loaded = plain(PF.parse(JSON.stringify(fixture(name))));
+        assert.equal(loaded.version, PF.CURRENT_VERSION, name);
+        assert.deepEqual(loaded.appState.labels, NO_LABELS, name);
+    }
+});
+
+test('coordinate labels, custom lists included, survive saving and loading', () => {
+    const labels = labelsOf({
+        enabled: true,
+        columns: { symbols: 'custom', custom: '♠ ♥ ♦ ♣', skip: '', start: 2, reverse: true, top: true, bottom: false },
+        rows: { symbols: 'roman', custom: '', skip: '', start: 0, reverse: false, left: false, right: true },
+        placement: 'outline'
+    });
+    const project = withLabels(labels);
+    const saved = plain(PF.createProject({ projectName: 'labels', appState: project.appState, now: 0 }));
+    const loaded = plain(PF.parse(JSON.stringify(saved)));
+    assert.deepEqual(loaded, saved);
+    assert.deepEqual(loaded.appState.labels, labels);
+    const autosave = plain(PF.createAutosave({ projectName: 'labels', appState: project.appState, now: 7 }));
+    assert.deepEqual(plain(PF.parse(JSON.stringify(autosave))), autosave);
+});
+
+test('coordinate labels are checked: switch, placement, symbol sets, lists, start, direction and sides', () => {
+    const column = (patch) => ({ ...NO_LABELS.columns, ...patch });
+    const row = (patch) => ({ ...NO_LABELS.rows, ...patch });
+    const reject = (labels, pattern) => throwsFormatError(() => PF.validate(withLabels(labels)), 'invalid', pattern);
+    assert.doesNotThrow(() => PF.validate(withLabels(labelsOf({}))));
+    assert.doesNotThrow(() => PF.validate(withLabels(labelsOf({ enabled: true, columns: column({ symbols: 'custom', custom: 'a b c' }) }))));
+    reject(labelsOf({ enabled: 'yes' }), /on\/off setting is not true\/false/);
+    reject(labelsOf({ placement: 'inside' }), /unknown placement/);
+    reject(labelsOf({ columns: column({ symbols: 'emoji' }) }), /column labels use an unknown symbol set/);
+    reject(labelsOf({ rows: row({ symbols: undefined }) }), /row labels use an unknown symbol set/);
+    reject(labelsOf({ columns: column({ custom: 5 }) }), /custom list over 200/);
+    reject(labelsOf({ columns: column({ custom: 'x'.repeat(201) }) }), /custom list over 200/);
+    reject(labelsOf({ columns: column({ custom: 'toolongentry' }) }), /more than 100 entries or an entry over 4/);
+    // 100 one-character entries fit in 200 characters, 101 do not: the length limit comes first
+    assert.doesNotThrow(() => PF.validate(withLabels(labelsOf({ columns: column({ custom: Array.from({ length: 100 }, () => 'a').join(' ') }) }))));
+    reject(labelsOf({ columns: column({ custom: Array.from({ length: 101 }, () => 'a').join(' ') }) }), /custom list over 200/);
+    reject(labelsOf({ rows: row({ skip: 'A'.repeat(27) }) }), /skip list over 26/);
+    reject(labelsOf({ rows: row({ skip: null }) }), /skip list over 26/);
+    reject(labelsOf({ rows: row({ start: 1.5 }) }), /start outside -100 to 1000/);
+    reject(labelsOf({ rows: row({ start: 1001 }) }), /start outside -100 to 1000/);
+    reject(labelsOf({ columns: column({ start: '1' }) }), /start outside -100 to 1000/);
+    reject(labelsOf({ columns: column({ reverse: 1 }) }), /direction of the column labels/);
+    reject(labelsOf({ columns: column({ top: 'yes' }) }), /top setting of the column labels/);
+    reject(labelsOf({ rows: row({ right: undefined }) }), /right setting of the row labels/);
+    reject(null, /no coordinate label settings/);
+    reject('labels', /no coordinate label settings/);
+    reject([], /no coordinate label settings/);
+    const project = withLabels(NO_LABELS);
+    delete project.appState.labels;
+    throwsFormatError(() => PF.validate(project), 'invalid', /no coordinate label settings/);
+    assert.doesNotThrow(() => PF.validate(withLabels(labelsOf({ columns: column({ custom: 'ab\u00e9d \u2660\ufe0f' }) }))), 'four characters, not four bytes');
+});
+
+test('a project from a newer app than this one is still refused (format 8)', () => {
+    const project = withLabels(NO_LABELS);
+    project.version = PF.CURRENT_VERSION + 1;
+    throwsFormatError(() => PF.parse(JSON.stringify(project)), 'newer-version');
 });

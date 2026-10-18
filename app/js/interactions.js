@@ -667,6 +667,8 @@ const Interactions = (() => {
         } else {
             AppState.clearDirty();
         }
+        // The coordinates panel follows the board (labels do not exist on an infinite board).
+        window.dispatchEvent(new CustomEvent('pg:labelschange', { detail: { rerender: true } }));
     }
 
     return {
