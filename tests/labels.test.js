@@ -73,6 +73,7 @@ test('the defaults are valid, everything off, a fresh copy every time, and the s
     assert.equal(a.enabled, false);
     assert.equal(a.onTiles, false);
     assert.equal(a.scheme, 'auto');
+    assert.equal(a.placement, 'auto', 'names hug the outline where the board is not a rectangle');
     assert.ok(accepted(a));
     a.columns.symbols = 'greek';
     assert.equal(Labels.defaults().columns.symbols, 'letters');
@@ -90,7 +91,7 @@ test('normalize() makes any input valid and keeps what was fine', () => {
     assert.equal(mixed.columns.skip, 'IO');
     assert.equal(mixed.columns.start, 1000);
     assert.equal(mixed.columns.bottom, false);
-    assert.equal(mixed.placement, 'straight');
+    assert.equal(mixed.placement, 'auto');
     assert.ok(accepted(mixed));
     for (const scheme of Labels.SCHEMES) assert.equal(Labels.normalize({ scheme }).scheme, scheme);
 });
@@ -498,12 +499,17 @@ test('infinite boards have no labels (they have no outside)', () => {
 const fakeContext = () => {
     const calls = [];
     const fills = [];
+    const shapes = { paths: 0, rects: [], fills: 0, strokes: 0 };
     return {
         calls,
         fills,
+        shapes,
         save() {}, restore() {},
         fillText: (...args) => calls.push(args),
-        set font(v) {}, set textAlign(v) {}, set textBaseline(v) {}, set globalAlpha(v) {},
+        fillRect: (...args) => shapes.rects.push(args),
+        beginPath() { shapes.paths += 1; }, moveTo() {}, lineTo() {}, closePath() {},
+        fill() { shapes.fills += 1; }, stroke() { shapes.strokes += 1; },
+        set font(v) {}, set textAlign(v) {}, set textBaseline(v) {}, set globalAlpha(v) {}, set lineWidth(v) {}, set strokeStyle(v) {},
         set fillStyle(v) { fills.push(v); }
     };
 };
@@ -566,4 +572,113 @@ test('playtest announces a tile by the board labels when they are on (outside or
     assert.equal(Pieces.tileLabel(polygons, tile, Labels.defaults(), 'rectangle'), 'column 5, row 4', 'labels off');
     assert.equal(Pieces.tileLabel(polygons, tile, Labels.applyPreset({ enabled: true }, 'chess'), 'rectangle'), 'E5');
     assert.equal(Pieces.tileLabel(polygons, tile, Labels.applyPreset({ onTiles: true }, 'chess'), 'rectangle'), 'E5', 'only on the tiles');
+});
+
+// ---- Placement: hugging the outline where the board is not a rectangle --------------------------------------------------
+
+test('automatic placement hugs the outline on hexagon, circle and triangle boards and is a straight line elsewhere', () => {
+    assert.equal(Labels.placementOf('auto', 'hexagon'), 'outline');
+    assert.equal(Labels.placementOf('auto', 'circle'), 'outline');
+    assert.equal(Labels.placementOf('auto', 'triangle'), 'outline');
+    assert.equal(Labels.placementOf('auto', 'rectangle'), 'straight');
+    assert.equal(Labels.placementOf('auto', 'country'), 'straight');
+    assert.equal(Labels.placementOf('straight', 'hexagon'), 'straight', 'an explicit choice is kept');
+    assert.equal(Labels.placementOf('outline', 'rectangle'), 'outline');
+
+    const same = (a, b) => assert.deepEqual(plain(a.items), plain(b.items));
+    const hexBoard = generate(make('hexagon', 'hexagon', 'pointy-top', { radius: 3 }));
+    same(Labels.layout(hexBoard, on({ placement: 'auto' }), 'hexagon'), Labels.layout(hexBoard, on({ placement: 'outline' }), 'hexagon'));
+    const rectangle = generate(make('rectangle', 'hexagon', 'pointy-top', { width: 5, height: 4 }));
+    same(Labels.layout(rectangle, on({ placement: 'auto' }), 'rectangle'), Labels.layout(rectangle, on({ placement: 'straight' }), 'rectangle'));
+    const circle = generate(make('circle', 'square', 'pointy-top', { radius: 4 }));
+    same(Labels.layout(circle, on({ placement: 'auto' }), 'circle'), Labels.layout(circle, on({ placement: 'outline' }), 'circle'));
+});
+
+test('the default (automatic) labels of a hexagon board are never on top of a tile', () => {
+    for (const config of [make('hexagon', 'hexagon', 'pointy-top', { radius: 4 }), make('hexagon', 'hexagon', 'flat-top', { radius: 4 }), make('circle', 'hexagon', 'pointy-top', { radius: 5 }), make('triangle', 'hexagon', 'pointy-top', { size: 6 })]) {
+        const polygons = generate(config);
+        for (const preset of ['chess', 'battleship', 'go']) {
+            const { items } = Labels.layout(polygons, Labels.applyPreset({ enabled: true }, preset), config.boardShape);
+            for (const item of items) assert.ok(!polygons.some((p) => insidePolygon(item, p.vertices)), `${config.boardShape} ${preset}: ${item.text}`);
+        }
+    }
+});
+
+// ---- Hovering a name lights up its line -----------------------------------------------------------------------------------
+
+test('every name knows which line it belongs to, and the line is the row or column of tiles it names', () => {
+    const polygons = generate(make('rectangle', 'square', 'pointy-top', { width: 5, height: 4 }));
+    const labels = Labels.applyPreset({ enabled: true }, 'go');
+    const { items } = Labels.layout(polygons, labels, 'rectangle');
+    assert.ok(items.every((i) => Number.isInteger(i.index)));
+    const bottom = items.filter((i) => i.side === 'bottom').sort((a, b) => a.x - b.x);
+    assert.deepEqual(plain(bottom.map((i) => i.index)), [0, 1, 2, 3, 4]);
+    // column 2 is the five-high... four tiles of one column, a row is the five tiles of one row
+    const column = Labels.lineTiles(polygons, labels, 'rectangle', 'columns', 2);
+    assert.equal(column.length, 4);
+    assert.ok(column.every((p) => Math.abs(p.center.x - column[0].center.x) < 1e-6));
+    const row = Labels.lineTiles(polygons, labels, 'rectangle', 'rows', 1);
+    assert.equal(row.length, 5);
+    assert.ok(row.every((p) => Math.abs(p.center.y - row[0].center.y) < 1e-6));
+    assert.deepEqual(plain(Labels.lineTiles(polygons, labels, 'rectangle', 'columns', 99)), [], 'no such line');
+});
+
+test('on a hexagon board the line of a diagonal name is the straight diagonal, and a half step names the aligned tiles', () => {
+    const polygons = generate(make('hexagon', 'hexagon', 'pointy-top', { radius: 2 }));
+    const labels = Labels.applyPreset({ enabled: true, scheme: 'axial' }, 'chess');
+    const middle = Labels.lineTiles(polygons, labels, 'hexagon', 'columns', 2);
+    assert.equal(middle.length, 5, 'the long diagonal of a radius-2 hexagon');
+    const d = { x: 0.5, y: SQRT3 / 2 };
+    for (const tile of middle) assert.ok(Math.abs((tile.center.x - middle[0].center.x) * d.y - (tile.center.y - middle[0].center.y) * d.x) < 1e-6);
+    const flat = generate(make('rectangle', 'hexagon', 'flat-top', { width: 4, height: 3 }));
+    const half = Labels.lineTiles(flat, Labels.applyPreset({ enabled: true, scheme: 'doubled' }, 'chess'), 'rectangle', 'rows', 1);
+    assert.deepEqual(plain(half.map((p) => p.id)).length, 2, 'half-row 1 holds the tiles of the odd columns at that height');
+});
+
+test('hit() finds the name under a point, the closest when boxes overlap, and nothing elsewhere', () => {
+    const polygons = generate(make('rectangle', 'square', 'pointy-top', { width: 5, height: 4 }));
+    const labels = Labels.applyPreset({ enabled: true }, 'chess');
+    const { items } = Labels.layout(polygons, labels, 'rectangle');
+    for (const item of items) {
+        assert.deepEqual(plain(Labels.hit(polygons, labels, 'rectangle', { x: item.x, y: item.y })), { axis: item.axis, index: item.index }, item.text);
+        assert.deepEqual(plain(Labels.hit(polygons, labels, 'rectangle', { x: item.x + 2, y: item.y - 2 })), { axis: item.axis, index: item.index }, 'close enough');
+    }
+    const centre = polygons[0].center;
+    assert.equal(Labels.hit(polygons, labels, 'rectangle', centre), null, 'a tile is not a name');
+    assert.equal(Labels.hit(polygons, Labels.defaults(), 'rectangle', { x: items[0].x, y: items[0].y }), null, 'labels off');
+    assert.equal(Labels.hit([], labels, 'rectangle', { x: 0, y: 0 }), null);
+});
+
+test('names that are thinned out are not there to be hit', () => {
+    const polygons = generate(make('rectangle', 'square', 'pointy-top', { width: 100, height: 100 }));
+    const labels = on();
+    const { items } = Labels.layout(polygons, labels, 'rectangle');
+    const shown = new Set(items.filter((i) => i.axis === 'columns').map((i) => i.index));
+    assert.ok(shown.size < 100);
+    const hidden = [...Array(100).keys()].find((i) => !shown.has(i));
+    const tile = Labels.lineTiles(polygons, labels, 'rectangle', 'columns', hidden)[0];
+    const found = Labels.hit(polygons, labels, 'rectangle', { x: tile.center.x, y: items.find((i) => i.side === 'bottom').y });
+    assert.ok(found === null || found.index !== hidden, 'a name that is not drawn is never the one hit');
+    assert.ok(found === null || shown.has(found.index));
+});
+
+test('the hovered line is lit tile by tile, and its name is drawn white on an accent label', () => {
+    const polygons = generate(make('rectangle', 'square', 'pointy-top', { width: 3, height: 2 }));
+    const labels = Labels.applyPreset({ enabled: true }, 'chess');
+    const ctx = fakeContext();
+    assert.equal(Labels.drawHover(ctx, polygons, labels, { axis: 'columns', index: 1 }, 1, 'rectangle'), 2);
+    assert.equal(ctx.shapes.paths, 2);
+    assert.equal(ctx.shapes.fills, 2);
+    assert.equal(ctx.shapes.strokes, 2);
+    assert.equal(Labels.drawHover(fakeContext(), polygons, labels, null, 1, 'rectangle'), 0, 'nothing hovered');
+    assert.equal(Labels.drawHover(fakeContext(), polygons, Labels.defaults(), { axis: 'columns', index: 1 }, 1, 'rectangle'), 0, 'labels off');
+    assert.equal(Labels.drawHover(fakeContext(), polygons, labels, { axis: 'rows', index: 9 }, 1, 'rectangle'), 0, 'no such line');
+
+    const drawn = fakeContext();
+    Labels.draw(drawn, polygons, labels, 1, null, 'rectangle', { axis: 'columns', index: 1 });
+    assert.equal(drawn.shapes.rects.length, 1, 'one name has the accent label');
+    assert.ok(drawn.fills.includes('#ffffff') && drawn.fills.includes('#2f6fed'));
+    const plainDraw = fakeContext();
+    Labels.draw(plainDraw, polygons, labels, 1, null, 'rectangle');
+    assert.equal(plainDraw.shapes.rects.length, 0, 'no hover, no accent label');
 });

@@ -359,7 +359,7 @@ test('label settings in a link are cleaned up, and links with unusable ones are 
     assert.equal(labels.columns.symbols, 'letters', 'an unknown symbol set falls back');
     assert.equal(labels.columns.start, 1000, 'a start is held within range');
     assert.equal(labels.columns.custom, 'x y', 'extra spaces are collapsed');
-    assert.equal(labels.placement, 'straight');
+    assert.equal(labels.placement, 'auto', 'an unknown placement falls back to the default');
 
     const reject = (mutate, pattern) => {
         const data = packLabels(LABELS_ON);

@@ -30,6 +30,8 @@ const AppState = (() => {
         dice: Config.STANDARD_DICE.map((die) => ({ sides: die.sides })),
         /** Coordinate labels of the design (see labels.js). Saved with the board; not part of the tile undo history. */
         labels: JSON.parse(JSON.stringify(Config.DEFAULT_LABELS)),
+        /** The coordinate name the pointer is over ({ axis, index }) so its row or column is lit up; never saved. */
+        labelHover: null,
         /** The running playtest game (pieces in trays or on tiles, rolls, move history). Never saved. */
         play: null,
         /** Ids of the pieces being carried in playtest (or null); each is shown as a ghost that follows its pointer, not on the board. */
@@ -180,6 +182,15 @@ const AppState = (() => {
     /** Replaces the coordinate label settings of the design (already normalised by the caller). */
     function setLabels(labels) {
         state.labels = labels && typeof labels === 'object' ? labels : JSON.parse(JSON.stringify(Config.DEFAULT_LABELS));
+    }
+
+    /** Sets (or clears) the highlighted coordinate line; returns true when it changed. */
+    function setLabelHover(hover) {
+        const next = hover ? { axis: hover.axis, index: hover.index } : null;
+        const same = (next === null && state.labelHover === null) || (next !== null && state.labelHover !== null && next.axis === state.labelHover.axis && next.index === state.labelHover.index);
+        if (same) return false;
+        state.labelHover = next;
+        return true;
     }
 
     function setDice(dice) {
@@ -446,6 +457,7 @@ const AppState = (() => {
         setPlayers,
         setDice,
         setLabels,
+        setLabelHover,
         setPlay,
         setDrag,
         setSelectedPiece,

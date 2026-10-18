@@ -14,6 +14,8 @@
  * The settings are part of the design (saved with it), not of the tile undo history. Everything is cleaned up through
  * Labels.normalize, so the panel can never store something a file could not hold. Other modules hear about changes with
  * the `pg:labelschange` event, which is also sent when a board or file is loaded.
+ *
+ * Hovering a name around the board lights up its row or column (AppState.labelHover, drawn by the renderer; never saved).
  */
 const LabelsPanel = (() => {
     const $$ = (selector) => Array.from(document.querySelectorAll(selector));
@@ -51,6 +53,30 @@ const LabelsPanel = (() => {
     }
 
     const isInfinite = () => state().boardConfig.boardShape === 'infinite';
+
+    // ---- Highlighting a line by hovering its name ----------------------------------------------------------
+
+    function clearHover() {
+        const canvas = state().canvas;
+        if (canvas) canvas.classList.remove('over-label');
+        if (AppState.setLabelHover(null)) Renderer.requestRender();
+    }
+
+    function onCanvasMove(event) {
+        const s = state();
+        // a mouse or pen only: a finger has no hover, and a pressed button means painting or panning
+        if (!s.canvas || !s.labels.enabled || event.pointerType === 'touch' || event.buttons || s.boardConfig.boardShape === 'infinite') {
+            if (s.labelHover || s.canvas?.classList.contains('over-label')) clearHover();
+            return;
+        }
+        const rect = s.canvas.getBoundingClientRect();
+        const x = (event.clientX - rect.left) * (s.canvas.width / rect.width);
+        const y = (event.clientY - rect.top) * (s.canvas.height / rect.height);
+        const world = { x: (x - s.view.x) / s.view.scale, y: (y - s.view.y) / s.view.scale };
+        const found = Labels.hit(s.polygons, s.labels, s.boardConfig.boardShape, world);
+        s.canvas.classList.toggle('over-label', Boolean(found));
+        if (AppState.setLabelHover(found)) Renderer.requestRender();
+    }
 
     // ---- Pictures of the indexings ----------------------------------------------------------------------
 
@@ -212,6 +238,7 @@ const LabelsPanel = (() => {
 
     /** Shows the settings in the controls (a control being typed in is left alone, so typing is never interrupted). */
     function render() {
+        clearHover();
         const labels = current();
         const blocked = isInfinite();
         const context = Labels.contextOfConfig(state().boardConfig);
@@ -266,6 +293,12 @@ const LabelsPanel = (() => {
             // Leaving a text field shows the cleaned-up value (extra spaces collapsed, entries cut to length).
             render();
         });
+        const canvas = state().canvas;
+        if (canvas) {
+            canvas.addEventListener('pointermove', onCanvasMove);
+            canvas.addEventListener('pointerleave', clearHover);
+            canvas.addEventListener('pointerdown', clearHover); // painting or panning starts: nothing is lit
+        }
         window.addEventListener('pg:labelschange', render);
         window.addEventListener('pg:designchange', render);
         render();

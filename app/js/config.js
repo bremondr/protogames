@@ -163,7 +163,7 @@ const Config = (() => {
         scheme: 'auto',
         columns: Object.freeze({ symbols: 'letters', custom: '', skip: '', start: 1, reverse: false, top: false, bottom: true }),
         rows: Object.freeze({ symbols: 'numbers', custom: '', skip: '', start: 1, reverse: true, left: true, right: false }),
-        placement: 'straight'
+        placement: 'auto'
     });
 
     /**

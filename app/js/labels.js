@@ -25,7 +25,7 @@
 const Labels = (() => {
     const SYMBOL_SETS = ['letters', 'numbers', 'roman', 'greek', 'custom'];
     const SCHEMES = ['auto', 'grid', 'triangles', 'offset', 'doubled', 'axial'];
-    const PLACEMENTS = ['straight', 'outline'];
+    const PLACEMENTS = ['auto', 'straight', 'outline'];
     // The same limits are enforced by ProjectFormat when a project is opened.
     const MAX_CUSTOM_TEXT = 200;
     const MAX_CUSTOM_ENTRIES = 100;
@@ -37,6 +37,9 @@ const Labels = (() => {
     const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     const ROMAN = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
     const SQRT3 = Math.sqrt(3);
+    // Boards whose outline is not a rectangle: with automatic placement the names hug the outline there.
+    const OUTLINE_SHAPES = ['hexagon', 'circle', 'triangle'];
+    const ACCENT = '#2f6fed';
 
     /** A fresh copy of the default settings (Config.DEFAULT_LABELS): everything off, chess style when switched on. */
     function defaults() {
@@ -460,10 +463,17 @@ const Labels = (() => {
     const LEAN_POINTY = { x: 0.5, y: SQRT3 / 2 }; // 60 degrees: the lines through tiles of neighbouring rows
     const LEAN_FLAT = { x: SQRT3 / 2, y: 0.5 }; // 30 degrees: the lines through tiles of neighbouring columns
 
+    /** 'straight' or 'outline': what automatic placement comes to on this board. */
+    function placementOf(placement, boardShape) {
+        if (placement === 'auto') return OUTLINE_SHAPES.includes(boardShape) ? 'outline' : 'straight';
+        return placement;
+    }
+
     const layoutCache = new WeakMap();
 
     /**
-     * Where every label goes: [{ axis, side, text, x, y }] in world coordinates, outside the board.
+     * Where every label goes: [{ axis, side, index, text, x, y }] in world coordinates, outside the board (index is the
+     * line the name belongs to). 'auto' hugs the outline on hexagon, circle and triangle boards and is straight elsewhere.
      * 'straight' puts the labels of a side on one straight line along the board's bounding box (a leaning line is
      * carried on along its own direction to get there); 'outline' puts each label next to the outermost tile of its line
      * (an axis that counts half steps always uses the straight line).
@@ -481,7 +491,7 @@ const Labels = (() => {
         const info = analyse(polygons, scheme);
         const font = fontSize(polygons);
         const gap = font * 0.95;
-        const outline = settings.placement === 'outline';
+        const outline = placementOf(settings.placement, boardShape) === 'outline';
         const b = info.bounds;
         const first = polygons[0];
         const half = Math.min(first.bounds.maxX - first.bounds.minX, first.bounds.maxY - first.bounds.minY) / 2;
@@ -522,7 +532,7 @@ const Labels = (() => {
         for (const side of ['top', 'bottom']) {
             if (!settings.columns[side]) continue;
             const pool = splitColumns ? columnLines.filter((line) => (Math.abs(line.top.center.y - topRowY) < 1e-6) === (side === 'top')) : columnLines;
-            items.push(...thinned(pool.map((line) => ({ axis: 'columns', side, text: line.text, ...placeColumn(line, side) })), 'x', font));
+            items.push(...thinned(pool.map((line) => ({ axis: 'columns', side, index: line.index, text: line.text, ...placeColumn(line, side) })), 'x', font));
         }
 
         // ---- rows axis: labels left and right of the board
@@ -558,7 +568,7 @@ const Labels = (() => {
         for (const side of ['left', 'right']) {
             if (!settings.rows[side]) continue;
             const pool = splitRows ? rowLines.filter((line) => (Math.abs(line.left.center.x - leftColumnX) < 1e-6) === (side === 'left')) : rowLines;
-            items.push(...thinned(pool.map((line) => ({ axis: 'rows', side, text: line.text, ...placeRow(line, side) })), 'y', font));
+            items.push(...thinned(pool.map((line) => ({ axis: 'rows', side, index: line.index, text: line.text, ...placeRow(line, side) })), 'y', font));
         }
 
         const value = { items, font };
@@ -570,22 +580,77 @@ const Labels = (() => {
      * Draws the labels around the board into a context that already has the board's world transform. `scale` is the
      * current zoom; labels are skipped when they would be too small to read or far outside the visible rectangle.
      */
-    function draw(ctx, polygons, labels, scale, visible, boardShape) {
+    function draw(ctx, polygons, labels, scale, visible, boardShape, hover) {
         const { items, font } = layout(polygons, labels, boardShape);
         if (!items.length || font * scale < 4) return 0;
         ctx.save();
         ctx.font = `600 ${font}px system-ui, "Segoe UI", sans-serif`;
-        ctx.fillStyle = '#3a4658';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         let drawn = 0;
         for (const item of items) {
             if (visible && (item.x < visible.minX - font * 3 || item.x > visible.maxX + font * 3 || item.y < visible.minY - font * 3 || item.y > visible.maxY + font * 3)) continue;
+            if (hover && item.axis === hover.axis && item.index === hover.index) {
+                // the name under the pointer: white on an accent label
+                const half = Math.max(font * 0.6, (item.text.length * font * 0.62) / 2) + 3;
+                ctx.fillStyle = ACCENT;
+                ctx.fillRect(item.x - half, item.y - font * 0.7, half * 2, font * 1.4);
+                ctx.fillStyle = '#ffffff';
+            } else {
+                ctx.fillStyle = '#3a4658';
+            }
             ctx.fillText(item.text, item.x, item.y);
             drawn += 1;
         }
         ctx.restore();
         return drawn;
+    }
+
+    /** The tiles of one line (a column or row index of the indexing in use), for highlighting. */
+    function lineTiles(polygons, labels, boardShape, axis, index) {
+        const settings = normalize(labels);
+        if (!polygons.length || isInfinite(polygons)) return [];
+        const info = analyse(polygons, schemeOf(settings, contextOf(polygons, boardShape)));
+        return (axis === 'columns' ? info.columns : info.rows).get(index) || [];
+    }
+
+    /**
+     * The name drawn at a world point, as { axis, index }, or null. Only names that are actually drawn (not thinned out)
+     * can be hit; the closest one wins when boxes overlap.
+     */
+    function hit(polygons, labels, boardShape, point) {
+        const { items, font } = layout(polygons, labels, boardShape);
+        let best = null;
+        let bestDistance = Infinity;
+        for (const item of items) {
+            const halfWidth = Math.max(font * 0.6, (item.text.length * font * 0.62) / 2) + 3;
+            const dx = Math.abs(point.x - item.x);
+            const dy = Math.abs(point.y - item.y);
+            if (dx > halfWidth || dy > font * 0.7) continue;
+            const distance = dx * dx + dy * dy;
+            if (distance < bestDistance) { best = item; bestDistance = distance; }
+        }
+        return best ? { axis: best.axis, index: best.index } : null;
+    }
+
+    /** Lights up the tiles of the line whose name the pointer is over. */
+    function drawHover(ctx, polygons, labels, hover, scale, boardShape) {
+        if (!hover || !labels || !labels.enabled) return 0;
+        const tiles = lineTiles(polygons, labels, boardShape, hover.axis, hover.index);
+        if (!tiles.length) return 0;
+        ctx.save();
+        ctx.lineWidth = 2 / scale;
+        ctx.strokeStyle = ACCENT;
+        ctx.fillStyle = 'rgba(47, 111, 237, 0.32)';
+        for (const tile of tiles) {
+            ctx.beginPath();
+            tile.vertices.forEach((v, i) => (i === 0 ? ctx.moveTo(v.x, v.y) : ctx.lineTo(v.x, v.y)));
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+        }
+        ctx.restore();
+        return tiles.length;
     }
 
     /** Readable text colour for a tile colour (#rgb or #rrggbb): white on dark tiles, dark on light ones. */
@@ -645,8 +710,12 @@ const Labels = (() => {
         tileName,
         tileNames,
         fontSize,
+        placementOf,
         layout,
         draw,
-        drawTiles
+        drawTiles,
+        lineTiles,
+        hit,
+        drawHover
     };
 })();

@@ -229,7 +229,7 @@ Two things are chosen separately: the **indexing** (how tiles get a column and a
 | `onTiles` | `true` writes the name of every tile in the tile (dark text on light tiles, white on dark ones; skipped when it would be unreadably small). Independent of `enabled`. |
 | `scheme` | The indexing: `auto` (the board decides: the first one offered below), `grid`, `triangles`, `offset`, `doubled` or `axial`. A choice that does not fit the current board (for example `axial` on a rectangle) is ignored, not lost: it applies again when the board changes back. |
 | `columns`, `rows` | One object per axis, each with the fields below. Columns and rows are independent: a chess board uses letters for one and numbers for the other. |
-| `placement` | `straight`: the names of a side sit on one straight line along the board's bounding box (a leaning line is carried on along its own direction to get there). `outline`: each name sits next to the outermost tile of its line, so it follows a hexagon, circle or triangle board; an axis that counts half steps always uses the straight line. |
+| `placement` | `auto` (the default): `outline` on hexagon, circle and triangle boards, `straight` on every other board. `straight`: the names of a side sit on one straight line along the board's bounding box (a leaning line is carried on along its own direction to get there). `outline`: each name sits next to the outermost tile of its line, so it hugs a hexagon, circle or triangle board; an axis that counts half steps always uses the straight line. |
 
 Per axis:
 
@@ -261,6 +261,8 @@ Which indexings the panel offers depends on the tile shape and the board shape, 
 - **`axial`**: two families of straight lines, as on Abalone: pointy-top tiles have horizontal rows and diagonals leaning down to the right; flat-top tiles have vertical columns and leaning rows. A number is the index of a line, it does not restart on each line, so shorter lines start at higher numbers (on a hexagon board the top row holds the highest diagonals).
 
 When lines are closer together than a name is tall, every n-th name is drawn so they never overlap.
+
+**Hover.** Pointing at a name around the board (mouse or pen, not touch) lights up the tiles of its row or column and draws the name white on an accent label (`AppState.labelHover`, `Labels.hit`, `Labels.drawHover`). It is never saved, not in exports, cleared when a button is pressed on the board or the labels change. Names that are thinned out cannot be hit.
 
 The names are drawn by `Renderer.paint`, so they appear on screen, in PNG export (inside the margin around the board) and anywhere else that paints through it. They are not in SVG export and not yet in Print (the printed board is cut to the tiles). With labels on (around the board or on the tiles), playtest announces a position as `B7` instead of "column 2, row 7"; two numeric parts are joined with a comma (`3, 7`).
 

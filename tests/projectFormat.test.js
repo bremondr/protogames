@@ -705,7 +705,7 @@ const NO_LABELS = {
     scheme: 'auto',
     columns: { symbols: 'letters', custom: '', skip: '', start: 1, reverse: false, top: false, bottom: true },
     rows: { symbols: 'numbers', custom: '', skip: '', start: 1, reverse: true, left: true, right: false },
-    placement: 'straight'
+    placement: 'auto'
 };
 const withLabels = (labels) => {
     const project = plain(PF.parse(JSON.stringify(v6Project())));

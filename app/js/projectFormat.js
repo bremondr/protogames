@@ -42,7 +42,7 @@ const ProjectFormat = (() => {
     const BOUND_KEYS = ['minX', 'maxX', 'minY', 'maxY'];
     // Coordinate labels: the same limits as labels.js, which cleans up user input; here a file that breaks them is refused.
     const LABEL_SYMBOL_SETS = ['letters', 'numbers', 'roman', 'greek', 'custom'];
-    const LABEL_PLACEMENTS = ['straight', 'outline'];
+    const LABEL_PLACEMENTS = ['auto', 'straight', 'outline'];
     const LABEL_SCHEMES = ['auto', 'grid', 'triangles', 'offset', 'doubled', 'axial'];
     const MAX_LABEL_CUSTOM_TEXT = 200;
     const MAX_LABEL_ENTRIES = 100;
@@ -237,7 +237,7 @@ const ProjectFormat = (() => {
                 scheme: 'auto',
                 columns: { symbols: 'letters', custom: '', skip: '', start: 1, reverse: false, top: false, bottom: true },
                 rows: { symbols: 'numbers', custom: '', skip: '', start: 1, reverse: true, left: true, right: false },
-                placement: 'straight'
+                placement: 'auto'
             };
         }
         return next;

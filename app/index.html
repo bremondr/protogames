@@ -160,6 +160,7 @@
                 <label class="checkbox-label labels-check"><input type="checkbox" data-lb="enabled"> Show coordinates around the board</label>
                 <label class="checkbox-label labels-check"><input type="checkbox" data-lb="onTiles"> Show coordinates on the tiles</label>
                 <div id="labelsOptions" class="labels-options">
+                    <p class="field-hint">Point at a name around the board to light up its row or column.</p>
                     <fieldset id="labelsSchemes" class="labels-schemes">
                         <legend>Indexing</legend>
                         <p id="labelsSchemeNote" class="field-hint"></p>
@@ -247,11 +248,12 @@
                             <label class="labels-field">
                                 <span>Placement</span>
                                 <select data-lb="placement" aria-label="Where the labels sit">
+                                    <option value="auto">Automatic: hug hexagon, circle and triangle boards</option>
                                     <option value="straight">In a straight line along the board</option>
                                     <option value="outline">Following the outline of the board</option>
                                 </select>
                             </label>
-                            <p class="field-hint">Following the outline works best with one side per axis: on a hexagon, circle or triangle board the labels of two sides can meet at a slanted edge.</p>
+                            <p class="field-hint">Hugging the outline works best with one side per axis: on a hexagon, circle or triangle board the names of two sides can meet at a slanted edge. A half-step axis always sits on the straight line.</p>
                         </div>
                     </details>
                 </div>

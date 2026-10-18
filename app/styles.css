@@ -1667,6 +1667,10 @@ button:focus-visible {
     touch-action: none;
 }
 
+#gameCanvas.over-label {
+    cursor: pointer;
+}
+
 #gameCanvas.pan-ready {
     cursor: grab !important;
 }
