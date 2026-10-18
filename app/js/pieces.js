@@ -337,9 +337,9 @@ const Pieces = (() => {
      * The board's own name for a tile when coordinate labels are on, otherwise "column 4, row 3": its place among the distinct centre positions of the board, which
      * reads naturally on every grid and is what a screen reader announces after a move.
      */
-    function tileLabel(polygons, polygon, labels) {
+    function tileLabel(polygons, polygon, labels, boardShape) {
         // With coordinate labels on, a position is announced the way the board shows it ("B7").
-        const named = labels && labels.enabled && typeof Labels !== 'undefined' ? Labels.tileName(polygons, polygon, labels) : null;
+        const named = labels && typeof Labels !== 'undefined' && Labels.isActive(labels) ? Labels.tileName(polygons, polygon, labels, boardShape) : null;
         if (named) return named;
         let axes = labelCache.get(polygons);
         if (!axes) {

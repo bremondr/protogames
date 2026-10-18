@@ -153,9 +153,14 @@ const Config = (() => {
     /** Dice every design starts with (there is no editor for the set yet). */
     const STANDARD_DICE = Object.freeze([3, 4, 6, 8, 10, 12, 20].map((sides) => Object.freeze({ sides })));
 
-    /** Coordinate labels every design starts with: off, and chess style (A, B, C along the bottom, 1, 2, 3 up the left) once switched on. See labels.js. */
+    /**
+     * Coordinate labels every design starts with: off, indexing chosen by the board ("auto"), and chess style (A, B, C
+     * along the bottom, 1, 2, 3 up the left) once switched on. See labels.js.
+     */
     const DEFAULT_LABELS = Object.freeze({
         enabled: false,
+        onTiles: false,
+        scheme: 'auto',
         columns: Object.freeze({ symbols: 'letters', custom: '', skip: '', start: 1, reverse: false, top: false, bottom: true }),
         rows: Object.freeze({ symbols: 'numbers', custom: '', skip: '', start: 1, reverse: true, left: true, right: false }),
         placement: 'straight'

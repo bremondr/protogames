@@ -701,6 +701,8 @@ test('dice are checked: a list of different dice with 2 to 1000 sides', () => {
 const v6Project = () => fixture('v6-space-arctic.protogames.json');
 const NO_LABELS = {
     enabled: false,
+    onTiles: false,
+    scheme: 'auto',
     columns: { symbols: 'letters', custom: '', skip: '', start: 1, reverse: false, top: false, bottom: true },
     rows: { symbols: 'numbers', custom: '', skip: '', start: 1, reverse: true, left: true, right: false },
     placement: 'straight'
@@ -748,6 +750,8 @@ test('every older fixture arrives with coordinate labels switched off', () => {
 test('coordinate labels, custom lists included, survive saving and loading', () => {
     const labels = labelsOf({
         enabled: true,
+        onTiles: true,
+        scheme: 'doubled',
         columns: { symbols: 'custom', custom: '♠ ♥ ♦ ♣', skip: '', start: 2, reverse: true, top: true, bottom: false },
         rows: { symbols: 'roman', custom: '', skip: '', start: 0, reverse: false, left: false, right: true },
         placement: 'outline'
@@ -768,6 +772,10 @@ test('coordinate labels are checked: switch, placement, symbol sets, lists, star
     assert.doesNotThrow(() => PF.validate(withLabels(labelsOf({}))));
     assert.doesNotThrow(() => PF.validate(withLabels(labelsOf({ enabled: true, columns: column({ symbols: 'custom', custom: 'a b c' }) }))));
     reject(labelsOf({ enabled: 'yes' }), /on\/off setting is not true\/false/);
+    reject(labelsOf({ onTiles: 1 }), /coordinates on the tiles is not true\/false/);
+    reject(labelsOf({ scheme: 'spiral' }), /unknown indexing/);
+    reject(labelsOf({ scheme: undefined }), /unknown indexing/);
+    for (const scheme of ['auto', 'grid', 'triangles', 'offset', 'doubled', 'axial']) assert.doesNotThrow(() => PF.validate(withLabels(labelsOf({ scheme }))), scheme);
     reject(labelsOf({ placement: 'inside' }), /unknown placement/);
     reject(labelsOf({ columns: column({ symbols: 'emoji' }) }), /column labels use an unknown symbol set/);
     reject(labelsOf({ rows: row({ symbols: undefined }) }), /row labels use an unknown symbol set/);

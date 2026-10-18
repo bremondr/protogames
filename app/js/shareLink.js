@@ -50,7 +50,7 @@ const ShareLink = (() => {
      *  ob = distinct object ids, o = "tileIndex:objectIndex" pairs.
      * Only when the design has them: pl = players as [colour, seat, [[kind, count], ...]],
      *  sc = distinct start colours, s = "tileIndex:colourIndex" pairs of start markers.
-     * lb = the coordinate label settings, only when they are switched on.
+     * lb = the coordinate label settings, only when they are switched on (around the board or on the tiles).
      * The dice set is not carried: every design has the standard set until it can be edited.
      */
     function pack({ projectName, boardConfig, paletteId, polygons, formatVersion, players, labels }) {
@@ -89,7 +89,7 @@ const ShareLink = (() => {
         });
         const playerList = Array.isArray(players) ? players : [];
         const hasPlayers = playerList.length > 0 || starts.length > 0;
-        const hasLabels = Boolean(labels && labels.enabled);
+        const hasLabels = Boolean(labels && (labels.enabled || labels.onTiles));
         return {
             v: Math.max(LINK_VERSION_FOR_SHAPE[boardConfig && boardConfig.boardShape] || 1, hasPlayers ? PLAYER_LINK_VERSION : 1, hasLabels ? LABEL_LINK_VERSION : 1),
             f: formatVersion,

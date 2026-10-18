@@ -191,7 +191,7 @@ const PlaytestDrag = (() => {
         } else if (insideCanvas(event)) {
             const tile = AppState.getTopology().locate(worldPoint(event));
             if (tile && Play.move(game(), drag.pieceId, tile.id)) {
-                message = `${name} moved to ${Pieces.tileLabel(state().polygons, tile, state().labels)}.`;
+                message = `${name} moved to ${Pieces.tileLabel(state().polygons, tile, state().labels, state().boardConfig.boardShape)}.`;
             }
         }
         AppState.setDrag(null);
@@ -242,7 +242,7 @@ const PlaytestDrag = (() => {
             const button = document.createElement('button');
             button.type = 'button';
             button.dataset.pieceId = piece.id;
-            button.textContent = `${Players.colorName(piece.color)} ${kindName(piece.kind)} at ${Pieces.tileLabel(s.polygons, tile, s.labels)}`;
+            button.textContent = `${Players.colorName(piece.color)} ${kindName(piece.kind)} at ${Pieces.tileLabel(s.polygons, tile, s.labels, s.boardConfig.boardShape)}`;
             button.setAttribute('aria-description', 'Arrow keys move it to the next tile. Delete puts it back in its tray.');
             item.appendChild(button);
             list.appendChild(item);
@@ -270,7 +270,7 @@ const PlaytestDrag = (() => {
             Play.move(game(), piece.id, next);
             const tile = Pieces.polygonMap(state().polygons).get(next);
             Playtest.refresh();
-            Playtest.announce(`${name} moved to ${Pieces.tileLabel(state().polygons, tile, state().labels)}.`);
+            Playtest.announce(`${name} moved to ${Pieces.tileLabel(state().polygons, tile, state().labels, state().boardConfig.boardShape)}.`);
         } else if (event.key === 'Delete' || event.key === 'Backspace') {
             event.preventDefault();
             Play.move(game(), piece.id, null);

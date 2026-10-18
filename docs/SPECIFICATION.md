@@ -47,7 +47,7 @@ Every file has a top-level integer `version`. The current version is **7**.
       { "color": "#c62828", "seat": "bottom", "pieces": [{ "kind": "pawn", "count": 4 }] }
     ],
     "dice": [{ "sides": 6 }],                // playtest: the dice of the design (the standard set d3 to d20 by default)
-    "labels": { "enabled": false, "columns": { /* ... */ }, "rows": { /* ... */ }, "placement": "straight" },  // coordinate labels, see "Coordinate labels"
+    "labels": { "enabled": false, "onTiles": false, "scheme": "auto", "columns": { /* ... */ }, "rows": { /* ... */ }, "placement": "straight" },  // coordinate labels, see "Coordinate labels"
     "polygons": [                            // one entry per tile
       {
         "id": "hex_0_-5",                    // unique, stable for a given board layout
@@ -99,7 +99,7 @@ Migrations are frozen history: do not edit one after it has been released, and d
 | 4 | New board shape `country` (see "Country boards"). Same kind of bump: nothing in existing projects changes. |
 | 5 | The board shapes `square` and `rectangle` were united: a square is a rectangle with equal sides. Migration turns `boardShape: "square"` into `"rectangle"` with `width` and `height` both set to the old `size`; the tiles are not touched. `square` is no longer a valid board shape (the **tile** shape `square` is unchanged). |
 | 6 | Playtest: `appState.players` and `appState.dice`, and the optional tile field `start` (see "Playtest data"). Migration adds `players: []` and the standard dice (a frozen copy of d3, d4, d6, d8, d10, d12, d20). |
-| 7 | Coordinate labels: `appState.labels` (see "Coordinate labels"). Migration adds the settings switched off (a frozen copy of the defaults). |
+| 7 | Coordinate labels: `appState.labels` (see "Coordinate labels"): names around the board and on the tiles, the indexing per board, and the symbols of each axis. Migration adds the settings switched off (a frozen copy of the defaults). |
 
 ### Playtest data
 
@@ -199,7 +199,7 @@ The payload is JSON, deflate-compressed (`deflate-raw`) and written as base64url
 | `pl` | Only with players: `[colour, seat, [[kind, count], ...]]` per player (colour as `#rrggbb`, lower case) |
 | `sc` | Only with start markers: the distinct start colours (`#rrggbb`) |
 | `s` | Only with start markers: `tileIndex:colourIndex` pairs (base 36, dot separated, same tile order as `t` and `o`) |
-| `lb` | Only with coordinate labels switched on: the settings object as saved in the project (see "Coordinate labels"). Anything missing or out of range is replaced by the default on opening; a `lb` that is not an object, or a `v` below 5, is refused. A link without `lb` opens with labels off. |
+| `lb` | Only with coordinate labels switched on (around the board or on the tiles): the settings object as saved in the project (see "Coordinate labels"). Anything missing or out of range is replaced by the default on opening; a `lb` that is not an object, or a `v` below 5, is refused. A link without `lb` opens with labels off. |
 
 The dice set is not in the link: every design has the standard set until it can be edited, so a link opens with it. When the dice become editable, add a key and bump `v`. A link with `pl`, `sc` or `s` but a `v` below 4 is refused, and the shapes of `pl`, `sc` and `s` are checked before the project format checks what they mean (unique colours, piece limits).
 
@@ -217,15 +217,19 @@ There is one fixed-size board shape, `rectangle` (`width` columns by `height` ro
 
 ## Coordinate labels
 
-A design can name its columns and rows, drawn outside the board like the A to H and 1 to 8 of a chess diagram. The settings are part of the design (saved in files, autosaves and links, not in the tile undo history); the labels themselves are never stored, they are computed from the board.
+A design can name its columns and rows, drawn outside the board like the A to H and 1 to 8 of a chess diagram, and optionally in every tile. The settings are part of the design (saved in files, autosaves and links, not in the tile undo history); the names themselves are never stored, they are computed from the board.
 
-**`appState.labels`** (required from format 7, switched off by default):
+Two things are chosen separately: the **indexing** (how tiles get a column and a row, picked from small pictures in the panel) and the **symbols** of each axis (letters, numbers, Roman numerals, Greek letters or the user's own list).
+
+**`appState.labels`** (required from format 7, everything off by default):
 
 | Field | Meaning |
 |---|---|
-| `enabled` | `true` draws the labels. Infinite boards have no outside, so they never show labels (the setting is kept). |
+| `enabled` | `true` draws the names around the board. Infinite boards have no outside, so they never show them (the setting is kept). |
+| `onTiles` | `true` writes the name of every tile in the tile (dark text on light tiles, white on dark ones; skipped when it would be unreadably small). Independent of `enabled`. |
+| `scheme` | The indexing: `auto` (the board decides: the first one offered below), `grid`, `triangles`, `offset`, `doubled` or `axial`. A choice that does not fit the current board (for example `axial` on a rectangle) is ignored, not lost: it applies again when the board changes back. |
 | `columns`, `rows` | One object per axis, each with the fields below. Columns and rows are independent: a chess board uses letters for one and numbers for the other. |
-| `placement` | `straight`: the labels of a side sit on one straight line along the board's bounding box. `outline`: each label sits next to the outermost tile of its line, so it follows a hexagon, circle or triangle board (best with one side per axis). |
+| `placement` | `straight`: the names of a side sit on one straight line along the board's bounding box (a leaning line is carried on along its own direction to get there). `outline`: each name sits next to the outermost tile of its line, so it follows a hexagon, circle or triangle board; an axis that counts half steps always uses the straight line. |
 
 Per axis:
 
@@ -238,15 +242,28 @@ Per axis:
 | `reverse` | `false` counts from the left (columns) or top (rows); `true` from the right or bottom. The defaults are chess style: columns `A, B, C` from the left, rows `1, 2, 3` from the bottom. |
 | `top`, `bottom` (columns) / `left`, `right` (rows) | Which sides the axis is drawn on. Chess style is bottom and left. |
 
-**Coordinates come from the geometry**, not from the board shape or the tile ids: every tile gets an integer column and row from where its centre sits on the lattice of its tile type, counted from 0 at the top left.
+### The indexings
 
-- Square tiles: the plain grid. Square tiles turned 45 degrees count like hexagons (the shifted rows).
-- Hexagon tiles use **offset coordinates**: on pointy-top tiles every other row is shifted by half a tile and a row counts its columns along itself, so a shifted row starts at the same column number as the rows around it; on flat-top tiles the shifted ones are the columns and the rows count down each column. A hexagon-shaped board is numbered on one lattice, so a column stays a column.
-- Triangle tiles: every triangle is a column step (a triangle row has two columns per triangle side) and rows are the bands of triangles.
-- The same rules apply to rectangle, hexagon, triangle, circle and country boards. When lines are closer together than a label is tall, every n-th label is drawn so they never overlap.
+Which indexings the panel offers depends on the tile shape and the board shape, because real games label rectangular and non-rectangular hexagon boards differently. Coordinates come from the tile geometry, never from the board shape or the tile ids.
 
-The labels are drawn by `Renderer.paint`, so they appear on screen, in PNG export (inside the margin around the board) and anywhere else that paints through it. They are not in SVG export and not yet in Print (the printed board is cut to the tiles). With labels on, playtest announces a position as `B7` instead of "column 2, row 7"; two numeric parts are joined with a comma (`3, 7`).
+| Tile and board | Indexings offered (the first is the default) |
+|---|---|
+| Square tiles, any board | `grid` |
+| Triangle tiles, any board | `triangles` |
+| Hexagon tiles on a rectangle or country board | `offset`, `doubled` |
+| Hexagon tiles on a hexagon, circle or triangle board | `axial`, `doubled` |
+| Infinite board | none (no labels) |
+
+- **`grid`**: every column and row is a straight line.
+- **`triangles`**: rows are the bands of triangles and every triangle is a column step (two per triangle side).
+- **`offset`**: the shifted rows (pointy-top tiles) or columns (flat-top tiles) are counted like the others, so a shifted row starts at the same number as the rows around it. The other axis zigzags.
+- **`doubled`**: one axis counts half steps, as on 18xx railway maps: pointy-top tiles keep straight rows and number the half-columns, flat-top tiles keep straight columns and number the half-rows, so the numbers of that axis skip by two (a column holds 1, 3, 5, its neighbour 2, 4, 6). Its names are shared between the two sides: the lines that reach the first column or row go on the first side, the others on the second (one side alone shows them all).
+- **`axial`**: two families of straight lines, as on Abalone: pointy-top tiles have horizontal rows and diagonals leaning down to the right; flat-top tiles have vertical columns and leaning rows. A number is the index of a line, it does not restart on each line, so shorter lines start at higher numbers (on a hexagon board the top row holds the highest diagonals).
+
+When lines are closer together than a name is tall, every n-th name is drawn so they never overlap.
+
+The names are drawn by `Renderer.paint`, so they appear on screen, in PNG export (inside the margin around the board) and anywhere else that paints through it. They are not in SVG export and not yet in Print (the printed board is cut to the tiles). With labels on (around the board or on the tiles), playtest announces a position as `B7` instead of "column 2, row 7"; two numeric parts are joined with a comma (`3, 7`).
 
 ### Changing the labels
 
-Validation lives in `ProjectFormat` (a file that breaks a limit is refused with a message); the panel and links go through `Labels.normalize`, which makes any input valid instead (an unknown symbol set falls back, numbers are clamped, lists are cut). `tests/labels.test.js` checks that the two agree. The migration default, `Config.DEFAULT_LABELS` and `Labels.defaults()` must stay the same; a test compares them.
+Validation lives in `ProjectFormat` (a file that breaks a limit is refused with a message); the panel and links go through `Labels.normalize`, which makes any input valid instead (an unknown symbol set or indexing falls back, numbers are clamped, lists are cut). `tests/labels.test.js` checks that the two agree. The migration default, `Config.DEFAULT_LABELS` and `Labels.defaults()` must stay the same; a test compares them.

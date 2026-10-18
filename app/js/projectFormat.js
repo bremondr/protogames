@@ -43,6 +43,7 @@ const ProjectFormat = (() => {
     // Coordinate labels: the same limits as labels.js, which cleans up user input; here a file that breaks them is refused.
     const LABEL_SYMBOL_SETS = ['letters', 'numbers', 'roman', 'greek', 'custom'];
     const LABEL_PLACEMENTS = ['straight', 'outline'];
+    const LABEL_SCHEMES = ['auto', 'grid', 'triangles', 'offset', 'doubled', 'axial'];
     const MAX_LABEL_CUSTOM_TEXT = 200;
     const MAX_LABEL_ENTRIES = 100;
     const MAX_LABEL_ENTRY = 4;
@@ -222,7 +223,7 @@ const ProjectFormat = (() => {
 
     /**
      * v6 -> v7: coordinate labels. A design now carries the settings for the column and row labels drawn
-     * outside the board. Existing projects get them switched off. The settings are a frozen copy: they
+     * outside the board and on the tiles, with the indexing ("auto" lets the board decide). Existing projects get them switched off. The settings are a frozen copy: they
      * must not follow later changes to the app's own defaults.
      */
     function migrateV6toV7(project) {
@@ -232,6 +233,8 @@ const ProjectFormat = (() => {
         if (state && !isObject(state.labels)) {
             state.labels = {
                 enabled: false,
+                onTiles: false,
+                scheme: 'auto',
                 columns: { symbols: 'letters', custom: '', skip: '', start: 1, reverse: false, top: false, bottom: true },
                 rows: { symbols: 'numbers', custom: '', skip: '', start: 1, reverse: true, left: true, right: false },
                 placement: 'straight'
@@ -396,6 +399,8 @@ const ProjectFormat = (() => {
     function validateLabels(labels) {
         if (!isObject(labels)) fail('The project has no coordinate label settings (appState.labels).');
         if (typeof labels.enabled !== 'boolean') fail('The coordinate labels on/off setting is not true/false.');
+        if (typeof labels.onTiles !== 'boolean') fail('The setting for coordinates on the tiles is not true/false.');
+        if (!LABEL_SCHEMES.includes(labels.scheme)) fail(`The coordinate labels use an unknown indexing (${JSON.stringify(labels.scheme)}).`);
         if (!LABEL_PLACEMENTS.includes(labels.placement)) fail(`The coordinate labels have an unknown placement (${JSON.stringify(labels.placement)}).`);
         validateLabelAxis(labels.columns, 'column', ['top', 'bottom']);
         validateLabelAxis(labels.rows, 'row', ['left', 'right']);

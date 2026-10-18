@@ -148,26 +148,25 @@
             <!-- --------------------------------------------
                  COORDINATES
                  Names for the columns and rows, drawn outside the
-                 board like the A to H and 1 to 8 of a chess diagram.
-                 Bound by data-lb attributes in labelsPanel.js.
+                 board like the A to H and 1 to 8 of a chess diagram
+                 and, if wanted, on every tile. The indexing is picked
+                 from small pictures (only the ones that make sense for
+                 the board); controls are bound by data-lb attributes
+                 in labelsPanel.js.
                  -------------------------------------------- -->
             <section class="panel" aria-labelledby="labels-title">
                 <h2 id="labels-title">Coordinates</h2>
-                <p class="field-hint panel-intro">Names for the columns and rows, drawn outside the board like the A to H and 1 to 8 of a chess diagram.</p>
-                <label class="checkbox-label labels-check"><input type="checkbox" data-lb="enabled"> Show coordinates</label>
+                <p class="field-hint panel-intro">Name the columns and rows like a chess diagram: pick how the tiles are indexed, then say what the names are.</p>
+                <label class="checkbox-label labels-check"><input type="checkbox" data-lb="enabled"> Show coordinates around the board</label>
+                <label class="checkbox-label labels-check"><input type="checkbox" data-lb="onTiles"> Show coordinates on the tiles</label>
                 <div id="labelsOptions" class="labels-options">
-                    <label class="labels-field">
-                        <span>Style</span>
-                        <select data-lb="preset" aria-label="Coordinate style">
-                            <option value="chess">Chess (A to H, 1 to 8 from the bottom)</option>
-                            <option value="battleship">Battleship (A to J across, 1 to 10 down)</option>
-                            <option value="go">Go (letters without I, all four sides)</option>
-                            <option value="numbers">Numbers (1, 2, 3 on both axes)</option>
-                            <option value="custom">Custom</option>
-                        </select>
-                    </label>
+                    <fieldset id="labelsSchemes" class="labels-schemes">
+                        <legend>Indexing</legend>
+                        <p id="labelsSchemeNote" class="field-hint"></p>
+                        <div id="labelsSchemeCards" class="labels-scheme-cards" role="radiogroup" aria-label="How the tiles are indexed"></div>
+                    </fieldset>
                     <fieldset class="labels-axis" data-lb-axis="columns">
-                        <legend>Columns</legend>
+                        <legend id="labelsColumnsLegend">Columns</legend>
                         <label class="labels-field">
                             <span>Symbols</span>
                             <select data-lb="columns.symbols" aria-label="Symbols for the columns">
@@ -186,18 +185,9 @@
                             <span>Skip letters</span>
                             <input type="text" data-lb="columns.skip" maxlength="26" autocomplete="off" spellcheck="false" placeholder="for example I O" aria-label="Letters to skip for the columns">
                         </label>
-                        <label class="labels-field">
-                            <span id="labels-columns-start-text">Start at</span>
-                            <input type="number" data-lb="columns.start" min="-100" max="1000" step="1" aria-label="Start the columns at">
-                        </label>
-                        <label class="checkbox-label labels-check"><input type="checkbox" data-lb="columns.reverse"> Count from the right</label>
-                        <div class="labels-sides" role="group" aria-label="Where the columns labels are drawn">
-                            <label class="checkbox-label labels-check"><input type="checkbox" data-lb="columns.top"> Top</label>
-                            <label class="checkbox-label labels-check"><input type="checkbox" data-lb="columns.bottom"> Bottom</label>
-                        </div>
                     </fieldset>
                     <fieldset class="labels-axis" data-lb-axis="rows">
-                        <legend>Rows</legend>
+                        <legend id="labelsRowsLegend">Rows</legend>
                         <label class="labels-field">
                             <span>Symbols</span>
                             <select data-lb="rows.symbols" aria-label="Symbols for the rows">
@@ -216,24 +206,54 @@
                             <span>Skip letters</span>
                             <input type="text" data-lb="rows.skip" maxlength="26" autocomplete="off" spellcheck="false" placeholder="for example I O" aria-label="Letters to skip for the rows">
                         </label>
-                        <label class="labels-field">
-                            <span id="labels-rows-start-text">Start at</span>
-                            <input type="number" data-lb="rows.start" min="-100" max="1000" step="1" aria-label="Start the rows at">
-                        </label>
-                        <label class="checkbox-label labels-check"><input type="checkbox" data-lb="rows.reverse"> Count from the bottom</label>
-                        <div class="labels-sides" role="group" aria-label="Where the rows labels are drawn">
-                            <label class="checkbox-label labels-check"><input type="checkbox" data-lb="rows.left"> Left</label>
-                            <label class="checkbox-label labels-check"><input type="checkbox" data-lb="rows.right"> Right</label>
-                        </div>
                     </fieldset>
-                    <label class="labels-field">
-                        <span>Placement</span>
-                        <select data-lb="placement" aria-label="Where the labels sit">
-                            <option value="straight">In a straight line along the board</option>
-                            <option value="outline">Following the outline of the board</option>
-                        </select>
-                    </label>
-                    <p class="field-hint">Hexagon tiles use offset coordinates: the shifted rows (or columns, for flat-top tiles) are counted like the others. Triangle tiles count each triangle as a column. Following the outline works best with one side per axis: on a hexagon, circle or triangle board the labels of two sides can meet at a slanted edge.</p>
+                    <details class="labels-more">
+                        <summary>More options</summary>
+                        <div class="labels-more-body">
+                            <label class="labels-field">
+                                <span>Quick style for the lists and sides</span>
+                                <select data-lb="preset" aria-label="Quick style">
+                                    <option value="chess">Chess (A to H, 1 to 8 from the bottom)</option>
+                                    <option value="battleship">Battleship (A to J across, 1 to 10 down)</option>
+                                    <option value="go">Go (letters without I, all four sides)</option>
+                                    <option value="numbers">Numbers (1, 2, 3 on both axes)</option>
+                                    <option value="custom">Custom</option>
+                                </select>
+                            </label>
+                            <fieldset class="labels-axis labels-axis-more" data-lb-axis="columns">
+                                <legend>Columns</legend>
+                                <label class="labels-field">
+                                    <span>Start at</span>
+                                    <input type="number" data-lb="columns.start" min="-100" max="1000" step="1" aria-label="Start the columns at">
+                                </label>
+                                <label class="checkbox-label labels-check"><input type="checkbox" data-lb="columns.reverse"> Count from the right</label>
+                                <div class="labels-sides" role="group" aria-label="Where the columns labels are drawn">
+                                    <label class="checkbox-label labels-check"><input type="checkbox" data-lb="columns.top"> Top</label>
+                                    <label class="checkbox-label labels-check"><input type="checkbox" data-lb="columns.bottom"> Bottom</label>
+                                </div>
+                            </fieldset>
+                            <fieldset class="labels-axis labels-axis-more" data-lb-axis="rows">
+                                <legend>Rows</legend>
+                                <label class="labels-field">
+                                    <span>Start at</span>
+                                    <input type="number" data-lb="rows.start" min="-100" max="1000" step="1" aria-label="Start the rows at">
+                                </label>
+                                <label class="checkbox-label labels-check"><input type="checkbox" data-lb="rows.reverse"> Count from the bottom</label>
+                                <div class="labels-sides" role="group" aria-label="Where the rows labels are drawn">
+                                    <label class="checkbox-label labels-check"><input type="checkbox" data-lb="rows.left"> Left</label>
+                                    <label class="checkbox-label labels-check"><input type="checkbox" data-lb="rows.right"> Right</label>
+                                </div>
+                            </fieldset>
+                            <label class="labels-field">
+                                <span>Placement</span>
+                                <select data-lb="placement" aria-label="Where the labels sit">
+                                    <option value="straight">In a straight line along the board</option>
+                                    <option value="outline">Following the outline of the board</option>
+                                </select>
+                            </label>
+                            <p class="field-hint">Following the outline works best with one side per axis: on a hexagon, circle or triangle board the labels of two sides can meet at a slanted edge.</p>
+                        </div>
+                    </details>
                 </div>
                 <p id="labelsNote" class="field-hint labels-note" role="status" hidden>Coordinates are not available on infinite boards.</p>
             </section>

@@ -313,6 +313,8 @@ test('links with unusable players or start markers are refused', () => {
 
 const LABELS_ON = {
     enabled: true,
+    onTiles: false,
+    scheme: 'doubled',
     columns: { symbols: 'custom', custom: 'a b c', skip: '', start: 1, reverse: false, top: true, bottom: false },
     rows: { symbols: 'roman', custom: '', skip: '', start: 1, reverse: true, left: true, right: true },
     placement: 'outline'
@@ -321,9 +323,12 @@ const packLabels = (labels) =>
     plain(ShareLink.pack({ projectName: 'Labels', boardConfig: CONFIG, paletteId: 'landscape', polygons: painted(), formatVersion: ProjectFormat.CURRENT_VERSION, labels }));
 
 test('a link with coordinate labels switched off is still version 1 and carries no extra key', () => {
-    const off = packLabels({ ...LABELS_ON, enabled: false });
+    const off = packLabels({ ...LABELS_ON, enabled: false, onTiles: false });
     assert.equal(off.v, 1);
     assert.equal(off.lb, undefined);
+    const tilesOnly = packLabels({ ...LABELS_ON, enabled: false, onTiles: true });
+    assert.equal(tilesOnly.v, 5, 'coordinates on the tiles alone also need the new link');
+    assert.equal(tilesOnly.lb.onTiles, true);
     assert.equal(packLabels(undefined).v, 1, 'labels left out entirely');
 });
 
