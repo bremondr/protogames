@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { loadApp, GEOMETRY_SCRIPTS, plain } = require('./support/load');
 
-const app = loadApp([...GEOMETRY_SCRIPTS, 'app/js/projectFormat.js', 'app/js/shareLink.js'], {
+const app = loadApp([...GEOMETRY_SCRIPTS, 'app/js/projectFormat.js', 'app/js/labels.js', 'app/js/shareLink.js'], {
     btoa, atob, TextEncoder, TextDecoder, CompressionStream, DecompressionStream, Response, Blob
 });
 const ShareLink = app.run('ShareLink');
@@ -234,7 +234,7 @@ test('players and start markers make a link version 4 and come back unchanged', 
     polygons[8].start = BLUE;
     const data = packWith(polygons, PLAYERS);
     assert.equal(data.v, 4, 'older apps say "newer version" instead of dropping the players');
-    assert.equal(ShareLink.LINK_VERSION, 4);
+    assert.equal(ShareLink.LINK_VERSION, 5);
     assert.deepEqual(data.pl, [[RED, 'bottom', [['pawn', 4], ['cube', 2]]], [BLUE, 'top', [['meeple', 1]]]]);
     assert.deepEqual(data.sc, [RED, BLUE], 'start colours are kept once each, in lower case');
 
@@ -307,4 +307,68 @@ test('links with unusable players or start markers are refused', () => {
     const tooMany = good();
     tooMany.pl = [[RED, 'bottom', [['pawn', 501]]]];
     assert.throws(() => ProjectFormat.parse(ShareLink.unpack(tooMany, blankBoard())), /invalid number of pawn/);
+});
+
+// ---- Coordinate labels (link version 5, project format 7) -------------------------------------------------------------
+
+const LABELS_ON = {
+    enabled: true,
+    onTiles: false,
+    scheme: 'doubled',
+    columns: { symbols: 'custom', custom: 'a b c', skip: '', start: 1, reverse: false, top: true, bottom: false },
+    rows: { symbols: 'roman', custom: '', skip: '', start: 1, reverse: true, left: true, right: true },
+    placement: 'outline'
+};
+const packLabels = (labels) =>
+    plain(ShareLink.pack({ projectName: 'Labels', boardConfig: CONFIG, paletteId: 'landscape', polygons: painted(), formatVersion: ProjectFormat.CURRENT_VERSION, labels }));
+
+test('a link with coordinate labels switched off is still version 1 and carries no extra key', () => {
+    const off = packLabels({ ...LABELS_ON, enabled: false, onTiles: false });
+    assert.equal(off.v, 1);
+    assert.equal(off.lb, undefined);
+    const tilesOnly = packLabels({ ...LABELS_ON, enabled: false, onTiles: true });
+    assert.equal(tilesOnly.v, 5, 'coordinates on the tiles alone also need the new link');
+    assert.equal(tilesOnly.lb.onTiles, true);
+    assert.equal(packLabels(undefined).v, 1, 'labels left out entirely');
+});
+
+test('switched-on coordinate labels make a link version 5 and come back unchanged', () => {
+    const data = packLabels(LABELS_ON);
+    assert.equal(data.v, 5, 'older apps say "newer version" instead of dropping the labels');
+    assert.deepEqual(data.lb, LABELS_ON);
+    const project = plain(ShareLink.unpack(data, blankBoard()));
+    assert.deepEqual(project.appState.labels, LABELS_ON);
+    const loaded = plain(ProjectFormat.parse(project));
+    assert.deepEqual(loaded.appState.labels, LABELS_ON);
+});
+
+test('a link of the new format without labels opens with them off, and an old link gets them from the migration', () => {
+    const current = plain(ShareLink.unpack(packLabels(undefined), blankBoard()));
+    assert.equal(current.appState.labels.enabled, false);
+    assert.doesNotThrow(() => ProjectFormat.parse(current));
+    const old = plain(ShareLink.unpack(packOf(painted(), 6), blankBoard()));
+    assert.equal(old.appState.labels, undefined, 'the file format of that link has none yet');
+    assert.equal(plain(ProjectFormat.parse(old)).appState.labels.enabled, false);
+});
+
+test('label settings in a link are cleaned up, and links with unusable ones are refused', () => {
+    const messy = packLabels(LABELS_ON);
+    messy.lb = { enabled: true, columns: { symbols: 'nope', start: 99999, custom: '  x   y ' }, placement: 'sideways' };
+    const labels = plain(ProjectFormat.parse(ShareLink.unpack(messy, blankBoard()))).appState.labels;
+    assert.equal(labels.enabled, true);
+    assert.equal(labels.columns.symbols, 'letters', 'an unknown symbol set falls back');
+    assert.equal(labels.columns.start, 1000, 'a start is held within range');
+    assert.equal(labels.columns.custom, 'x y', 'extra spaces are collapsed');
+    assert.equal(labels.placement, 'auto', 'an unknown placement falls back to the default');
+
+    const reject = (mutate, pattern) => {
+        const data = packLabels(LABELS_ON);
+        mutate(data);
+        assert.throws(() => ShareLink.unpack(data, blankBoard()), pattern);
+    };
+    assert.doesNotThrow(() => ShareLink.unpack(packLabels(LABELS_ON), blankBoard()));
+    reject((d) => { d.v = 4; }, /Unrecognised/);
+    reject((d) => { d.lb = 'labels'; }, /invalid coordinate labels/);
+    reject((d) => { d.lb = ['a']; }, /invalid coordinate labels/);
+    reject((d) => { d.lb = null; }, /invalid coordinate labels/);
 });

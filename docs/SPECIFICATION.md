@@ -8,25 +8,26 @@ Projects are saved as `<name>.protogames.json` and the editor also keeps one cop
 
 ### Version
 
-Every file has a top-level integer `version`. The current version is **6**.
+Every file has a top-level integer `version`. The current version is **7**.
 
 | `version` in the file | Meaning |
 |---|---|
 | missing, or the string `"1.0"` | **v0**: written before versioning existed. Migrated to v1 on load. |
 | integer `1` | migrated to v2 on load (Space/Arctic colours, see below), then to v3 |
-| integer `2` | migrated to v3, v4, v5, then v6 on load (only the version number changes until v5) |
-| integer `3` | migrated to v4, v5, then v6 on load |
-| integer `4` | migrated to v5 (a square board becomes a rectangle, see below), then v6 on load |
-| integer `5` | migrated to v6 on load: gets no players and the standard dice, see "Playtest data" |
-| integer `6` | current format |
+| integer `2` | migrated to v3, v4, v5, v6, then v7 on load (only the version number changes until v5) |
+| integer `3` | migrated to v4, v5, v6, then v7 on load |
+| integer `4` | migrated to v5 (a square board becomes a rectangle, see below), then v6 and v7 on load |
+| integer `5` | migrated to v6 (no players and the standard dice, see "Playtest data"), then v7 on load |
+| integer `6` | migrated to v7 on load: gets coordinate labels switched off, see "Coordinate labels" |
+| integer `7` | current format |
 | integer greater than the app's current version | rejected: "saved by a newer version of Protogames, update to open it" |
 | anything else (`1.5`, `-1`, `"abc"`, `null`, ...) | rejected as unreadable |
 
-### Project file (v6)
+### Project file (v7)
 
 ```jsonc
 {
-  "version": 6,
+  "version": 7,
   "projectName": "my board",
   "created": "2026-10-02T13:31:51.661Z",     // ISO time of the save
   "appState": {
@@ -46,6 +47,7 @@ Every file has a top-level integer `version`. The current version is **6**.
       { "color": "#c62828", "seat": "bottom", "pieces": [{ "kind": "pawn", "count": 4 }] }
     ],
     "dice": [{ "sides": 6 }],                // playtest: the dice of the design (the standard set d3 to d20 by default)
+    "labels": { "enabled": false, "onTiles": false, "scheme": "auto", "columns": { /* ... */ }, "rows": { /* ... */ }, "placement": "straight" },  // coordinate labels, see "Coordinate labels"
     "polygons": [                            // one entry per tile
       {
         "id": "hex_0_-5",                    // unique, stable for a given board layout
@@ -97,6 +99,7 @@ Migrations are frozen history: do not edit one after it has been released, and d
 | 4 | New board shape `country` (see "Country boards"). Same kind of bump: nothing in existing projects changes. |
 | 5 | The board shapes `square` and `rectangle` were united: a square is a rectangle with equal sides. Migration turns `boardShape: "square"` into `"rectangle"` with `width` and `height` both set to the old `size`; the tiles are not touched. `square` is no longer a valid board shape (the **tile** shape `square` is unchanged). |
 | 6 | Playtest: `appState.players` and `appState.dice`, and the optional tile field `start` (see "Playtest data"). Migration adds `players: []` and the standard dice (a frozen copy of d3, d4, d6, d8, d10, d12, d20). |
+| 7 | Coordinate labels: `appState.labels` (see "Coordinate labels"): names around the board and on the tiles, the indexing per board, and the symbols of each axis. Migration adds the settings switched off (a frozen copy of the defaults). |
 
 ### Playtest data
 
@@ -183,7 +186,7 @@ The payload is JSON, deflate-compressed (`deflate-raw`) and written as base64url
 
 | Key | Meaning |
 |---|---|
-| `v` | Link version: **1** for fixed boards, **2** for infinite boards, **3** for country boards, **4** for any board with players or start markers (older apps can still open the links of the boards they know). A number higher than the app knows is rejected as "made by a newer version", and a link that describes a board shape newer than its version is refused. |
+| `v` | Link version: **1** for fixed boards, **2** for infinite boards, **3** for country boards, **4** for any board with players or start markers, **5** for any board with coordinate labels switched on (older apps can still open the links of the boards they know). A number higher than the app knows is rejected as "made by a newer version", and a link that describes a board shape newer than its version is refused. |
 | `f` | **Project file format** the colours belong to. On opening, the link is turned into a project of this version and passed through `ProjectFormat.parse`, so a link made before a palette change migrates exactly like a saved file. |
 | `n` | Project name |
 | `c` | Board settings (`boardConfig`); every size must be an integer from 1 to 100 |
@@ -196,6 +199,7 @@ The payload is JSON, deflate-compressed (`deflate-raw`) and written as base64url
 | `pl` | Only with players: `[colour, seat, [[kind, count], ...]]` per player (colour as `#rrggbb`, lower case) |
 | `sc` | Only with start markers: the distinct start colours (`#rrggbb`) |
 | `s` | Only with start markers: `tileIndex:colourIndex` pairs (base 36, dot separated, same tile order as `t` and `o`) |
+| `lb` | Only with coordinate labels switched on (around the board or on the tiles): the settings object as saved in the project (see "Coordinate labels"). Anything missing or out of range is replaced by the default on opening; a `lb` that is not an object, or a `v` below 5, is refused. A link without `lb` opens with labels off. |
 
 The dice set is not in the link: every design has the standard set until it can be edited, so a link opens with it. When the dice become editable, add a key and bump `v`. A link with `pl`, `sc` or `s` but a `v` below 4 is refused, and the shapes of `pl`, `sc` and `s` are checked before the project format checks what they mean (unique colours, piece limits).
 
@@ -210,3 +214,58 @@ When the link format changes, bump `v` (and keep reading the old one), or, if on
 ## Square and rectangle boards
 
 There is one fixed-size board shape, `rectangle` (`width` columns by `height` rows); a square board is the case where both are equal. Before project format 5 a square board was a separate shape of `size` x `size` tiles. Old files are migrated on load (see the history above). Old **share links** that name `square` still open: the generator keeps understanding the old name as a `size` x `size` rectangle, and the link then goes through the same migration (so new links and files always say `rectangle`; links of both kinds are link version 1 and older apps can open the new ones).
+
+## Coordinate labels
+
+A design can name its columns and rows, drawn outside the board like the A to H and 1 to 8 of a chess diagram, and optionally in every tile. The settings are part of the design (saved in files, autosaves and links, not in the tile undo history); the names themselves are never stored, they are computed from the board.
+
+Two things are chosen separately: the **indexing** (how tiles get a column and a row, picked from small pictures in the panel) and the **symbols** of each axis (letters, numbers, Roman numerals, Greek letters or the user's own list).
+
+**`appState.labels`** (required from format 7, everything off by default):
+
+| Field | Meaning |
+|---|---|
+| `enabled` | `true` draws the names around the board. Infinite boards have no outside, so they never show them (the setting is kept). |
+| `onTiles` | `true` writes the name of every tile in the tile (dark text on light tiles, white on dark ones; skipped when it would be unreadably small). Independent of `enabled`. |
+| `scheme` | The indexing: `auto` (the board decides: the first one offered below), `grid`, `triangles`, `offset`, `doubled` or `axial`. A choice that does not fit the current board (for example `axial` on a rectangle) is ignored, not lost: it applies again when the board changes back. |
+| `columns`, `rows` | One object per axis, each with the fields below. Columns and rows are independent: a chess board uses letters for one and numbers for the other. |
+| `placement` | `auto` (the default): `outline` on hexagon, circle and triangle boards, `straight` on every other board. `straight`: the names of a side sit on one straight line along the board's bounding box (a leaning line is carried on along its own direction to get there). `outline`: each name sits next to the outermost tile of its line, so it hugs a hexagon, circle or triangle board; an axis that counts half steps always uses the straight line. |
+
+Per axis:
+
+| Field | Meaning |
+|---|---|
+| `symbols` | `letters` (A to Z, then AA, AB, ...), `numbers`, `roman` (I, II, ... up to 3999, then numbers), `greek` (α to ω), or `custom` (the list below). |
+| `custom` | The user's own list for `symbols: "custom"`: entries separated by spaces or commas, at most 100 entries of at most 4 characters, at most 200 characters in all. When the list runs out it starts again with a number behind each symbol (`x`, `y`, `x2`, `y2`). An empty list falls back to numbers. |
+| `skip` | Letters left out of `letters` (Go skips `I`), at most 26 characters, case does not matter. |
+| `start` | Where counting starts, an integer from -100 to 1000. For `numbers` it is the first number; for every other set it is the 1-based position of the first symbol (`start: 3` makes `C` the first letter). |
+| `reverse` | `false` counts from the left (columns) or top (rows); `true` from the right or bottom. The defaults are chess style: columns `A, B, C` from the left, rows `1, 2, 3` from the bottom. |
+| `top`, `bottom` (columns) / `left`, `right` (rows) | Which sides the axis is drawn on. Chess style is bottom and left. |
+
+### The indexings
+
+Which indexings the panel offers depends on the tile shape and the board shape, because real games label rectangular and non-rectangular hexagon boards differently. Coordinates come from the tile geometry, never from the board shape or the tile ids.
+
+| Tile and board | Indexings offered (the first is the default) |
+|---|---|
+| Square tiles, any board | `grid` |
+| Triangle tiles, any board | `triangles` |
+| Hexagon tiles on a rectangle or country board | `offset`, `doubled` |
+| Hexagon tiles on a hexagon, circle or triangle board | `axial`, `doubled` |
+| Infinite board | none (no labels) |
+
+- **`grid`**: every column and row is a straight line.
+- **`triangles`**: rows are the bands of triangles and every triangle is a column step (two per triangle side).
+- **`offset`**: the shifted rows (pointy-top tiles) or columns (flat-top tiles) are counted like the others, so a shifted row starts at the same number as the rows around it. The other axis zigzags.
+- **`doubled`**: one axis counts half steps, as on 18xx railway maps: pointy-top tiles keep straight rows and number the half-columns, flat-top tiles keep straight columns and number the half-rows, so the numbers of that axis skip by two (a column holds 1, 3, 5, its neighbour 2, 4, 6). Its names are shared between the two sides: the lines that reach the first column or row go on the first side, the others on the second (one side alone shows them all).
+- **`axial`**: two families of straight lines, as on Abalone: pointy-top tiles have horizontal rows and diagonals leaning down to the right; flat-top tiles have vertical columns and leaning rows. A number is the index of a line, it does not restart on each line, so shorter lines start at higher numbers (on a hexagon board the top row holds the highest diagonals).
+
+When lines are closer together than a name is tall, every n-th name is drawn so they never overlap.
+
+**Hover.** Pointing at a name around the board (mouse or pen, not touch) lights up the tiles of its row or column and draws the name white on an accent label (`AppState.labelHover`, `Labels.hit`, `Labels.drawHover`). It is never saved, not in exports, cleared when a button is pressed on the board or the labels change. Names that are thinned out cannot be hit.
+
+The names are drawn by `Renderer.paint`, so they appear on screen, in PNG export (inside the margin around the board) and anywhere else that paints through it. They are not in SVG export and not yet in Print (the printed board is cut to the tiles). With labels on (around the board or on the tiles), playtest announces a position as `B7` instead of "column 2, row 7"; two numeric parts are joined with a comma (`3, 7`).
+
+### Changing the labels
+
+Validation lives in `ProjectFormat` (a file that breaks a limit is refused with a message); the panel and links go through `Labels.normalize`, which makes any input valid instead (an unknown symbol set or indexing falls back, numbers are clamped, lists are cut). `tests/labels.test.js` checks that the two agree. The migration default, `Config.DEFAULT_LABELS` and `Labels.defaults()` must stay the same; a test compares them.

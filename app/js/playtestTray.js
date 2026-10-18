@@ -202,7 +202,7 @@ const PlaytestTray = (() => {
         }
         AppState.setSelectedPiece(result.pieceId);
         const tile = state.polygons.find((p) => p.id === result.tileId);
-        say(`${name} ${kindLabel(kind).toLowerCase()} placed at ${tile ? Pieces.tileLabel(state.polygons, tile) : 'its start'}.`);
+        say(`${name} ${kindLabel(kind).toLowerCase()} placed at ${tile ? Pieces.tileLabel(state.polygons, tile, state.labels, state.boardConfig.boardShape) : 'its start'}.`);
         Playtest.refresh();
     }
 

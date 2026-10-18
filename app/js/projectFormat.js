@@ -17,7 +17,7 @@
  * read live app config inside them.
  */
 const ProjectFormat = (() => {
-    const CURRENT_VERSION = 6;
+    const CURRENT_VERSION = 7;
 
     const GRID_TYPES = ['hexagon', 'square', 'triangle'];
     const BOARD_SHAPES = ['hexagon', 'rectangle', 'triangle', 'circle', 'infinite', 'country'];
@@ -40,6 +40,16 @@ const ProjectFormat = (() => {
     // #rgb or #rrggbb: what palettes and the colour pickers produce. Anything else could end up in markup or CSS.
     const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
     const BOUND_KEYS = ['minX', 'maxX', 'minY', 'maxY'];
+    // Coordinate labels: the same limits as labels.js, which cleans up user input; here a file that breaks them is refused.
+    const LABEL_SYMBOL_SETS = ['letters', 'numbers', 'roman', 'greek', 'custom'];
+    const LABEL_PLACEMENTS = ['auto', 'straight', 'outline'];
+    const LABEL_SCHEMES = ['auto', 'grid', 'triangles', 'offset', 'doubled', 'axial'];
+    const MAX_LABEL_CUSTOM_TEXT = 200;
+    const MAX_LABEL_ENTRIES = 100;
+    const MAX_LABEL_ENTRY = 4;
+    const MAX_LABEL_SKIP = 26;
+    const MIN_LABEL_START = -100;
+    const MAX_LABEL_START = 1000;
 
     /** Raised for any file we cannot (or must not) load. `message` is user-readable. */
     class ProjectFormatError extends Error {
@@ -211,6 +221,28 @@ const ProjectFormat = (() => {
         return next;
     }
 
+    /**
+     * v6 -> v7: coordinate labels. A design now carries the settings for the column and row labels drawn
+     * outside the board and on the tiles, with the indexing ("auto" lets the board decide). Existing projects get them switched off. The settings are a frozen copy: they
+     * must not follow later changes to the app's own defaults.
+     */
+    function migrateV6toV7(project) {
+        const next = clone(project);
+        next.version = 7;
+        const state = isObject(next.appState) ? next.appState : null;
+        if (state && !isObject(state.labels)) {
+            state.labels = {
+                enabled: false,
+                onTiles: false,
+                scheme: 'auto',
+                columns: { symbols: 'letters', custom: '', skip: '', start: 1, reverse: false, top: false, bottom: true },
+                rows: { symbols: 'numbers', custom: '', skip: '', start: 1, reverse: true, left: true, right: false },
+                placement: 'auto'
+            };
+        }
+        return next;
+    }
+
     /** MIGRATIONS[n] upgrades a version-n project to version n + 1. */
     const MIGRATIONS = {
         0: migrateV0toV1,
@@ -218,7 +250,8 @@ const ProjectFormat = (() => {
         2: migrateV2toV3,
         3: migrateV3toV4,
         4: migrateV4toV5,
-        5: migrateV5toV6
+        5: migrateV5toV6,
+        6: migrateV6toV7
     };
 
     /**
@@ -346,6 +379,33 @@ const ProjectFormat = (() => {
         if (total > MAX_PIECES) fail(`The project has too many pieces (at most ${MAX_PIECES} in total).`);
     }
 
+    /** One axis of the coordinate labels: a symbol set, a custom list, letters to skip, a start, a direction and the sides it is drawn on. */
+    function validateLabelAxis(axis, name, sides) {
+        const label = `The ${name} labels`;
+        if (!isObject(axis)) fail(`${label} are missing.`);
+        if (!LABEL_SYMBOL_SETS.includes(axis.symbols)) fail(`${label} use an unknown symbol set (${JSON.stringify(axis.symbols)}).`);
+        if (typeof axis.custom !== 'string' || Array.from(axis.custom).length > MAX_LABEL_CUSTOM_TEXT) fail(`${label} have a custom list over ${MAX_LABEL_CUSTOM_TEXT} characters.`);
+        const entries = axis.custom.split(/[\s,]+/).filter(Boolean);
+        if (entries.length > MAX_LABEL_ENTRIES || entries.some((entry) => Array.from(entry).length > MAX_LABEL_ENTRY)) {
+            fail(`${label} have a custom list with more than ${MAX_LABEL_ENTRIES} entries or an entry over ${MAX_LABEL_ENTRY} characters.`);
+        }
+        if (typeof axis.skip !== 'string' || Array.from(axis.skip).length > MAX_LABEL_SKIP) fail(`${label} have a skip list over ${MAX_LABEL_SKIP} characters.`);
+        if (!Number.isInteger(axis.start) || axis.start < MIN_LABEL_START || axis.start > MAX_LABEL_START) fail(`${label} start outside ${MIN_LABEL_START} to ${MAX_LABEL_START}.`);
+        if (typeof axis.reverse !== 'boolean') fail(`The direction of the ${name} labels is not true/false.`);
+        for (const side of sides) if (typeof axis[side] !== 'boolean') fail(`The ${side} setting of the ${name} labels is not true/false.`);
+    }
+
+    /** Coordinate labels: an on/off switch, one setting per axis, and where they are placed. */
+    function validateLabels(labels) {
+        if (!isObject(labels)) fail('The project has no coordinate label settings (appState.labels).');
+        if (typeof labels.enabled !== 'boolean') fail('The coordinate labels on/off setting is not true/false.');
+        if (typeof labels.onTiles !== 'boolean') fail('The setting for coordinates on the tiles is not true/false.');
+        if (!LABEL_SCHEMES.includes(labels.scheme)) fail(`The coordinate labels use an unknown indexing (${JSON.stringify(labels.scheme)}).`);
+        if (!LABEL_PLACEMENTS.includes(labels.placement)) fail(`The coordinate labels have an unknown placement (${JSON.stringify(labels.placement)}).`);
+        validateLabelAxis(labels.columns, 'column', ['top', 'bottom']);
+        validateLabelAxis(labels.rows, 'row', ['left', 'right']);
+    }
+
     /** Dice: at most MAX_DICE entries, each a whole number of sides from MIN_SIDES to MAX_SIDES, no repeats. An empty list means no dice. */
     function validateDice(dice) {
         if (!Array.isArray(dice)) fail('The project has no dice list (appState.dice).');
@@ -395,6 +455,7 @@ const ProjectFormat = (() => {
         state.polygons.forEach(validatePolygon);
         validatePlayers(state.players);
         validateDice(state.dice);
+        validateLabels(state.labels);
         // Infinite files keep at least one tile (the board type survives in it), see the specification.
         if (state.boardConfig.boardShape === 'infinite' && !state.polygons.length) fail('An infinite board needs at least one tile.');
         const ids = new Set(state.polygons.map((p) => p.id));

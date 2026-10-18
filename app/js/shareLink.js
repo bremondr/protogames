@@ -15,11 +15,14 @@
 const ShareLink = (() => {
     /**
      * Version of the link payload (not the project file format). 2 added infinite boards, 3 country
-     * boards and 4 players and start markers; links without any of these are still written as version 1
-     * so older apps can open them.
+     * boards, 4 players and start markers and 5 coordinate labels; links without any of these are still
+     * written as version 1 so older apps can open them.
      */
-    const LINK_VERSION = 4;
+    const LINK_VERSION = 5;
     const PLAYER_LINK_VERSION = 4;
+    const LABEL_LINK_VERSION = 5;
+    // First project file format that has coordinate labels; links made before it get them from the migration.
+    const FORMAT_WITH_LABELS = 7;
     // First project file format that has players and dice; links made before it get them from the migration.
     const FORMAT_WITH_PLAYERS = 6;
     const SEATS = ['bottom', 'top', 'left', 'right'];
@@ -47,9 +50,10 @@ const ShareLink = (() => {
      *  ob = distinct object ids, o = "tileIndex:objectIndex" pairs.
      * Only when the design has them: pl = players as [colour, seat, [[kind, count], ...]],
      *  sc = distinct start colours, s = "tileIndex:colourIndex" pairs of start markers.
+     * lb = the coordinate label settings, only when they are switched on (around the board or on the tiles).
      * The dice set is not carried: every design has the standard set until it can be edited.
      */
-    function pack({ projectName, boardConfig, paletteId, polygons, formatVersion, players }) {
+    function pack({ projectName, boardConfig, paletteId, polygons, formatVersion, players, labels }) {
         const colors = [];
         const colorIndex = new Map();
         const tiles = polygons.map((polygon) => {
@@ -85,8 +89,9 @@ const ShareLink = (() => {
         });
         const playerList = Array.isArray(players) ? players : [];
         const hasPlayers = playerList.length > 0 || starts.length > 0;
+        const hasLabels = Boolean(labels && (labels.enabled || labels.onTiles));
         return {
-            v: Math.max(LINK_VERSION_FOR_SHAPE[boardConfig && boardConfig.boardShape] || 1, hasPlayers ? PLAYER_LINK_VERSION : 1),
+            v: Math.max(LINK_VERSION_FOR_SHAPE[boardConfig && boardConfig.boardShape] || 1, hasPlayers ? PLAYER_LINK_VERSION : 1, hasLabels ? LABEL_LINK_VERSION : 1),
             f: formatVersion,
             n: projectName || '',
             c: boardConfig,
@@ -99,6 +104,7 @@ const ShareLink = (() => {
                 ? { pl: playerList.map((p) => [String(p.color).toLowerCase(), p.seat, (p.pieces || []).map((e) => [e.kind, e.count])]) }
                 : {}),
             ...(starts.length ? { sc: startColors, s: starts.join('.') } : {}),
+            ...(hasLabels ? { lb: labels } : {}),
             ...(boardConfig && boardConfig.boardShape === 'infinite' ? { i: polygons.map((p) => p.id).join('.') } : {})
         };
     }
@@ -128,6 +134,7 @@ const ShareLink = (() => {
         const needs = data.c && LINK_VERSION_FOR_SHAPE[data.c.boardShape];
         if (needs && data.v < needs) fail('Unrecognised link.');
         if ((data.pl !== undefined || data.sc !== undefined || data.s !== undefined) && data.v < PLAYER_LINK_VERSION) fail('Unrecognised link.');
+        if (data.lb !== undefined && data.v < LABEL_LINK_VERSION) fail('Unrecognised link.');
     }
 
     /** Rough tile count of a board's settings, high enough never to undercount (the exact check follows the build). */
@@ -180,9 +187,17 @@ const ShareLink = (() => {
                 autoSaveEnabled: true,
                 polygons: result,
                 // Links of the format that has them carry players; the standard dice are implied (see pack).
-                ...(data.f >= FORMAT_WITH_PLAYERS ? { players, dice: standardDice() } : {})
+                ...(data.f >= FORMAT_WITH_PLAYERS ? { players, dice: standardDice() } : {}),
+                // Links of the format that has them carry the label settings when they are on; off is the default.
+                ...(data.f >= FORMAT_WITH_LABELS ? { labels: labelsFrom(data.lb) } : {})
             }
         };
+    }
+
+    /** The coordinate label settings of a payload, cleaned up (an unknown or missing part falls back to the default); off when absent. */
+    function labelsFrom(raw) {
+        if (raw !== undefined && (raw === null || typeof raw !== 'object' || Array.isArray(raw))) fail('The link has invalid coordinate labels.');
+        return Labels.normalize(raw);
     }
 
     /** The dice every design starts with: a copy, so nothing shared can be changed by accident. */
@@ -320,7 +335,8 @@ const ShareLink = (() => {
             paletteId: state.currentPaletteId,
             polygons: Infinite.isActive() ? Infinite.paintedTiles(state.polygons) : state.polygons,
             formatVersion: ProjectFormat.CURRENT_VERSION,
-            players: state.players
+            players: state.players,
+            labels: state.labels
         });
     }
 

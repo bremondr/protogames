@@ -69,6 +69,9 @@ const Renderer = (() => {
      * @param {Array}  [scene.pieces]               playtest pieces: [{ id, kind, color, tileId }] (omit for exports)
      * @param {string[]|null} [scene.hiddenPieceIds] pieces being carried (left out; a ghost follows each pointer)
      * @param {string|null} [scene.selectedPieceId] piece that gets a selection ring
+     * @param {Object} [scene.labels]               coordinate label settings (see labels.js); omit for none
+     * @param {{axis: string, index: number}} [scene.labelHover] coordinate name under the pointer: its line is lit up (screen only)
+     * @param {string} [scene.boardShape]           board shape, which decides how hexagon tiles are indexed (see labels.js)
      * @returns {{drawn:number,total:number}} how many tiles were actually drawn (the rest were off-screen)
      */
     function paint(ctx, scene) {
@@ -95,6 +98,13 @@ const Renderer = (() => {
             if (!inView(polygon)) continue;
             drawPolygon(ctx, polygon, {}, view.scale);
             drawn++;
+        }
+
+        // Coordinate labels: the names inside the tiles (under objects and pieces) and the ones outside the board.
+        if (scene.labels && typeof Labels !== 'undefined') {
+            if (scene.labelHover) Labels.drawHover(ctx, polygons, scene.labels, scene.labelHover, view.scale, scene.boardShape);
+            if (scene.labels.onTiles) Labels.drawTiles(ctx, polygons, scene.labels, view.scale, visible, scene.boardShape);
+            if (scene.labels.enabled) Labels.draw(ctx, polygons, scene.labels, view.scale, visible, scene.boardShape, scene.labelHover);
         }
 
         // Start markers: a coloured outline inside the tile, above the terrain and below objects and pieces.
@@ -160,7 +170,7 @@ const Renderer = (() => {
      * Draws the board on the visible canvas with the current pan/zoom view.
      */
     function renderBoard() {
-        const { ctx, canvas, polygons, hoverPolygonId, hoverIds, linePreviewIds, view, playtest, play, drag, selectedPieceId } = AppState.getState();
+        const { ctx, canvas, polygons, hoverPolygonId, hoverIds, linePreviewIds, view, playtest, play, drag, selectedPieceId, labels, labelHover, boardConfig } = AppState.getState();
         if (!ctx || !canvas) return;
         const stats = paint(ctx, {
             polygons,
@@ -172,7 +182,10 @@ const Renderer = (() => {
             linePreviewIds,
             pieces: playtest && play ? play.pieces : null,
             hiddenPieceIds: drag || null,
-            selectedPieceId
+            selectedPieceId,
+            labels,
+            labelHover,
+            boardShape: boardConfig && boardConfig.boardShape
         });
         renderListeners.forEach((listener) => listener(stats));
     }
@@ -202,7 +215,7 @@ const Renderer = (() => {
      * preview overlays. This is what PNG/PDF exports use.
      */
     function createExportCanvas() {
-        const { canvas, polygons } = AppState.getState();
+        const { canvas, polygons, labels, boardConfig } = AppState.getState();
         const out = document.createElement('canvas');
         out.width = canvas.width;
         out.height = canvas.height;
@@ -210,7 +223,7 @@ const Renderer = (() => {
         const scene = typeof Infinite !== 'undefined' && Infinite.isActive() ? Infinite.exportScene(out.width, out.height) : null;
         paint(out.getContext('2d'), scene
             ? { polygons: scene.polygons, width: out.width, height: out.height, view: scene.view }
-            : { polygons, width: out.width, height: out.height });
+            : { polygons, width: out.width, height: out.height, labels, boardShape: boardConfig && boardConfig.boardShape });
         return out;
     }
 

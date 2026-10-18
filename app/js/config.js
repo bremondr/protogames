@@ -154,6 +154,19 @@ const Config = (() => {
     const STANDARD_DICE = Object.freeze([3, 4, 6, 8, 10, 12, 20].map((sides) => Object.freeze({ sides })));
 
     /**
+     * Coordinate labels every design starts with: off, indexing chosen by the board ("auto"), and chess style (A, B, C
+     * along the bottom, 1, 2, 3 up the left) once switched on. See labels.js.
+     */
+    const DEFAULT_LABELS = Object.freeze({
+        enabled: false,
+        onTiles: false,
+        scheme: 'auto',
+        columns: Object.freeze({ symbols: 'letters', custom: '', skip: '', start: 1, reverse: false, top: false, bottom: true }),
+        rows: Object.freeze({ symbols: 'numbers', custom: '', skip: '', start: 1, reverse: true, left: true, right: false }),
+        placement: 'auto'
+    });
+
+    /**
      * Showcase boards shipped with the app: project files in /showcases that
      * every user can open from the Showcase panel. Add an entry (and the file)
      * to publish another one.
@@ -225,6 +238,7 @@ const Config = (() => {
         MAX_PLAYERS,
         MAX_PIECES,
         STANDARD_DICE,
+        DEFAULT_LABELS,
         SHOWCASES,
         getPaletteById,
         getAllPalettes,
