@@ -4,9 +4,13 @@ Protogames is a static site (no build step), so any version of the repository ca
 
 | Version | Address | Built from |
 |---|---|---|
-| **Production** | `https://bremondr.github.io/protogames/` (landing page) and `.../app/` (the editor) | `main` |
-| **Preview** | `https://bremondr.github.io/protogames/preview/pr-<number>/` (landing page) and `.../preview/pr-<number>/app/` (the editor) | the head of open pull request `<number>` |
-| Index of previews | `https://bremondr.github.io/protogames/preview/` | all open pull requests |
+| **Production** | `https://protogames.eu/` (landing page) and `.../app/` (the editor) | `main` |
+| **Preview** | `https://protogames.eu/preview/pr-<number>/` (landing page) and `.../preview/pr-<number>/app/` (the editor) | the head of open pull request `<number>` |
+| Index of previews | `https://protogames.eu/preview/` | all open pull requests |
+
+## Custom domain
+
+The site is served from `protogames.eu` (set under Settings → Pages → Custom domain; the site is deployed by a workflow, so no `CNAME` file is needed). DNS is at WEDOS: `A` records `185.199.108.153`, `.109.153`, `.110.153`, `.111.153` and `AAAA` records `2606:50c0:8000::153` to `8003::153` on the apex, and a `www` `CNAME` to `bremondr.github.io`. The old `bremondr.github.io/protogames/` address redirects to the new one. Browser storage (autosave, custom themes) is tied to the address, so work saved only in the browser under the old address is not visible on the new one; export projects first.
 
 ## How to try something out
 
