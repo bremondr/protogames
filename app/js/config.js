@@ -142,7 +142,45 @@ const Config = (() => {
         { "hex": "#A9BCD0", "label": "Snowy Mountains" },
         { "hex": "#5E6B7A", "label": "Icy Peaks" }
         ]
-        }        
+        },
+        {
+            id: 'chess',
+            name: 'Chess',
+            description: 'The two tones of a chessboard.',
+            colors: [
+                { label: 'Light square', hex: '#F0D9B5' },
+                { label: 'Dark square', hex: '#B58863' }
+            ]
+        },
+        {
+            id: 'island-settlers',
+            name: 'Island settlers',
+            description: 'The land types of a trading-and-building island, with the sea around it.',
+            colors: [
+                { label: 'Forest', hex: '#2F6B3A' },
+                { label: 'Hills', hex: '#C0583A' },
+                { label: 'Pasture grass', hex: '#8BC34A' },
+                { label: 'Wheat fields', hex: '#E6C84C' },
+                { label: 'Mountains', hex: '#8A8F98' },
+                { label: 'Desert', hex: '#E3CB8F' },
+                { label: 'Sea water', hex: '#2B6CB0' }
+            ]
+        },
+        {
+            id: 'classic-wood',
+            name: 'Classic wood',
+            description: 'A wooden board with holes, for peg and marble games; six tinted corners for a star board.',
+            colors: [
+                { label: 'Wood board', hex: '#B9894F' },
+                { label: 'Hole', hex: '#F3E3C3' },
+                { label: 'Red corner', hex: '#E57373' },
+                { label: 'Green corner', hex: '#81C784' },
+                { label: 'Blue corner', hex: '#64B5F6' },
+                { label: 'Yellow corner', hex: '#FFD54F' },
+                { label: 'Purple corner', hex: '#BA68C8' },
+                { label: 'Orange corner', hex: '#FFB74D' }
+            ]
+        }
     ];
     const DEFAULT_PALETTE_ID = 'landscape';
 
@@ -185,6 +223,30 @@ const Config = (() => {
             name: 'Fantasy landscape',
             description: 'A hex island with forests, mountains, a volcano, and a few landmarks.',
             file: 'showcases/fantasy-landscape.protogames.json'
+        },
+        {
+            id: 'chess',
+            name: 'Chess',
+            description: 'An 8 x 8 board of square tiles with both armies ready to play.',
+            file: 'showcases/chess.protogames.json'
+        },
+        {
+            id: 'island-settlers',
+            name: 'Island settlers',
+            description: 'A hex island of 19 land tiles in the sea, the board of a trading-and-building game (no pieces).',
+            file: 'showcases/island-settlers.protogames.json'
+        },
+        {
+            id: 'peg-solitaire',
+            name: 'Triangle peg solitaire',
+            description: 'A triangle of 15 holes with 14 pegs: jump over a peg to remove it.',
+            file: 'showcases/peg-solitaire.protogames.json'
+        },
+        {
+            id: 'chinese-checkers',
+            name: 'Chinese checkers',
+            description: 'The 121-hole star for up to six players, ten marbles in each corner.',
+            file: 'showcases/chinese-checkers.protogames.json'
         }
     ];
 
