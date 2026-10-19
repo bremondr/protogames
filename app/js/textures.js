@@ -10,6 +10,7 @@ const Textures = (() => {
     const urls = TextureUtils.createUrlCache();
     const cache = new Map();
     let labelMap = null;
+    let styleMap = null;
 
     const customTiles = new Map();
     /** Registers an image texture for a palette color (custom tile themes). */
@@ -23,17 +24,26 @@ const Textures = (() => {
         cache.delete(key); urls.drop(key);
     }
     function unregister(hex) { const key = String(hex).toLowerCase(); customTiles.delete(key); cache.delete(key); urls.drop(key); }
-    function resetLabels() { labelMap = null; }
+    function resetLabels() { labelMap = null; styleMap = null; }
+
+    function indexPalettes() {
+        labelMap = new Map();
+        styleMap = new Map();
+        Config.COLOR_PALETTES.forEach((p) => p.colors.forEach((c) => {
+            const k = c.hex.toLowerCase();
+            if (!labelMap.has(k)) { labelMap.set(k, c.label.toLowerCase()); styleMap.set(k, p.style || null); }
+        }));
+    }
 
     function getLabel(hex) {
-        if (!labelMap) {
-            labelMap = new Map();
-            Config.COLOR_PALETTES.forEach((p) => p.colors.forEach((c) => {
-                const k = c.hex.toLowerCase();
-                if (!labelMap.has(k)) labelMap.set(k, c.label.toLowerCase());
-            }));
-        }
+        if (!labelMap) indexPalettes();
         return labelMap.get(String(hex).toLowerCase()) || null;
+    }
+
+    /** The drawing style of a palette colour: 'nordic' for the flat palette, null for the usual one. */
+    function getStyle(hex) {
+        if (!styleMap) indexPalettes();
+        return styleMap.get(String(hex).toLowerCase()) || null;
     }
 
     function rng(seed) {
@@ -710,6 +720,120 @@ const Textures = (() => {
             ctx.fillStyle = fount; ctx.beginPath(); ctx.arc(C, top - 6, 18, 0, Math.PI * 2); ctx.fill();
         }
     };
+    // ---- Simple nordic: flat colours and plain shapes, in the style of the map on the landing page ----------------
+    // Palettes with `style: 'nordic'` (see Config) use these instead of G and F; nothing else changes.
+    const NORD = { pine: '#0f3326', trunk: '#3b2a1e', snow: '#dcebf2', ink: '#1c120a', ember: '#ffb347', wood: '#4a3322', trim: '#c9a26a' };
+    function triangles(ctx, list) {
+        ctx.beginPath();
+        list.forEach(([a, b, c, d, e, f]) => { ctx.moveTo(a, b); ctx.lineTo(c, d); ctx.lineTo(e, f); ctx.closePath(); });
+    }
+    // A snow-dusted pine: three tiers, a trunk, a white cap on each tier. (x, y) is the middle of the trunk, s the scale.
+    function nordicPine(ctx, x, y, s) {
+        ctx.save();
+        ctx.translate(x, y); ctx.scale(s, s);
+        ctx.fillStyle = NORD.trunk; ctx.fillRect(-1.6, 8, 3.2, 6);
+        ctx.fillStyle = NORD.pine; triangles(ctx, [[0, -18, 8, -4, -8, -4], [0, -10, 11, 4, -11, 4], [0, -2, 14, 11, -14, 11]]); ctx.fill();
+        ctx.globalAlpha = 0.85; ctx.fillStyle = NORD.snow; triangles(ctx, [[0, -18, 4, -11, -4, -11], [0, -10, 6, -3, -6, -3], [0, -2, 7, 5, -7, 5]]); ctx.fill();
+        ctx.restore();
+    }
+    // A log cabin with a snow-covered roof and a lit door.
+    function nordicCabin(ctx, x, y, s) {
+        ctx.save();
+        ctx.translate(x, y); ctx.scale(s, s);
+        ctx.beginPath(); ctx.moveTo(-13, 8); ctx.lineTo(-13, -2); ctx.lineTo(0, -12); ctx.lineTo(13, -2); ctx.lineTo(13, 8); ctx.closePath();
+        ctx.fillStyle = NORD.wood; ctx.fill(); ctx.strokeStyle = NORD.ink; ctx.lineWidth = 1.2; ctx.lineJoin = 'round'; ctx.stroke();
+        ctx.lineCap = 'round'; ctx.strokeStyle = NORD.snow; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(-15, -1); ctx.lineTo(0, -14); ctx.lineTo(15, -1); ctx.stroke();
+        ctx.strokeStyle = NORD.trim; ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(-5, -8); ctx.lineTo(0, -14); ctx.lineTo(5, -8); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,179,71,0.18)'; ctx.beginPath(); ctx.arc(0, 3, 9, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = NORD.ember; ctx.beginPath(); ctx.moveTo(-3, 8); ctx.lineTo(-3, 4); ctx.arc(0, 4, 3, Math.PI, 0); ctx.lineTo(3, 8); ctx.closePath(); ctx.fill();
+        ctx.restore();
+    }
+    // Flat ground with a few soft marks, tiling seamlessly: the whole style in one place.
+    function nordicGround(ctx, R, hex, marks) {
+        ctx.fillStyle = hex; ctx.fillRect(0, 0, S, S);
+        marks(ctx, R);
+    }
+    const N = {
+        forest(ctx, R, hex) {
+            nordicGround(ctx, R, hex, () => {
+                for (let i = 0; i < 7; i++) { const x = R() * S, y = R() * S, r = 14 + R() * 14; ctx.fillStyle = 'rgba(8,30,22,0.22)'; wrap(x, y, (X, Y) => { ctx.beginPath(); ctx.arc(X, Y, r, 0, Math.PI * 2); ctx.fill(); }); }
+            });
+        },
+        grass(ctx, R, hex) {
+            nordicGround(ctx, R, hex, () => {
+                ctx.strokeStyle = 'rgba(220,235,242,0.22)'; ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+                for (let i = 0; i < 16; i++) { const x = R() * S, y = R() * S; wrap(x, y, (X, Y) => { ctx.beginPath(); ctx.moveTo(X - 3, Y - 4); ctx.lineTo(X, Y); ctx.lineTo(X + 3, Y - 4); ctx.stroke(); }); }
+            });
+        },
+        water(ctx, R, hex) {
+            nordicGround(ctx, R, hex, () => {
+                ctx.strokeStyle = 'rgba(169,201,216,0.16)'; ctx.lineWidth = 2.4; ctx.lineCap = 'round';
+                for (let i = 0; i < 9; i++) { const x = R() * S, y = R() * S, l = 8 + R() * 10; wrap(x, y, (X, Y) => { ctx.beginPath(); ctx.moveTo(X - l, Y); ctx.lineTo(X + l, Y); ctx.stroke(); }); }
+            });
+        },
+        mountain(ctx, R, hex) {
+            nordicGround(ctx, R, hex, () => {
+                for (let i = 0; i < 6; i++) { const x = R() * S, y = R() * S, r = 12 + R() * 16; ctx.fillStyle = 'rgba(30,38,52,0.16)'; wrap(x, y, (X, Y) => { ctx.beginPath(); ctx.arc(X, Y, r, 0, Math.PI * 2); ctx.fill(); }); }
+            });
+        },
+        desert(ctx, R, hex) {
+            nordicGround(ctx, R, hex, () => {
+                ctx.strokeStyle = 'rgba(90,70,40,0.2)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+                for (let i = 0; i < 6; i++) { const x = R() * S, y = R() * S, w = 14 + R() * 12; wrap(x, y, (X, Y) => { ctx.beginPath(); ctx.moveTo(X - w, Y); ctx.quadraticCurveTo(X, Y - 8, X + w, Y); ctx.stroke(); }); }
+            });
+        },
+        snow(ctx, R, hex) {
+            nordicGround(ctx, R, hex, () => {
+                ctx.fillStyle = 'rgba(232,246,255,0.7)';
+                for (let i = 0; i < 9; i++) {
+                    const x = R() * S, y = R() * S, k = 2.2 + R() * 2.2;
+                    wrap(x, y, (X, Y) => { ctx.beginPath(); ctx.moveTo(X, Y - k * 1.6); ctx.lineTo(X + k * 0.4, Y - k * 0.4); ctx.lineTo(X + k * 1.6, Y); ctx.lineTo(X + k * 0.4, Y + k * 0.4); ctx.lineTo(X, Y + k * 1.6); ctx.lineTo(X - k * 0.4, Y + k * 0.4); ctx.lineTo(X - k * 1.6, Y); ctx.lineTo(X - k * 0.4, Y - k * 0.4); ctx.closePath(); ctx.fill(); });
+                }
+            });
+        },
+        village(ctx, R, hex) {
+            nordicGround(ctx, R, hex, () => {
+                ctx.fillStyle = 'rgba(220,235,242,0.16)';
+                for (let i = 0; i < 12; i++) { const x = R() * S, y = R() * S, r = 1.6 + R() * 1.8; wrap(x, y, (X, Y) => { ctx.beginPath(); ctx.arc(X, Y, r, 0, Math.PI * 2); ctx.fill(); }); }
+            });
+        },
+        volcanic(ctx, R, hex) {
+            nordicGround(ctx, R, hex, () => {
+                ctx.fillStyle = 'rgba(255,179,71,0.55)';
+                for (let i = 0; i < 14; i++) { const x = R() * S, y = R() * S, r = 1.2 + R() * 1.6; wrap(x, y, (X, Y) => { ctx.beginPath(); ctx.arc(X, Y, r, 0, Math.PI * 2); ctx.fill(); }); }
+            });
+        }
+    };
+    // Single-tile drawings, centred on the tile like the village and volcano of the landscape set.
+    const NF = {
+        forest(ctx) { nordicPine(ctx, 100, 128, 3.9); nordicPine(ctx, 160, 144, 3.2); },
+        grass(ctx) { nordicPine(ctx, 128, 136, 3.1); },
+        village(ctx) { nordicCabin(ctx, 128, 136, 3.8); },
+        mountain(ctx) {
+            const peak = (cx, top, half, base, dark, light) => {
+                triangles(ctx, [[cx, top, cx + half, base, cx - half, base]]); ctx.fillStyle = dark; ctx.fill();
+                triangles(ctx, [[cx, top, cx, base, cx - half, base]]); ctx.fillStyle = light; ctx.fill();
+                triangles(ctx, [[cx, top, cx + half * 0.28, top + (base - top) * 0.28, cx - half * 0.28, top + (base - top) * 0.28]]); ctx.fillStyle = NORD.snow; ctx.fill();
+            };
+            peak(168, 100, 46, 178, '#4a5565', '#8793a6');
+            peak(110, 66, 62, 178, '#4f5a6b', '#95a1b4');
+        },
+        volcanic(ctx) {
+            const glow = ctx.createRadialGradient(128, 96, 4, 128, 96, 70);
+            glow.addColorStop(0, 'rgba(255,179,71,0.5)'); glow.addColorStop(1, 'rgba(255,179,71,0)');
+            ctx.fillStyle = glow; ctx.fillRect(0, 0, 256, 256);
+            ctx.beginPath(); ctx.moveTo(44, 182); ctx.lineTo(104, 100); ctx.lineTo(152, 100); ctx.lineTo(212, 182); ctx.closePath();
+            ctx.fillStyle = '#33282c'; ctx.fill();
+            ctx.beginPath(); ctx.moveTo(128, 100); ctx.lineTo(152, 100); ctx.lineTo(212, 182); ctx.lineTo(128, 182); ctx.closePath();
+            ctx.fillStyle = '#241b1f'; ctx.fill();
+            ctx.fillStyle = NORD.ember; ctx.beginPath(); ctx.ellipse(128, 100, 24, 7, 0, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = NORD.ember; ctx.lineWidth = 5; ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.moveTo(120, 104); ctx.lineTo(110, 150); ctx.moveTo(138, 104); ctx.lineTo(150, 164); ctx.stroke();
+        }
+    };
+
     function featureKind(label) {
         if (/village/.test(label || '')) return 'village';
         if (/volcan/.test(label || '')) return 'volcano';
@@ -742,13 +866,14 @@ const Textures = (() => {
         const ctx = canvas.getContext('2d');
         const R = rng(hashStr(key + label));
         const kind = generatorFor(label);
-        G[kind](ctx, R, hex);
+        const nordic = getStyle(key) === 'nordic';
+        (nordic && N[kind] ? N : G)[kind](ctx, R, hex);
         let feature = null;
-        const fk = featureKind(label);
+        const fk = nordic ? (NF[kind] ? kind : null) : featureKind(label);
         if (fk) {
             feature = document.createElement('canvas');
             feature.width = 256; feature.height = 256;
-            F[fk](feature.getContext('2d'), rng(hashStr(key + fk)), hex);
+            (nordic ? NF : F)[fk](feature.getContext('2d'), rng(hashStr(key + fk)), hex);
         }
         const entry = { canvas, feature, url: null, patterns: new WeakMap() };
         cache.set(key, entry);

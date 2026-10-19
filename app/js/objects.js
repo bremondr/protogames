@@ -344,6 +344,126 @@ const Objects = (() => {
             });
         }
     });
+    // ---- Simple nordic: plain flat shapes, a thin dark outline, snow on every roof (the landing page map) -------------
+    const NORD = { pine: '#0f3326', trunk: '#3b2a1e', snow: '#dcebf2', ink: '#1c120a', ember: '#ffb347', wood: '#4a3322', trim: '#c9a26a', stone: '#6c7787', stoneLight: '#8a96a8', teal: '#1f4a3a' };
+    /** Runs `draw` in a local space where (0, 0) is where the object stands and one unit is 1 / s of the scale. */
+    function nordic(ctx, x, y, s, draw) {
+        ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+        draw(ctx); ctx.restore();
+    }
+    const inked = (ctx, lw = 1.2) => { ctx.strokeStyle = NORD.ink; ctx.lineWidth = lw; ctx.stroke(); };
+    const flat = (ctx, pts, col, lw) => { poly(ctx, pts); ctx.fillStyle = col; ctx.fill(); if (lw !== 0) inked(ctx, lw); };
+    const tri = (ctx, list, col, alpha = 1) => { ctx.beginPath(); list.forEach(([a, b, c, d, e, f]) => { ctx.moveTo(a, b); ctx.lineTo(c, d); ctx.lineTo(e, f); ctx.closePath(); }); ctx.globalAlpha = alpha; ctx.fillStyle = col; ctx.fill(); ctx.globalAlpha = 1; };
+    const pine = (ctx) => {
+        ctx.fillStyle = NORD.trunk; ctx.fillRect(-1.6, 8, 3.2, 6);
+        tri(ctx, [[0, -18, 8, -4, -8, -4], [0, -10, 11, 4, -11, 4], [0, -2, 14, 11, -14, 11]], NORD.pine);
+        tri(ctx, [[0, -18, 4, -11, -4, -11], [0, -10, 6, -3, -6, -3], [0, -2, 7, 5, -7, 5]], NORD.snow, 0.85);
+    };
+    const lit = (ctx, x, y, w, h) => {
+        ctx.fillStyle = 'rgba(255,179,71,0.2)'; ctx.beginPath(); ctx.arc(x + w / 2, y + h / 2, Math.max(w, h) * 1.6, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = NORD.ember; ctx.beginPath(); ctx.moveTo(x, y + h); ctx.lineTo(x, y + w / 2); ctx.arc(x + w / 2, y + w / 2, w / 2, Math.PI, 0); ctx.lineTo(x + w, y + h); ctx.closePath(); ctx.fill();
+    };
+    const snowLine = (ctx, pts, w = 3) => { ctx.strokeStyle = NORD.snow; ctx.lineWidth = w; ctx.beginPath(); pts.forEach(([a, b], i) => (i ? ctx.lineTo(a, b) : ctx.moveTo(a, b))); ctx.stroke(); };
+    Object.assign(G, {
+        nordicCabin(ctx) {
+            shadow(ctx, 64, 104, 40);
+            nordic(ctx, 64, 76, 3.4, () => {
+                flat(ctx, [[-13, 8], [-13, -2], [0, -12], [13, -2], [13, 8]], NORD.wood);
+                snowLine(ctx, [[-15, -1], [0, -14], [15, -1]]);
+                ctx.strokeStyle = NORD.trim; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(-5, -8); ctx.lineTo(0, -14); ctx.lineTo(5, -8); ctx.stroke();
+                lit(ctx, -3, 1, 6, 7);
+            });
+        },
+        nordicLonghouse(ctx) {
+            shadow(ctx, 64, 104, 56);
+            nordic(ctx, 64, 80, 2.3, () => {
+                flat(ctx, [[-28, 10], [-28, -2], [28, -2], [28, 10]], '#5a3d28');
+                flat(ctx, [[-34, -1], [-21, -15], [21, -15], [34, -1]], NORD.wood);
+                snowLine(ctx, [[-36, -1], [-21, -16], [21, -16], [36, -1]], 3.4);
+                ctx.strokeStyle = NORD.trim; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(-20, -9); ctx.lineTo(20, -9); ctx.stroke();
+                lit(ctx, -4, 1, 8, 9); lit(ctx, -21, 1, 5, 5); lit(ctx, 16, 1, 5, 5);
+                flat(ctx, [[14, -15], [14, -23], [19, -23], [19, -15]], '#3b2a1e');
+                snowLine(ctx, [[13, -23], [20, -23]], 2.4);
+            });
+        },
+        nordicWatchtower(ctx) {
+            shadow(ctx, 64, 104, 30);
+            nordic(ctx, 64, 78, 3, () => {
+                flat(ctx, [[-7, 9], [-5, -12], [5, -12], [7, 9]], NORD.wood);
+                ctx.strokeStyle = NORD.ink; ctx.lineWidth = 0.9; ctx.beginPath(); ctx.moveTo(-6, 9); ctx.lineTo(5, -12); ctx.moveTo(6, 9); ctx.lineTo(-5, -12); ctx.stroke();
+                flat(ctx, [[-9, -12], [-9, -17], [9, -17], [9, -12]], '#5a3d28');
+                lit(ctx, -2.5, -17, 5, 5);
+                flat(ctx, [[-11, -17], [0, -29], [11, -17]], NORD.wood);
+                snowLine(ctx, [[-12, -16], [0, -30], [12, -16]], 2.8);
+            });
+        },
+        nordicPine(ctx) {
+            shadow(ctx, 64, 104, 26);
+            nordic(ctx, 64, 59, 3.2, pine);
+        },
+        nordicGrove(ctx) {
+            shadow(ctx, 64, 104, 48);
+            nordic(ctx, 38, 60, 2.5, pine);
+            nordic(ctx, 92, 62, 2.2, pine);
+            nordic(ctx, 64, 66, 3.2, pine);
+        },
+        nordicRunestone(ctx) {
+            shadow(ctx, 64, 104, 26);
+            nordic(ctx, 64, 72, 4, () => {
+                flat(ctx, [[-9, 8], [-11, -6], [-4, -15], [6, -14], [11, -4], [9, 8]], NORD.stone);
+                flat(ctx, [[-4, -15], [-3, 8], [-9, 8], [-11, -6]], NORD.stoneLight, 0);
+                ctx.beginPath(); ctx.moveTo(-9, 8); ctx.lineTo(-11, -6); ctx.lineTo(-4, -15); ctx.lineTo(6, -14); ctx.lineTo(11, -4); ctx.lineTo(9, 8); ctx.closePath(); inked(ctx);
+                ctx.fillStyle = 'rgba(255,179,71,0.2)'; ctx.beginPath(); ctx.arc(1, -2, 8, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = NORD.ember; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(0, 4); ctx.moveTo(0, -9); ctx.lineTo(4.5, -5); ctx.lineTo(0, -1); ctx.moveTo(0, -1); ctx.lineTo(4.5, 4); ctx.stroke();
+            });
+        },
+        nordicFire(ctx) {
+            shadow(ctx, 64, 104, 34);
+            nordic(ctx, 64, 86, 3.6, () => {
+                ctx.fillStyle = 'rgba(255,179,71,0.2)'; ctx.beginPath(); ctx.arc(0, -4, 14, 0, Math.PI * 2); ctx.fill();
+                [[-10, 6], [-6, 8], [-1, 9], [5, 8], [10, 6]].forEach(([x, y]) => { ctx.beginPath(); ctx.arc(x, y, 2.6, 0, Math.PI * 2); ctx.fillStyle = NORD.stone; ctx.fill(); inked(ctx, 0.8); });
+                ctx.strokeStyle = NORD.wood; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-9, 6); ctx.lineTo(9, 2); ctx.moveTo(9, 6); ctx.lineTo(-9, 2); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, -14); ctx.quadraticCurveTo(8, -5, 5, 1); ctx.quadraticCurveTo(0, 5, -5, 1); ctx.quadraticCurveTo(-8, -6, 0, -14); ctx.closePath();
+                ctx.fillStyle = '#ff7a3a'; ctx.fill(); inked(ctx, 0.9);
+                ctx.beginPath(); ctx.moveTo(0, -8); ctx.quadraticCurveTo(3.5, -3, 2, 0); ctx.quadraticCurveTo(0, 2, -2, 0); ctx.quadraticCurveTo(-3.5, -3, 0, -8); ctx.closePath();
+                ctx.fillStyle = NORD.ember; ctx.fill();
+            });
+        },
+        nordicLongship(ctx) {
+            shadow(ctx, 64, 106, 48);
+            nordic(ctx, 64, 80, 2.4, () => {
+                ctx.strokeStyle = NORD.ink; ctx.lineWidth = 1.1; ctx.beginPath(); ctx.moveTo(0, 6); ctx.lineTo(0, -27); ctx.stroke();
+                flat(ctx, [[-1, -25], [-17, -22], [-15, -6], [-1, -3]], NORD.snow);
+                ctx.fillStyle = '#b5452e'; ctx.fillRect(-16.2, -16, 15, 3.2);
+                ctx.beginPath(); ctx.moveTo(-1, -25); ctx.lineTo(-17, -22); ctx.lineTo(-15, -6); ctx.lineTo(-1, -3); ctx.closePath(); inked(ctx, 0.9);
+                ctx.beginPath(); ctx.moveTo(-26, -3); ctx.quadraticCurveTo(-24, 8, -14, 9); ctx.lineTo(14, 9); ctx.quadraticCurveTo(24, 8, 26, -3); ctx.quadraticCurveTo(14, 2, 0, 2); ctx.quadraticCurveTo(-14, 2, -26, -3); ctx.closePath();
+                ctx.fillStyle = NORD.wood; ctx.fill(); inked(ctx, 1.2);
+                ctx.fillStyle = NORD.trim; ctx.beginPath(); ctx.moveTo(-26, -3); ctx.lineTo(-27, -9); ctx.lineTo(-23, -4); ctx.closePath(); ctx.fill();
+                [-16, -8, 0, 8, 16].forEach((x) => { ctx.beginPath(); ctx.arc(x, 5, 2.2, 0, Math.PI * 2); ctx.fillStyle = NORD.snow; ctx.fill(); inked(ctx, 0.7); });
+            });
+        },
+        nordicBanner(ctx) {
+            shadow(ctx, 64, 104, 26);
+            nordic(ctx, 64, 76, 3.6, () => {
+                [[-6, 8, 4], [0, 9, 4.4], [6, 8, 3.6]].forEach(([x, y, r]) => { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = NORD.stone; ctx.fill(); inked(ctx, 0.9); });
+                ctx.strokeStyle = NORD.trunk; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, 6); ctx.lineTo(0, -22); ctx.stroke();
+                flat(ctx, [[1, -21], [14, -18], [10, -12], [14, -6], [1, -8]], NORD.teal);
+                flat(ctx, [[6, -16], [8.5, -13.5], [6, -11], [3.5, -13.5]], NORD.ember, 0.7);
+                ctx.fillStyle = NORD.snow; ctx.beginPath(); ctx.arc(0, -23, 2, 0, Math.PI * 2); ctx.fill();
+            });
+        }
+    });
+    const NORDIC = [
+        { id: 'nordicCabin', label: 'Cabin' },
+        { id: 'nordicLonghouse', label: 'Longhouse' },
+        { id: 'nordicWatchtower', label: 'Watchtower' },
+        { id: 'nordicPine', label: 'Pine' },
+        { id: 'nordicGrove', label: 'Pine grove' },
+        { id: 'nordicRunestone', label: 'Runestone' },
+        { id: 'nordicFire', label: 'Campfire' },
+        { id: 'nordicLongship', label: 'Longship' },
+        { id: 'nordicBanner', label: 'Banner' }
+    ];
     const SPACE = [
         { id: 'star', label: 'Yellow Star' },
         { id: 'redDwarf', label: 'Red Dwarf' },
@@ -371,7 +491,8 @@ const Objects = (() => {
     // Object themes: add new sets here ({ id, name, items }) and their drawings to G.
     const THEMES = [
         { id: 'medieval', name: 'Medieval', items: MEDIEVAL },
-        { id: 'space', name: 'Space', items: SPACE }
+        { id: 'space', name: 'Space', items: SPACE },
+        { id: 'simple-nordic', name: 'Simple nordic', items: NORDIC }
     ];
     let ALL = THEMES.flatMap((t) => t.items);
     const custom = new Map(); // id -> canvas

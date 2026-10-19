@@ -15,7 +15,7 @@ Protogames lets designers sketch and iterate on board layouts quickly—no build
 - Board outlines: Rectangle (a square when width and height are equal), Hexagon, Triangle, Circle, an **Infinite canvas** (prototype): an endless hex / square / triangle lattice that you pan across; only drawn tiles are saved and shared, and **Country**: a board cut to the outline of a real country (Natural Earth 1:50m, shipped in `data/`), with a choice of tiles across and which islands to include, also for multi-country regions (Scandinavia, Balkans, European Union and more) with the borders between the countries highlighted
 - Painting: one drawing tool with a Brush / Fill / Line switch (and brush size, theme and colours) in its settings popover; the eraser has its own size; objects are placed one per click, ignoring the draw mode and size
 - Fill and line tools: flood-fill a connected region in one click, or drag from tile A to tile B to paint a gap-free tile path (works on hexagon, square and triangle grids; each is a single undo step; they apply to colours only)
-- Palettes: Switchable themed color palettes (e.g., Landscape, Space) with labeled swatches
+- Palettes: Switchable themed color palettes (e.g., Landscape, Simple nordic, Space) with labeled swatches; item sets to match (Medieval, Simple nordic, Space)
 - Projects: every board is a named project kept in the browser and autosaved as you work. The home page lists them (open, delete); a new project asks for a name; share links, project files and the showcase map open as new projects instead of replacing the one you are working on
 - History: Undo/redo
 - File ops: Save/load JSON projects; export PNG and SVG (SVG is a flat-colour outline of the tiles: no textures or objects)
