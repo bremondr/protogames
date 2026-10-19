@@ -453,6 +453,18 @@ const Objects = (() => {
             });
         }
     });
+    // The items stand a little smaller than the others, so the flat style does not crowd the tile: each drawing is shrunk
+    // towards the point it stands on.
+    const NORDIC_SCALE = 0.86;
+    ['nordicCabin', 'nordicLonghouse', 'nordicWatchtower', 'nordicPine', 'nordicGrove', 'nordicRunestone', 'nordicFire', 'nordicLongship', 'nordicBanner'].forEach((id) => {
+        const draw = G[id];
+        G[id] = (ctx) => {
+            ctx.save();
+            ctx.translate(64, 104); ctx.scale(NORDIC_SCALE, NORDIC_SCALE); ctx.translate(-64, -104);
+            draw(ctx);
+            ctx.restore();
+        };
+    });
     const NORDIC = [
         { id: 'nordicCabin', label: 'Cabin' },
         { id: 'nordicLonghouse', label: 'Longhouse' },

@@ -736,6 +736,25 @@ const Textures = (() => {
         ctx.globalAlpha = 0.85; ctx.fillStyle = NORD.snow; triangles(ctx, [[0, -18, 4, -11, -4, -11], [0, -10, 6, -3, -6, -3], [0, -2, 7, 5, -7, 5]]); ctx.fill();
         ctx.restore();
     }
+    // A dwarf birch (Betula nana): a low tangle of thin twigs with small round leaves, some turned to autumn amber.
+    // (x, y) is where the stems meet the ground, s the scale.
+    function dwarfBirch(ctx, x, y, s, seed) {
+        ctx.save();
+        ctx.translate(x, y); ctx.scale(s, s);
+        ctx.lineCap = 'round';
+        const twigs = [[-9, -8, -13, -17], [-4, -10, -5, -21], [2, -10, 5, -22], [6, -8, 12, -16], [0, -6, -1, -13]];
+        ctx.strokeStyle = NORD.trunk; ctx.lineWidth = 1.3;
+        ctx.beginPath();
+        twigs.forEach(([bx, by, tx, ty]) => { ctx.moveTo(0, 0); ctx.quadraticCurveTo(bx, by, tx, ty); });
+        ctx.stroke();
+        const leaves = [[-13, -17], [-10, -20], [-15, -13], [-5, -21], [-8, -16], [-2, -23], [5, -22], [2, -18], [9, -19], [12, -16], [8, -13], [-1, -13], [-5, -10], [3, -11]];
+        leaves.forEach(([lx, ly], i) => {
+            ctx.fillStyle = i % 4 === 1 ? '#d9a05b' : i % 4 === 3 ? '#a3b78f' : '#7f9a72';
+            ctx.beginPath(); ctx.arc(lx + (seed % 3 - 1) * 0.4, ly, 3.1, 0, Math.PI * 2); ctx.fill();
+            ctx.lineWidth = 0.7; ctx.strokeStyle = 'rgba(20,32,24,0.55)'; ctx.stroke(); ctx.strokeStyle = NORD.trunk; ctx.lineWidth = 1.3;
+        });
+        ctx.restore();
+    }
     // A log cabin with a snow-covered roof and a lit door.
     function nordicCabin(ctx, x, y, s) {
         ctx.save();
@@ -809,7 +828,7 @@ const Textures = (() => {
     // Single-tile drawings, centred on the tile like the village and volcano of the landscape set.
     const NF = {
         forest(ctx) { nordicPine(ctx, 100, 128, 3.9); nordicPine(ctx, 160, 144, 3.2); },
-        grass(ctx) { nordicPine(ctx, 128, 136, 3.1); },
+        grass(ctx) { dwarfBirch(ctx, 96, 158, 3.4, 0); dwarfBirch(ctx, 162, 148, 2.6, 1); },
         village(ctx) { nordicCabin(ctx, 128, 136, 3.8); },
         mountain(ctx) {
             const peak = (cx, top, half, base, dark, light) => {
