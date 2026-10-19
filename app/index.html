@@ -57,7 +57,7 @@
                  overall dimensions before generating tiles.
                  -------------------------------------------- -->
             <section class="panel" aria-labelledby="board-setup-title">
-                <h2 id="board-setup-title">Board Setup</h2>
+                <h2 id="board-setup-title"><button type="button" class="panel-toggle" aria-expanded="true"><span>Board Setup</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></h2>
                 <form class="panel-form">
                     <label class="field">
                         <span class="field-label">Tile shape</span>
@@ -160,7 +160,7 @@
                  a set of pieces each. Used by playtest.
                  -------------------------------------------- -->
             <section class="panel" aria-labelledby="players-title">
-                <h2 id="players-title">Players</h2>
+                <h2 id="players-title"><button type="button" class="panel-toggle" aria-expanded="true"><span>Players</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></h2>
                 <p class="field-hint panel-intro">For playtest: each player has a colour, a seat at one edge of the screen and a set of pieces. Mark where a player starts with the Start tool.</p>
                 <div id="playersList" class="players-list"></div>
                 <p id="playersHints" class="field-hint players-hints" role="status"></p>
@@ -175,7 +175,7 @@
                  link to it and opening another project or file.
                  -------------------------------------------- -->
             <section class="panel" aria-labelledby="project-title">
-                <h2 id="project-title">Project</h2>
+                <h2 id="project-title"><button type="button" class="panel-toggle" aria-expanded="true"><span>Project</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></h2>
                 <div class="panel-form">
                     <label class="field">
                         <span class="field-label">Name</span>
@@ -196,7 +196,7 @@
                  from JSON files or plain images.
                  -------------------------------------------- -->
             <section class="panel" aria-labelledby="themes-title">
-                <h2 id="themes-title">Themes</h2>
+                <h2 id="themes-title"><button type="button" class="panel-toggle" aria-expanded="true"><span>Themes</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></h2>
                 <p class="field-hint panel-intro">Import a JSON file or images. Images become tiles or items named after the file.</p>
                 <div class="theme-groups">
                     <div class="theme-group">
@@ -688,6 +688,7 @@
     <script defer src="js/exporter.js"></script>
     <script defer src="js/themeManager.js"></script>
     <script defer src="js/ui.js"></script>
+    <script defer src="js/panels.js"></script>
     <script defer src="js/viewControls.js"></script>
     <script defer src="js/shortcuts.js"></script>
     <script defer src="js/toolbar.js"></script>
