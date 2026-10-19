@@ -39,11 +39,7 @@ const UI = (() => {
         elements.undoButton = document.querySelector('[data-action="undo"]');
         elements.redoButton = document.querySelector('[data-action="redo"]');
         elements.clearButton = document.querySelector('[data-action="clear-board"]');
-        elements.saveButton = document.getElementById('saveProjectBtn');
-        elements.loadButton = document.getElementById('loadProjectBtn');
         elements.loadInput = document.getElementById('loadProject');
-        elements.exportPNGBtn = document.getElementById('exportPNGBtn');
-        elements.exportSVGBtn = document.getElementById('exportSVGBtn');
         elements.notificationBar = document.getElementById('notificationBar');
 
         elements.boardShapeSelect?.addEventListener('change', refreshBoardForm);

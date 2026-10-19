@@ -115,7 +115,10 @@ const CountryRegions = (() => {
     const originalExport = Renderer.createExportCanvas;
     Renderer.createExportCanvas = function () {
         const out = originalExport.apply(this, arguments);
-        if (out && active()) drawBorders(out.getContext('2d'), AppState.getState().polygons, ViewMath.identity(), 1);
+        if (out && active()) {
+            const scale = out.exportScale || 1;
+            drawBorders(out.getContext('2d'), AppState.getState().polygons, { ...ViewMath.identity(), scale }, scale);
+        }
         return out;
     };
 

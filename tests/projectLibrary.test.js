@@ -124,3 +124,25 @@ test('importing the same old autosave twice (two tabs starting together) makes o
     assert.equal(Library.importLegacy(), 0);
     assert.deepEqual(plain(Library.list()).map((entry) => entry.name), ['Once'], 'the project already there is not overwritten');
 });
+
+test('ages are told in plain words', () => {
+    const { Library } = fresh();
+    const now = Date.UTC(2026, 9, 19, 12, 0, 0);
+    assert.equal(Library.describeAge(0, now), 'Never saved');
+    assert.equal(Library.describeAge(now - 20 * 1000, now), 'Edited just now');
+    assert.equal(Library.describeAge(now - 60 * 1000, now), 'Edited 1 minute ago');
+    assert.equal(Library.describeAge(now - 5 * 60 * 1000, now), 'Edited 5 minutes ago');
+    assert.equal(Library.describeAge(now - 3 * 3600 * 1000, now), 'Edited 3 hours ago');
+    assert.equal(Library.describeAge(now - 30 * 3600 * 1000, now), 'Edited yesterday');
+    assert.equal(Library.describeAge(now - 4 * 86400 * 1000, now), 'Edited 4 days ago');
+    assert.equal(Library.describeAge(Date.UTC(2026, 6, 1), now), 'Edited 2026-07-01');
+    assert.equal(Library.describeAge(now + 5000, now), 'Edited just now', 'a clock that is off does not make negative ages');
+});
+
+test('a project is described by its board and tiles', () => {
+    const { Library } = fresh();
+    assert.equal(Library.describeBoard({ readable: true, boardShape: 'hexagon', gridType: 'hexagon', tiles: 91 }), 'Hexagon board, 91 hexagon tiles');
+    assert.equal(Library.describeBoard({ readable: true, boardShape: 'rectangle', gridType: 'square', tiles: 1 }), 'Rectangle board, 1 square tile');
+    assert.equal(Library.describeBoard({ readable: true, boardShape: '', gridType: '', tiles: 4 }), '4 tiles');
+    assert.equal(Library.describeBoard({ readable: false }), 'This project cannot be read');
+});

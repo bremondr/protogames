@@ -11,21 +11,13 @@ const FileManager = (() => {
     let autoSaveIntervalId = null;
     function init(uiRefs) {
         ui = uiRefs;
-        ui?.saveButton?.addEventListener('click', saveProjectFile);
-        if (ui?.loadButton && ui?.loadInput) {
-            ui.loadButton.addEventListener('click', () => ui.loadInput.click());
-            ui.loadInput.addEventListener('change', handleFileUpload);
-        }
+        ui?.loadInput?.addEventListener('change', handleFileUpload);
         wireProjectPanel();
     }
 
     function wireProjectPanel() {
         const nameInput = document.getElementById('projectNameInput');
         nameInput?.addEventListener('change', () => renameProject(nameInput.value));
-        document.getElementById('newProjectButton')?.addEventListener('click', () => {
-            autoSaveToLocalStorage(true);
-            location.assign(location.pathname);
-        });
     }
 
     /** Shows the open project's name in the Project panel. */
@@ -386,6 +378,20 @@ const FileManager = (() => {
         });
     }
 
+    /** Goes to a blank board that asks for a name (the open project is saved first). */
+    function startAnotherProject() {
+        autoSaveToLocalStorage(true);
+        location.assign(location.pathname);
+    }
+
+    /** Opens another project of the library in this tab; the open one is saved first. */
+    function openProjectById(id) {
+        if (!ProjectLibrary.isValidId(id)) return;
+        if (id === AppState.getState().currentProjectId) return;
+        autoSaveToLocalStorage(true);
+        location.assign(`${location.pathname}?project=${encodeURIComponent(id)}`);
+    }
+
     function downloadProject() {
         const payload = prepareProjectData();
         const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -486,6 +492,9 @@ const FileManager = (() => {
         hasUserWork,
         confirmReplace,
         saveProjectFile,
+        startAnotherProject,
+        downloadProject,
+        openProjectById,
         showMessage
     };
 })();

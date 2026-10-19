@@ -169,33 +169,10 @@
             </section>
 
             <!-- --------------------------------------------
-                 FILE MANAGEMENT
-                 Allows saving/loading project JSON files and
-                 placeholders for exporting to other formats.
-                 -------------------------------------------- -->
-            <section class="panel" aria-labelledby="files-title">
-                <h2 id="files-title">File Management</h2>
-                <div class="stacked-buttons">
-                    <button type="button" id="saveProjectBtn" data-shortcut="save" class="secondary-button">Save Project</button>
-                    <button type="button" id="loadProjectBtn" class="secondary-button file-button">Load Project</button>
-                    <button type="button" id="shareButton" class="secondary-button share-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>Share Link</button>
-                    <input type="file" id="loadProject" class="visually-hidden" aria-label="Load project file" accept=".json">
-                    <div class="field">
-                        <span class="field-label">Export</span>
-                        <div class="export-buttons">
-                            <button type="button" id="exportPNGBtn" class="secondary-button">PNG</button>
-                            <button type="button" id="exportSVGBtn" class="secondary-button">SVG</button>
-                        </div>
-                        <button type="button" id="printButton" class="secondary-button print-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9V3h12v6"></path><rect x="3" y="9" width="18" height="8" rx="2"></rect><path d="M6 14h12v7H6z"></path></svg>Print…</button>
-                    </div>
-                </div>
-            </section>
-
-            <!-- --------------------------------------------
                  PROJECT
-                 Every board is a project saved in this browser.
-                 Rename it here, start another one, or go back to
-                 the home page to see them all.
+                 The open project: its name, and the dialogs for
+                 exporting it (print, PNG, SVG, file), sharing a
+                 link to it and opening another project or file.
                  -------------------------------------------- -->
             <section class="panel" aria-labelledby="project-title">
                 <h2 id="project-title">Project</h2>
@@ -204,9 +181,11 @@
                         <span class="field-label">Name</span>
                         <input type="text" id="projectNameInput" maxlength="80" autocomplete="off" aria-label="Project name">
                     </label>
-                    <div class="project-actions">
-                        <button type="button" id="newProjectButton" class="secondary-button">New project</button>
-                        <a class="secondary-button" id="allProjectsLink" href="../">All projects</a>
+                    <div class="stacked-buttons">
+                        <button type="button" id="exportButton" class="secondary-button menu-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>Export…</button>
+                        <button type="button" id="shareButton" class="secondary-button menu-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>Share Link</button>
+                        <button type="button" id="loadProjectBtn" class="secondary-button menu-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>Load…</button>
+                        <input type="file" id="loadProject" class="visually-hidden" aria-label="Load project file" accept=".json">
                     </div>
                 </div>
             </section>
@@ -429,111 +408,202 @@
         </main>
     </div>
 
-    <!-- Print dialog: tile size in mm, home-printer pages or one sheet, live preview, PDF download -->
-    <div id="printDialog" class="modal-backdrop hidden" role="presentation">
-        <div class="modal print-dialog" role="dialog" aria-modal="true" aria-labelledby="printTitle">
+    <!-- Export dialog: print (PDF), PNG, SVG and the project file, each with its own options -->
+    <div id="exportDialog" class="modal-backdrop hidden" role="presentation">
+        <div class="modal print-dialog" role="dialog" aria-modal="true" aria-labelledby="exportTitle">
             <div class="theme-editor-head">
-                <h3 id="printTitle">Print</h3>
-                <button type="button" id="printClose" class="icon-close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+                <h3 id="exportTitle">Export</h3>
+                <button type="button" id="exportClose" class="icon-close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
             </div>
-            <div class="print-body">
-                <div class="print-controls">
-                    <div class="print-field">
-                        <span class="field-label">Output</span>
-                        <div class="mode-switch" role="group" aria-label="Output" data-pr-group="mode">
-                            <button type="button" data-value="tiled">Home printer</button>
-                            <button type="button" data-value="sheet">Single sheet</button>
+            <div class="export-tabs" role="tablist" aria-label="Export as">
+                <button type="button" role="tab" id="exportTab-print" aria-controls="exportPanel-print" data-tab="print">Print</button>
+                <button type="button" role="tab" id="exportTab-png" aria-controls="exportPanel-png" data-tab="png">PNG</button>
+                <button type="button" role="tab" id="exportTab-svg" aria-controls="exportPanel-svg" data-tab="svg">SVG</button>
+                <button type="button" role="tab" id="exportTab-file" aria-controls="exportPanel-file" data-tab="file">Project file</button>
+            </div>
+            <div class="export-panel" role="tabpanel" id="exportPanel-print" aria-labelledby="exportTab-print">
+                <div class="print-body">
+                    <div class="print-controls">
+                        <div class="print-field">
+                            <span class="field-label">Output</span>
+                            <div class="mode-switch" role="group" aria-label="Output" data-pr-group="mode">
+                                <button type="button" data-value="tiled">Home printer</button>
+                                <button type="button" data-value="sheet">Single sheet</button>
+                            </div>
+                            <span class="print-hint" id="printModeHint"></span>
                         </div>
-                        <span class="print-hint" id="printModeHint"></span>
-                    </div>
-                    <label class="print-field">
-                        <span class="field-label" id="printMeasureLabel">Tile size</span>
-                        <span class="print-inline"><input type="number" data-pr="tileMm" min="5" max="200" step="1" aria-label="Tile size in millimetres"><span>mm</span></span>
-                    </label>
-                    <div class="print-section" id="printTiledOnly">
                         <label class="print-field">
-                            <span class="field-label">Paper</span>
-                            <select data-pr="paper" aria-label="Paper size">
-                                <option value="A4">A4 (210 × 297 mm)</option>
-                                <option value="Letter">Letter (8.5 × 11 in)</option>
-                                <option value="A3">A3 (297 × 420 mm)</option>
-                            </select>
+                            <span class="field-label" id="printMeasureLabel">Tile size</span>
+                            <span class="print-inline"><input type="number" data-pr="tileMm" min="5" max="200" step="1" aria-label="Tile size in millimetres"><span>mm</span></span>
+                        </label>
+                        <div class="print-section" id="printTiledOnly">
+                            <label class="print-field">
+                                <span class="field-label">Paper</span>
+                                <select data-pr="paper" aria-label="Paper size">
+                                    <option value="A4">A4 (210 × 297 mm)</option>
+                                    <option value="Letter">Letter (8.5 × 11 in)</option>
+                                    <option value="A3">A3 (297 × 420 mm)</option>
+                                </select>
+                            </label>
+                            <div class="print-field">
+                                <span class="field-label">Orientation</span>
+                                <div class="mode-switch" role="group" aria-label="Orientation" data-pr-group="orientation">
+                                    <button type="button" data-value="auto">Auto</button>
+                                    <button type="button" data-value="portrait">Portrait</button>
+                                    <button type="button" data-value="landscape">Landscape</button>
+                                </div>
+                            </div>
+                            <label class="print-field">
+                                <span class="field-label">Overlap (mm)</span>
+                                <input type="number" data-pr="overlapMm" min="0" max="30" step="1" aria-label="Overlap in millimetres">
+                            </label>
+                            <label class="print-check"><input type="checkbox" data-pr="labels">Page labels and assembly hints</label>
+                        </div>
+                        <div class="print-section" id="printSheetOnly" hidden>
+                            <label class="print-field">
+                                <span class="field-label">Sheet size</span>
+                                <select data-pr="sheet" aria-label="Sheet size">
+                                    <option value="fit">Fit to board</option>
+                                    <option value="A3">A3 (297 × 420 mm)</option>
+                                    <option value="A2">A2 (420 × 594 mm)</option>
+                                    <option value="A1">A1 (594 × 841 mm)</option>
+                                    <option value="A0">A0 (841 × 1189 mm)</option>
+                                </select>
+                            </label>
+                            <label class="print-check"><input type="checkbox" data-pr="cropMarks">Crop marks</label>
+                        </div>
+                        <label class="print-field">
+                            <span class="field-label">Margin (mm)</span>
+                            <input type="number" data-pr="marginMm" min="0" max="30" step="1" aria-label="Margin in millimetres">
                         </label>
                         <div class="print-field">
-                            <span class="field-label">Orientation</span>
-                            <div class="mode-switch" role="group" aria-label="Orientation" data-pr-group="orientation">
-                                <button type="button" data-value="auto">Auto</button>
-                                <button type="button" data-value="portrait">Portrait</button>
-                                <button type="button" data-value="landscape">Landscape</button>
+                            <span class="field-label">Objects</span>
+                            <div class="mode-switch" role="group" aria-label="Objects" data-pr-group="objects" id="printObjectsGroup">
+                                <button type="button" data-value="board">On board</button>
+                                <button type="button" data-value="tokens">Tokens</button>
+                                <button type="button" data-value="both">Both</button>
                             </div>
+                            <span class="print-hint" id="printObjectHint"></span>
+                            <label class="print-field" id="printTokenPaper" hidden>
+                                <span class="field-label">Token paper</span>
+                                <select data-pr="paper" aria-label="Token paper size">
+                                    <option value="A4">A4</option>
+                                    <option value="Letter">Letter</option>
+                                    <option value="A3">A3</option>
+                                </select>
+                            </label>
                         </div>
-                        <label class="print-field">
-                            <span class="field-label">Overlap (mm)</span>
-                            <input type="number" data-pr="overlapMm" min="0" max="30" step="1" aria-label="Overlap in millimetres">
-                        </label>
-                        <label class="print-check"><input type="checkbox" data-pr="labels">Page labels and assembly hints</label>
-                    </div>
-                    <div class="print-section" id="printSheetOnly" hidden>
-                        <label class="print-field">
-                            <span class="field-label">Sheet size</span>
-                            <select data-pr="sheet" aria-label="Sheet size">
-                                <option value="fit">Fit to board</option>
-                                <option value="A3">A3 (297 × 420 mm)</option>
-                                <option value="A2">A2 (420 × 594 mm)</option>
-                                <option value="A1">A1 (594 × 841 mm)</option>
-                                <option value="A0">A0 (841 × 1189 mm)</option>
-                            </select>
-                        </label>
-                        <label class="print-check"><input type="checkbox" data-pr="cropMarks">Crop marks</label>
-                    </div>
-                    <label class="print-field">
-                        <span class="field-label">Margin (mm)</span>
-                        <input type="number" data-pr="marginMm" min="0" max="30" step="1" aria-label="Margin in millimetres">
-                    </label>
-                    <div class="print-field">
-                        <span class="field-label">Objects</span>
-                        <div class="mode-switch" role="group" aria-label="Objects" data-pr-group="objects" id="printObjectsGroup">
-                            <button type="button" data-value="board">On board</button>
-                            <button type="button" data-value="tokens">Tokens</button>
-                            <button type="button" data-value="both">Both</button>
+                        <label class="print-check"><input type="checkbox" data-pr="textures">Print textures (off = flat colours, saves ink)</label>
+                        <div class="print-field">
+                            <label class="print-check"><input type="checkbox" data-pr="legend">Include legend with tile names</label>
+                            <div class="mode-switch" role="group" aria-label="Legend position" data-pr-group="legendPlace" id="printLegendPlace" hidden>
+                                <button type="button" data-value="sheet">Below the board</button>
+                                <button type="button" data-value="page">Separate page</button>
+                            </div>
+                            <span class="print-hint" id="printLegendHint"></span>
                         </div>
-                        <span class="print-hint" id="printObjectHint"></span>
-                        <label class="print-field" id="printTokenPaper" hidden>
-                            <span class="field-label">Token paper</span>
-                            <select data-pr="paper" aria-label="Token paper size">
-                                <option value="A4">A4</option>
-                                <option value="Letter">Letter</option>
-                                <option value="A3">A3</option>
-                            </select>
-                        </label>
                     </div>
-                    <label class="print-check"><input type="checkbox" data-pr="textures">Print textures (off = flat colours, saves ink)</label>
-                    <div class="print-field">
-                        <label class="print-check"><input type="checkbox" data-pr="legend">Include legend with tile names</label>
-                        <div class="mode-switch" role="group" aria-label="Legend position" data-pr-group="legendPlace" id="printLegendPlace" hidden>
-                            <button type="button" data-value="sheet">Below the board</button>
-                            <button type="button" data-value="page">Separate page</button>
+                    <div class="print-preview">
+                        <canvas id="printCanvas" aria-label="Print preview"></canvas>
+                        <div class="print-summary">
+                            <strong id="printSummary"></strong>
+                            <span id="printLegendSummary" hidden></span>
+                            <span id="printTokenSummary" hidden></span>
+                            <span class="print-total" id="printTotal"></span>
                         </div>
-                        <span class="print-hint" id="printLegendHint"></span>
+                        <div id="printWarnings"></div>
                     </div>
                 </div>
-                <div class="print-preview">
-                    <canvas id="printCanvas" aria-label="Print preview"></canvas>
-                    <div class="print-summary">
-                        <strong id="printSummary"></strong>
-                        <span id="printLegendSummary" hidden></span>
-                        <span id="printTokenSummary" hidden></span>
-                        <span class="print-total" id="printTotal"></span>
+            </div>
+            <div class="export-panel" role="tabpanel" id="exportPanel-png" aria-labelledby="exportTab-png" hidden>
+                <div class="print-body">
+                    <div class="print-controls">
+                        <div class="print-field">
+                            <span class="field-label">Size</span>
+                            <div class="mode-switch" role="group" aria-label="Size" data-ex-group="scale">
+                                <button type="button" data-value="1">1×</button>
+                                <button type="button" data-value="2">2×</button>
+                                <button type="button" data-value="3">3×</button>
+                                <button type="button" data-value="4">4×</button>
+                            </div>
+                            <span class="print-hint" id="exportPngSize"></span>
+                        </div>
+                        <label class="print-check"><input type="checkbox" data-ex="textures">Textures (off = flat colours)</label>
+                        <label class="print-check"><input type="checkbox" data-ex="objects">Objects and start markers</label>
+                        <label class="print-check"><input type="checkbox" data-ex="grid">Grid lines</label>
+                        <div class="print-field">
+                            <span class="field-label">Background</span>
+                            <div class="mode-switch" role="group" aria-label="Background" data-ex-group="background">
+                                <button type="button" data-value="transparent">Transparent</button>
+                                <button type="button" data-value="white">White</button>
+                            </div>
+                        </div>
                     </div>
-                    <div id="printWarnings"></div>
+                    <div class="print-preview">
+                        <div class="export-preview"><canvas id="exportPngCanvas" aria-label="Preview"></canvas></div>
+                        <div class="print-summary">
+                            <strong id="exportPngSummary"></strong>
+                            <span class="print-total" id="exportPngSummaryNote"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="export-panel" role="tabpanel" id="exportPanel-svg" aria-labelledby="exportTab-svg" hidden>
+                <div class="print-body">
+                    <div class="print-controls">
+                        <p class="print-hint">A vector picture in flat colours, to edit in a drawing program or to cut from. Textures are not part of an SVG.</p>
+                        <label class="print-check"><input type="checkbox" data-ex="objects">Objects (as embedded pictures)</label>
+                        <label class="print-check"><input type="checkbox" data-ex="grid">Grid lines</label>
+                        <div class="print-field">
+                            <span class="field-label">Background</span>
+                            <div class="mode-switch" role="group" aria-label="Background" data-ex-group="background">
+                                <button type="button" data-value="transparent">Transparent</button>
+                                <button type="button" data-value="white">White</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="print-preview">
+                        <div class="export-preview"><canvas id="exportSvgCanvas" aria-label="Preview"></canvas></div>
+                        <div class="print-summary">
+                            <strong id="exportSvgSummary"></strong>
+                            <span class="print-total" id="exportSvgSummaryNote"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="export-panel" role="tabpanel" id="exportPanel-file" aria-labelledby="exportTab-file" hidden>
+                <div class="print-body">
+                    <div class="print-controls">
+                        <p class="print-hint">The whole project in one file: the board, its colours and objects, the players and the dice. Open it again with Load…, here or on another computer.</p>
+                        <div class="print-summary"><strong id="exportFileName"></strong><span class="print-total" id="exportFileNote"></span></div>
+                    </div>
                 </div>
             </div>
             <div class="theme-editor-foot">
-                <span class="print-status" id="printStatus" role="status"></span>
+                <span class="print-status" id="exportStatus" role="status"></span>
                 <div class="modal-actions">
-                    <button type="button" id="printCancel" class="secondary-button">Cancel</button>
-                    <button type="button" id="printDownload" class="primary-button">Download PDF</button>
+                    <button type="button" id="exportCancel" class="secondary-button">Close</button>
+                    <button type="button" id="exportDownload" class="primary-button">Download PDF</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load dialog: open a project kept in this browser, or import a project file -->
+    <div id="loadDialog" class="modal-backdrop hidden" role="presentation">
+        <div class="modal load-dialog" role="dialog" aria-modal="true" aria-labelledby="loadTitle">
+            <div class="theme-editor-head">
+                <h3 id="loadTitle">Open a project</h3>
+                <button type="button" id="loadClose" class="icon-close" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+            </div>
+            <h4 class="load-heading">In this browser</h4>
+            <ul class="load-list" id="loadList"></ul>
+            <p class="field-hint" id="loadEmpty" hidden>No other project is saved in this browser yet.</p>
+            <h4 class="load-heading">From a file</h4>
+            <button type="button" id="loadImport" class="secondary-button">Import a project file…</button>
+            <div class="theme-editor-foot">
+                <a class="secondary-button" id="loadHome" href="../">All projects</a>
+                <button type="button" id="loadNew" class="primary-button">New project</button>
             </div>
         </div>
     </div>
@@ -631,7 +701,8 @@
     <script defer src="js/countryBoard.js"></script>
     <script defer src="js/countryRegions.js"></script>
     <script defer src="js/print.js"></script>
-    <script defer src="js/printDialog.js"></script>
+    <script defer src="js/exportDialog.js"></script>
+    <script defer src="js/loadDialog.js"></script>
     <script defer src="js/main.js"></script>
     <!-- 100% privacy-first analytics -->
 <script async src="https://scripts.simpleanalyticscdn.com/latest.js"></script>

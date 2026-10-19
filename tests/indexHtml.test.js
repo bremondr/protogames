@@ -84,7 +84,7 @@ test('the page has favicons (small .ico and the logo png), and they are files th
 test('the main regions of the page are direct children of the right containers', () => {
     // A stray </div> shifts everything after it out of its container; these anchors would move with it.
     const body = html.slice(html.indexOf('<body'));
-    for (const id of ['printDialog', 'shareDialog', 'themeEditor']) {
+    for (const id of ['exportDialog', 'loadDialog', 'shareDialog', 'themeEditor']) {
         const before = body.slice(0, body.indexOf(`id="${id}"`));
         const depth = (before.match(/<div\b/g) || []).length - (before.match(/<\/div>/g) || []).length;
         assert.ok(depth <= 1, `${id} is a top-level dialog (nesting depth ${depth})`);
@@ -108,4 +108,37 @@ test('every element id the scripts look up by getElementById or a local $ helper
         }
     }
     assert.deepEqual([...new Set(missing)], []);
+});
+
+test('the Project panel holds the name and three buttons: Export, Share and Load; the old panels are gone', () => {
+    const panel = /<section class="panel" aria-labelledby="project-title">([\s\S]*?)<\/section>/.exec(html);
+    assert.ok(panel, 'one Project panel');
+    assert.ok(panel[1].includes('id="projectNameInput"'));
+    const buttons = [...panel[1].matchAll(/<button\b[^>]*id="([^"]+)"[^>]*>/g)].map((m) => m[1]);
+    assert.deepEqual(buttons, ['exportButton', 'shareButton', 'loadProjectBtn']);
+    assert.ok(!html.includes('File Management') && !html.includes('id="files-title"'), 'File Management is part of the Project panel now');
+    for (const old of ['saveProjectBtn', 'exportPNGBtn', 'exportSVGBtn', 'printButton', 'newProjectButton', 'allProjectsLink']) {
+        assert.ok(!html.includes(`id="${old}"`), `${old} moved into a dialog`);
+    }
+});
+
+test('the Export dialog has the tabs Print, PNG, SVG and Project file, each tied to its own panel', () => {
+    const dialog = /<div id="exportDialog"[\s\S]*?<!-- Load dialog/.exec(html)[0];
+    const tabs = [...dialog.matchAll(/role="tab" id="exportTab-(\w+)" aria-controls="exportPanel-(\w+)" data-tab="(\w+)">([^<]+)</g)];
+    assert.deepEqual(tabs.map((m) => m[4]), ['Print', 'PNG', 'SVG', 'Project file']);
+    for (const [, id, controls, data] of tabs) {
+        assert.equal(id, controls);
+        assert.equal(id, data);
+        assert.match(dialog, new RegExp(`role="tabpanel" id="exportPanel-${id}" aria-labelledby="exportTab-${id}"`), `panel for ${id}`);
+    }
+    // the print controls are still all there, the picture tabs have their options
+    for (const pr of ['tileMm', 'paper', 'overlapMm', 'marginMm', 'textures', 'legend']) assert.ok(dialog.includes(`data-pr="${pr}"`), pr);
+    assert.deepEqual([...dialog.matchAll(/data-ex-group="(\w+)"/g)].map((m) => m[1]), ['scale', 'background', 'background']);
+    assert.deepEqual([...dialog.matchAll(/data-ex="(\w+)"/g)].map((m) => m[1]), ['textures', 'objects', 'grid', 'objects', 'grid']);
+});
+
+test('the Load dialog offers the projects of this browser, a file import, a new project and the home page', () => {
+    const dialog = /<div id="loadDialog"[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/.exec(html)[0];
+    for (const id of ['loadList', 'loadEmpty', 'loadImport', 'loadNew', 'loadHome', 'loadClose']) assert.ok(dialog.includes(`id="${id}"`), id);
+    assert.ok(html.includes('<input type="file" id="loadProject"'), 'the file input the import button clicks');
 });

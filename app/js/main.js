@@ -38,7 +38,8 @@ const Main = (() => {
         PlaytestDrag.init();
         Playtest.init();
         ShareLink.init();
-        PrintDialog.init();
+        ExportDialog.init();
+        LoadDialog.init(uiRefs);
         Shortcuts.init();
         ThemeEditor.init();
         ThemeManager.init()

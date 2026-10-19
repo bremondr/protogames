@@ -35,6 +35,13 @@
    Neutral base rules so the experience behaves the same across
    browsers on desktop and tablets.
    ============================================================== */
+/* Every scrollable area (the dialogs, the lists, the menu) gets the slim, dark scrollbar of the sidebar: the browser's own
+   one is a wide white bar with arrows. The few areas with their own colour below still win, being more specific. */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+
 *, 
 *::before,
 *::after {
@@ -338,20 +345,6 @@ button:focus-visible {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-}
-
-.file-button {
-    text-align: center;
-}
-
-.export-buttons {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-}
-
-.export-buttons .secondary-button {
-    flex: 1 1 90px;
 }
 
 .visually-hidden {
@@ -1915,17 +1908,6 @@ kbd {
     text-align: right;
 }
 
-.share-button svg {
-    width: 16px;
-    height: 16px;
-    stroke: currentColor;
-    stroke-width: 2;
-    fill: none;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    margin-right: 0.5rem;
-}
-
 .share-warning {
     margin-top: 0.75rem;
     padding: 0.5rem 0.65rem;
@@ -1985,22 +1967,7 @@ kbd {
     min-height: 40px;
 }
 
-/* Print dialog */
-.print-button {
-    width: 100%;
-    margin-top: 0.5rem;
-}
-
-.print-button svg {
-    width: 16px;
-    height: 16px;
-    stroke: currentColor;
-    stroke-width: 2;
-    fill: none;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    margin-right: 0.5rem;
-}
+/* Export dialog (it started as the print dialog) */
 
 .modal.print-dialog {
     max-width: 980px;
@@ -2914,21 +2881,162 @@ kbd {
     stroke-dasharray: 3 2;
 }
 
-/* Project panel: the name of the open project and the way to another one */
-.project-actions {
+/* The buttons of the Project panel that open a dialog */
+.menu-button {
     display: flex;
-    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
     gap: 0.5rem;
 }
 
-.project-actions .secondary-button {
-    flex: 1 1 auto;
-    text-align: center;
-    text-decoration: none;
+.menu-button svg {
+    width: 16px;
+    height: 16px;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 .modal-note {
     margin: 0 0 0.6rem;
     font-size: 0.85rem;
     opacity: 0.8;
+}
+
+/* Export dialog: the tabs and the preview of a picture */
+.export-tabs {
+    display: flex;
+    gap: 0.25rem;
+    padding: 0 1.25rem;
+    margin-bottom: 0.9rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.export-tabs [role="tab"] {
+    padding: 0.55rem 1rem;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: none;
+    color: rgba(255, 255, 255, 0.7);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.export-tabs [role="tab"]:hover {
+    color: #fff;
+}
+
+.export-tabs [role="tab"][aria-selected="true"] {
+    color: #fff;
+    border-bottom-color: var(--color-accent);
+}
+
+.export-tabs [role="tab"]:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: -2px;
+}
+
+.export-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.export-panel[hidden] {
+    display: none;
+}
+
+.export-preview {
+    height: 380px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    /* a chequerboard shows which parts of the picture are transparent */
+    background: conic-gradient(#2a3140 25%, #1f2531 0 50%, #2a3140 0 75%, #1f2531 0) 0 0 / 16px 16px;
+}
+
+.export-preview canvas {
+    display: block;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+/* Load dialog */
+.modal.load-dialog {
+    max-width: 520px;
+}
+
+.load-heading {
+    margin: 1rem 0 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.load-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    max-height: 260px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+.load-item {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.1rem;
+    padding: 0.55rem 0.75rem;
+    text-align: left;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.06);
+    color: #f4f4f4;
+    cursor: pointer;
+}
+
+.load-item:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.load-item:disabled {
+    cursor: default;
+    opacity: 0.6;
+}
+
+.load-item:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+}
+
+.load-name {
+    font-weight: 600;
+}
+
+.load-detail {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.load-dialog .theme-editor-foot {
+    margin-top: 1.25rem;
+}
+
+.load-dialog .theme-editor-foot .secondary-button {
+    text-decoration: none;
+}
+
+.load-dialog .theme-editor-head {
+    padding: 0 0 0.25rem;
 }

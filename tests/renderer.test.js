@@ -10,7 +10,7 @@ function recordingContext() {
     const calls = [];
     const record = (name) => (...args) => calls.push([name, ...args]);
     const ctx = { calls, fillStyle: '', strokeStyle: '', lineWidth: 1 };
-    for (const name of ['beginPath', 'moveTo', 'lineTo', 'closePath', 'fill', 'stroke', 'save', 'restore', 'clearRect', 'setTransform', 'clip', 'drawImage']) {
+    for (const name of ['beginPath', 'moveTo', 'lineTo', 'closePath', 'fill', 'stroke', 'save', 'restore', 'clearRect', 'setTransform', 'clip', 'drawImage', 'fillRect']) {
         ctx[name] = record(name);
     }
     // lineWidth/transform at the moment each stroke happens
@@ -206,4 +206,68 @@ test('the board on screen passes the running game, the carried pieces and the se
     env.setState({ ...base, playtest: true });
     env.Renderer.renderBoard();
     assert.deepEqual(plain(env.app.context.__drawn), { ids: ['a', 'b'], hidden: ['b'], selected: 'a' });
+});
+
+test('an export can be larger, without grid lines, and on a background; the default is unchanged', () => {
+    const env = setup();
+    const polygons = board(env);
+    env.setState({ canvas: { ...CANVAS }, polygons, view: { scale: 5, x: -100, y: -100 } });
+
+    const plain1 = env.Renderer.createExportCanvas();
+    const calls1 = plain(plain1.ctx.calls);
+    assert.equal(plain1.width, CANVAS.width);
+    assert.equal(plain1.exportScale, 1);
+
+    const big = env.Renderer.createExportCanvas({ scale: 2 });
+    assert.equal(big.width, CANVAS.width * 2);
+    assert.equal(big.height, CANVAS.height * 2);
+    assert.equal(big.exportScale, 2);
+    assert.deepEqual(plain(big.ctx.calls.find((c) => c[0] === 'setTransform' && c[1] !== 1)), ['setTransform', 2, 0, 0, 2, 0, 0], 'the tiles are drawn at twice the size');
+    assert.deepEqual(plain(env.Renderer.createExportCanvas({}).ctx.calls), calls1, 'no options: exactly the export of before');
+
+    // without grid lines every tile is stroked in its own colour, so no seams show
+    polygons.forEach((p, i) => { p.color = i % 2 ? '#112233' : '#445566'; });
+    const stroked = [];
+    const out = env.Renderer.createExportCanvas({ grid: false });
+    out.ctx.calls.filter((c) => c[0] === 'stroke').forEach(() => stroked.push(1));
+    assert.equal(stroked.length, polygons.length);
+    assert.equal(env.Renderer.createExportCanvas({ grid: true }).ctx.strokes.length, polygons.length);
+});
+
+test('a background is painted first and the board is laid over it, on a second canvas', () => {
+    const env = setup();
+    const polygons = board(env);
+    env.setState({ canvas: { ...CANVAS }, polygons, view: { scale: 1, x: 0, y: 0 } });
+    env.created.length = 0;
+    const out = env.Renderer.createExportCanvas({ background: '#ffffff' });
+    assert.equal(env.created.length, 2, 'the result and the canvas of the board, nothing else');
+    const names = out.ctx.calls.map((c) => c[0]);
+    assert.ok(names.includes('drawImage'), 'the board is drawn over the background');
+    assert.equal(out.ctx.fillStyle, '#ffffff', 'the background colour');
+    assert.equal(out.ctx.strokes.length, 0, 'tiles are not stroked on the result itself, only on the board canvas');
+});
+
+test('a very large export is cut back to the largest scale a canvas can have', () => {
+    const env = setup();
+    const polygons = board(env);
+    env.setState({ canvas: { width: 6000, height: 4000 }, polygons, view: { scale: 1, x: 0, y: 0 } });
+    const out = env.Renderer.createExportCanvas({ scale: 4 });
+    assert.equal(out.exportScale, 2, '6000 x 4 is over the limit, 6000 x 2 is not');
+    assert.equal(out.width, 12000);
+    assert.equal(env.Renderer.MAX_EXPORT_SIDE, 16000);
+});
+
+test('objects and start markers can be left out of an export', () => {
+    const env = setup();
+    const polygons = board(env);
+    polygons[0].object = 'castle';
+    polygons[1].start = '#c62828';
+    env.setState({ canvas: { ...CANVAS }, polygons, view: { scale: 1, x: 0, y: 0 } });
+    const drawn = [];
+    env.app.context.Objects = { drawOnPolygon: (ctx, p) => drawn.push(p.id) };
+    env.Renderer.createExportCanvas({ objects: true });
+    assert.equal(drawn.length, 1, 'with objects: the castle');
+    drawn.length = 0;
+    env.Renderer.createExportCanvas({ objects: false });
+    assert.equal(drawn.length, 0, 'without: none');
 });

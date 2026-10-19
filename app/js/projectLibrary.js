@@ -78,6 +78,35 @@ const ProjectLibrary = (() => {
         return entries.sort((a, b) => b.timestamp - a.timestamp || (a.id < b.id ? -1 : 1));
     }
 
+    const MINUTE = 60 * 1000;
+    const HOUR = 60 * MINUTE;
+    const DAY = 24 * HOUR;
+
+    /** "Edited just now", "Edited 5 minutes ago", "Edited yesterday", "Edited 3 days ago"; an old one becomes its date. */
+    function describeAge(timestamp, now) {
+        if (!timestamp) return 'Never saved';
+        const age = Math.max(0, now - timestamp);
+        const plural = (n, unit) => `${n} ${unit}${n === 1 ? '' : 's'} ago`;
+        if (age < MINUTE) return 'Edited just now';
+        if (age < HOUR) return `Edited ${plural(Math.floor(age / MINUTE), 'minute')}`;
+        if (age < DAY) return `Edited ${plural(Math.floor(age / HOUR), 'hour')}`;
+        if (age < 2 * DAY) return 'Edited yesterday';
+        if (age < 30 * DAY) return `Edited ${plural(Math.floor(age / DAY), 'day')}`;
+        return `Edited ${new Date(timestamp).toISOString().slice(0, 10)}`;
+    }
+
+    const BOARD_NAMES = { hexagon: 'Hexagon', rectangle: 'Rectangle', triangle: 'Triangle', circle: 'Circle', infinite: 'Infinite', country: 'Country' };
+    const TILE_NAMES = { hexagon: 'hexagon', square: 'square', triangle: 'triangle' };
+
+    /** "Hexagon board, 91 hexagon tiles" for an entry of list(). */
+    function describeBoard(entry) {
+        if (!entry.readable) return 'This project cannot be read';
+        const board = BOARD_NAMES[entry.boardShape];
+        const tile = TILE_NAMES[entry.gridType] ? `${TILE_NAMES[entry.gridType]} tile` : 'tile';
+        const tiles = `${entry.tiles} ${tile}${entry.tiles === 1 ? '' : 's'}`;
+        return board ? `${board} board, ${tiles}` : tiles;
+    }
+
     /** The stored text of a project, or null. */
     function read(id) {
         const store = storage();
@@ -134,5 +163,5 @@ const ProjectLibrary = (() => {
         return created;
     }
 
-    return { KEY_PREFIX, MAX_NAME_LENGTH, isValidId, newId, cleanName, summarize, list, read, write, remove, importLegacy };
+    return { KEY_PREFIX, MAX_NAME_LENGTH, isValidId, newId, cleanName, summarize, list, read, write, remove, importLegacy, describeAge, describeBoard };
 })();

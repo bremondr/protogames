@@ -18,13 +18,14 @@ Protogames lets designers sketch and iterate on board layouts quickly—no build
 - Palettes: Switchable themed color palettes (e.g., Landscape, Simple nordic, Space) with labeled swatches; item sets to match (Medieval, Simple nordic, Space)
 - Projects: every board is a named project kept in the browser and autosaved as you work. The home page lists them (open, delete); a new project asks for a name; share links, project files and the showcase map open as new projects instead of replacing the one you are working on
 - History: Undo/redo
-- File ops: Save/load JSON projects; export PNG and SVG (SVG is a flat-colour outline of the tiles: no textures or objects)
-- Print: **Print…** makes a PDF at a real-world tile size (in mm): split across A4 / Letter / A3 home-printer pages with overlap, page labels and assembly hints, or one large sheet (fit to board, A3–A0) with crop marks; objects on the board, as cut-out tokens, or both; optional legend of the terrains and objects used; a live preview shows how the board sits on the paper. Settings are remembered per browser.
+- Project panel: the name of the project and three buttons. **Export…** opens one dialog with tabs for **Print**, **PNG**, **SVG** and **Project file**, each with its own options and a preview; **Share Link** (see below); **Load…** opens another project from this browser or imports a project file (and starts a new project, or goes to the home page)
+- Export options: PNG at 1× to 4× the size on screen, with or without textures, objects, grid lines, on a transparent or white background; SVG (flat colours) with or without embedded objects, grid lines, background
+- Print: the **Print** tab of Export… makes a PDF at a real-world tile size (in mm): split across A4 / Letter / A3 home-printer pages with overlap, page labels and assembly hints, or one large sheet (fit to board, A3–A0) with crop marks; objects on the board, as cut-out tokens, or both; optional legend of the terrains and objects used; a live preview shows how the board sits on the paper. Settings are remembered per browser.
 - Sharing: **Share Link** puts the whole board in the address (nothing is uploaded); whoever opens it gets their own copy
 - Playtest: the play button locks editing so the board can be played on; pan and zoom keep working, **Esc** or the pill returns to editing. With **players** defined (a colour, a seat at one screen edge and a set of pieces each) and **start markers** painted on the map, every player gets a tray at their seat, turned to face outwards: click a piece to send it to a free start, drag it anywhere, roll the design's dice (d3 to d20) from the tray, undo moves, reset the game. Several people can move pieces at once on a touch screen. See [docs/PLAYTEST.md](docs/PLAYTEST.md)
 - Layout: the tools sit in a column at the right edge, under the full screen and playtest buttons; their settings open to the left
 - Input: Mouse, touch, stylus; responsive layout
-- View: a button in the zoom cluster switches between textured tiles and plain colours (remembered; PNG export follows it and the Print dialog starts from it; SVG export always draws flat colours without textures or objects)
+- View: a button in the zoom cluster switches between textured tiles and plain colours (remembered; the PNG and Print tabs of the Export dialog start from it; an SVG is always flat colours without textures)
 - Navigation: wheel/pinch zoom at the pointer, pan, fit-to-screen and actual-size buttons, and an optional minimap for large boards (exports are always independent of the current zoom and pan)
 
 ## Keyboard shortcuts
@@ -102,8 +103,9 @@ protogames/
 │  │  ├─ themeManager.js    (custom tile themes and item sets)
 │  │  ├─ themeEditor.js     (theme editor dialog)
 │  │  ├─ print.js           (print layout at real-world scale + PDF writer)
-│  │  ├─ printDialog.js     (the Print… dialog)
-│  │  ├─ exporter.js        (PNG and SVG export)
+│  │  ├─ exportDialog.js    (the Export… dialog: Print, PNG, SVG and project file tabs)
+│  │  ├─ loadDialog.js      (the Load… dialog: projects of this browser, file import)
+│  │  ├─ exporter.js        (PNG and SVG export and their options)
 │  │  ├─ ui.js
 │  │  ├─ utils.js
 │  │  └─ main.js
@@ -132,7 +134,7 @@ protogames/
 1. Open `app/index.html` in a modern browser (or serve the repository, for example `python -m http.server`, and open `/` for the landing page or `/app/` for the editor).
 2. Choose board shape, grid type, and parameters in the sidebar; click **Generate Board**.
 3. Pick a palette theme, select a color (or click **Eraser**), then click or drag on tiles. Switch the tool to **Fill** to repaint a whole connected region of one colour, or **Line** to drag out a straight path of tiles (Esc cancels a line in progress).
-4. Save projects as `.protogames.json`; export PNG/SVG, or print a PDF at real-world scale, as needed.
+4. Projects are saved in the browser as you work; **Export…** downloads a `.protogames.json` file, a PNG/SVG, or a PDF at real-world scale.
 
 ## Development Notes
 - Stack: Vanilla JS + HTML5 Canvas; no build tooling required.
