@@ -17,8 +17,12 @@
     /**
      * Builds the config the UI would build for a board shape (see UI.getBoardConfig).
      */
+    const isCentral = (boardShape) => boardShape === 'hexagon' || boardShape === 'circle';
+
     function makeConfig(boardShape, gridType, orientation, triangleOrientation, sizes) {
         const s = { ...DEFAULT_SIZES, ...(sizes || {}) };
+        // What a board saved before the choice existed gets (see GeometryHelpers.resolveCenter).
+        const center = s.center || (isCentral(boardShape) && gridType === 'triangle' ? 'point' : 'tile');
         const config = {
             gridType,
             orientation: orientation || 'pointy-top',
@@ -27,42 +31,49 @@
             size: s.size,
             width: s.width,
             height: s.height,
-            triangleOrientation: triangleOrientation || 'point-up'
+            triangleOrientation: triangleOrientation || 'point-up',
+            center
         };
         if (boardShape === 'triangle') {
             config.width = s.size;
             config.height = s.size;
-        } else if (boardShape === 'hexagon' || boardShape === 'circle') {
-            config.width = s.radius * 2 + 1;
-            config.height = s.radius * 2 + 1;
+        } else if (isCentral(boardShape)) {
+            config.width = s.radius * 2 + (center === 'point' ? 2 : 1);
+            config.height = config.width;
         }
         return config;
     }
 
     /**
-     * Every board shape x tile shape x orientation combination, each flagged valid
+     * Every board shape x tile shape x orientation (x centre, on hexagon and circle boards) combination, each flagged valid
      * or invalid (with the reason) so galleries can show unsupported ones explicitly.
      */
     function allCombinations(sizes) {
         const list = [];
         for (const boardShape of BOARD_SHAPES) {
             for (const gridType of TILE_SHAPES) {
-                const orientations = gridType === 'hexagon' || boardShape === 'hexagon' ? ['pointy-top', 'flat-top'] : ['pointy-top'];
-                const triangleOrientations = boardShape === 'triangle' ? ['point-up', 'point-down'] : ['point-up'];
-                for (const orientation of orientations) {
-                    for (const triangleOrientation of triangleOrientations) {
-                        const config = makeConfig(boardShape, gridType, orientation, triangleOrientation, sizes);
-                        const parts = [boardShape + ' board', gridType + ' tiles'];
-                        if (orientations.length > 1) parts.push(orientation);
-                        if (triangleOrientations.length > 1) parts.push(triangleOrientation);
-                        let valid = true;
-                        let reason = '';
-                        // The sidebar disables square tiles on hexagon boards (UI.applyGridTypeRestrictions).
-                        if (boardShape === 'hexagon' && gridType === 'square') {
-                            valid = false;
-                            reason = 'Square tiles cannot fill a hexagon outline; the sidebar blocks this combination.';
+                const centers = isCentral(boardShape) ? ['tile', 'point'] : [undefined];
+                for (const center of centers) {
+                    const orientations = gridType === 'hexagon' || boardShape === 'hexagon' ? ['pointy-top', 'flat-top'] : ['pointy-top'];
+                    // Triangle tiles point up or down: the whole triangle board, or the triangle a board is built around.
+                    const triangleOrientations = boardShape === 'triangle' || (isCentral(boardShape) && gridType === 'triangle' && center === 'tile')
+                        ? ['point-up', 'point-down'] : ['point-up'];
+                    for (const orientation of orientations) {
+                        for (const triangleOrientation of triangleOrientations) {
+                            const config = makeConfig(boardShape, gridType, orientation, triangleOrientation, { ...(sizes || {}), ...(center ? { center } : {}) });
+                            const parts = [boardShape + ' board', gridType + ' tiles'];
+                            if (center) parts.push('around a ' + (center === 'tile' ? 'tile' : 'point'));
+                            if (orientations.length > 1) parts.push(orientation);
+                            if (triangleOrientations.length > 1) parts.push(triangleOrientation);
+                            let valid = true;
+                            let reason = '';
+                            // The sidebar disables square tiles on hexagon boards (UI.applyGridTypeRestrictions).
+                            if (boardShape === 'hexagon' && gridType === 'square') {
+                                valid = false;
+                                reason = 'Square tiles cannot fill a hexagon outline; the sidebar blocks this combination.';
+                            }
+                            list.push({ key: parts.join(' / '), config, valid, reason });
                         }
-                        list.push({ key: parts.join(' / '), config, valid, reason });
                     }
                 }
             }
@@ -76,8 +87,9 @@
      */
     function expectedCount(config) {
         const { boardShape, gridType, radius, size, width, height } = config;
-        if (boardShape === 'hexagon' && gridType === 'hexagon') return 3 * radius * (radius + 1) + 1;
-        if (boardShape === 'hexagon' && gridType === 'triangle') return 6 * radius * radius;
+        const point = config.center === 'point';
+        if (boardShape === 'hexagon' && gridType === 'hexagon') return point ? 3 * (radius + 1) * (radius + 1) : 3 * radius * (radius + 1) + 1;
+        if (boardShape === 'hexagon' && gridType === 'triangle') return point ? 6 * radius * radius : null;
         if (boardShape === 'triangle' && gridType === 'triangle') return size * size;
         if (boardShape === 'rectangle' && (gridType === 'square' || gridType === 'hexagon')) return width * height;
         return null;
@@ -137,13 +149,17 @@
 
     /**
      * The n-fold rotational symmetry a board should have, or null when none is expected.
-     * Circle and hexagon boards are centred on a tile (or lattice vertex), so hexagon and
-     * triangle tiles repeat every 60 degrees and square tiles every 90. A rectangle of
+     * Circle and hexagon boards are centred on a tile or a corner (see below), and square tiles repeat every 90 degrees. A rectangle of
      * square tiles with equal sides (a square board) repeats every 90 degrees.
      */
     function expectedSymmetry(config) {
         const { boardShape, gridType } = config;
-        if (boardShape === 'circle' || boardShape === 'hexagon') return gridType === 'square' ? 4 : 6;
+        // Around a tile or corner the board has the symmetry of the lattice at that point: hexagon tiles 6-fold around
+        // a tile and 3-fold around a corner, triangle tiles the other way round, square tiles 4-fold either way.
+        if (boardShape === 'circle' || boardShape === 'hexagon') {
+            if (gridType === 'square') return 4;
+            return (gridType === 'hexagon') === (config.center !== 'point') ? 6 : 3;
+        }
         if (boardShape === 'rectangle' && gridType === 'square' && config.width === config.height) return 4;
         return null;
     }

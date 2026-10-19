@@ -8,7 +8,9 @@
         shouldIncludePolygon,
         createBoardMetrics,
         normalizeBoardDimensions,
-        createHexVertices
+        createHexVertices,
+        resolveCenter,
+        limitBetween
     } = helpers;
 
     function buildHexGrid(config, canvas, colorMap) {
@@ -99,11 +101,21 @@
         return polygons;
     }
 
+    /** Axial offsets (q, r) of the three hexagons that meet at one corner; neighbours of each other. */
+    const CORNER_SEEDS = [[0, 0], [1, 0], [0, 1]];
+    const hexDistance = (dq, dr) => Math.max(Math.abs(dq), Math.abs(dr), Math.abs(dq + dr));
+
+    /** Position of an axial tile in units of the tile size. */
+    function axialUnits(q, r, orientation) {
+        const width = Math.sqrt(3);
+        return orientation === 'pointy-top' ? { x: width * (q + r / 2), y: 1.5 * r } : { x: 1.5 * q, y: width * (r + q / 2) };
+    }
+
     /**
-     * Circle-shaped board of hexagons: every tile whose centre lies within
-     * (radius + 0.5) tile widths of the middle tile. Centring the disc on a tile (not
-     * on the corner of a staggered grid) gives the full 6-fold symmetry of the hex
-     * lattice, so the board is round instead of lopsided. Laid out at a fixed scale
+     * Circle-shaped board of hexagons: every tile whose centre lies within a limit of the middle, which is a tile
+     * (limit radius + 0.5 tile widths) or the corner shared by three tiles (limit radius + 0.72 tile widths, so radius 0
+     * is those three). Centring the disc like that gives the full symmetry of the lattice around that point (6-fold
+     * around a tile, 3-fold around a corner), so the board is round instead of lopsided. Laid out at a fixed scale
      * around the canvas centre; Geometry.generateGrid fits it to the canvas.
      */
     function buildCircleHexGrid(config, canvas, colorMap) {
@@ -115,34 +127,51 @@
         const orientation = config.orientation === 'flat-top' ? 'flat-top' : 'pointy-top';
         const size = 40;
         const width = Math.sqrt(3) * size; // distance between neighbouring tile centres
-        // (radius + 0.5) * width squared is never a lattice distance squared, so no tile sits on the edge.
-        const limit = (radius + 0.5) * width;
-        const span = radius + 2;
+        const span = radius + 3;
         const cx = canvas.width / 2;
         const cy = canvas.height / 2;
 
-        const polygons = [];
+        // The middle of the disc in tile-size units: a tile centre, or the corner of the three seed tiles.
+        const seeds = CORNER_SEEDS.map(([q, r]) => axialUnits(q, r, orientation));
+        const around = resolveCenter(config) === 'point'
+            ? { x: (seeds[0].x + seeds[1].x + seeds[2].x) / 3, y: (seeds[0].y + seeds[1].y + seeds[2].y) / 3 }
+            : { x: 0, y: 0 };
+
+        const candidates = [];
         for (let r = -span; r <= span; r++) {
             for (let q = -span; q <= span; q++) {
-                const x = orientation === 'pointy-top' ? width * (q + r / 2) : 1.5 * size * q;
-                const y = orientation === 'pointy-top' ? 1.5 * size * r : width * (r + q / 2);
-                if (Math.hypot(x, y) > limit) continue;
-                const id = `hex_${q}_${r}`;
-                const center = { x: cx + x, y: cy + y };
-                polygons.push(
-                    createPolygon({
-                        id,
-                        type: 'hexagon',
-                        center,
-                        vertices: createHexVertices(center, size, orientation),
-                        color: colorMap?.get(id)
-                    })
-                );
+                const u = axialUnits(q, r, orientation);
+                const x = (u.x - around.x) * size;
+                const y = (u.y - around.y) * size;
+                candidates.push({ q, r, x, y, d2: x * x + y * y });
             }
+        }
+        // A tile-centred disc keeps its own limit; either way no tile can sit exactly on the edge.
+        const wanted = resolveCenter(config) === 'point' ? (radius + 0.72) * width : (radius + 0.5) * width;
+        const limit2 = resolveCenter(config) === 'point' ? limitBetween(candidates.map((c) => c.d2), wanted * wanted) : wanted * wanted;
+
+        const polygons = [];
+        for (const { q, r, x, y, d2 } of candidates) {
+            if (d2 > limit2) continue;
+            const id = `hex_${q}_${r}`;
+            const center = { x: cx + x, y: cy + y };
+            polygons.push(
+                createPolygon({
+                    id,
+                    type: 'hexagon',
+                    center,
+                    vertices: createHexVertices(center, size, orientation),
+                    color: colorMap?.get(id)
+                })
+            );
         }
         return polygons;
     }
 
+    /**
+     * Hexagon-shaped board of hexagons: `radius` rings around a tile, or around the corner shared by three tiles
+     * (rings of layers counted by shared edges from those three).
+     */
     function buildHexagonShapedGrid(config, canvas, colorMap) {
         if (!canvas) return [];
         const radius = Math.max(
@@ -150,8 +179,9 @@
             Number.isFinite(config.radius) ? Math.floor(config.radius) : Config.DEFAULT_BOARD_CONFIG.radius
         );
         const orientation = config.orientation === 'flat-top' ? 'flat-top' : 'pointy-top';
-        const rowPlan = createHexagonRowPlan(radius);
-        const layout = computeHexagonAxialLayout(rowPlan.rows, orientation);
+        const layout = resolveCenter(config) === 'point'
+            ? layoutOfCoords(hexagonAroundCorner(radius), orientation)
+            : computeHexagonAxialLayout(createHexagonRowPlan(radius).rows, orientation);
         const placement = calculateHexagonCentering(layout, orientation, canvas);
 
         return layout.coords.map((coord) => {
@@ -168,6 +198,18 @@
                 color: colorMap?.get(polygonId)
             });
         });
+    }
+
+    /** The axial coordinates of every tile within `radius` steps of the nearest of the three tiles around a corner. */
+    function hexagonAroundCorner(radius) {
+        const coords = [];
+        for (let r = -radius - 1; r <= radius + 2; r++) {
+            for (let q = -radius - 1; q <= radius + 2; q++) {
+                const nearest = Math.min(...CORNER_SEEDS.map(([sq, sr]) => hexDistance(q - sq, r - sr)));
+                if (nearest <= radius) coords.push({ q, r });
+            }
+        }
+        return coords;
     }
 
     function createHexagonRowPlan(radius) {
@@ -194,6 +236,15 @@
 
     function computeHexagonAxialLayout(rows, orientation) {
         const coords = [];
+        for (const row of rows) {
+            for (let q = row.qStart; q <= row.qEnd; q++) coords.push({ q, r: row.axialR });
+        }
+        return layoutOfCoords(coords, orientation);
+    }
+
+    /** Positions (in units of the tile size) and extent of a list of axial coordinates [{ q, r }]. */
+    function layoutOfCoords(list, orientation) {
+        const coords = [];
         let minX = Infinity;
         let maxX = -Infinity;
         let minY = Infinity;
@@ -201,17 +252,14 @@
         const widthUnit = orientation === 'pointy-top' ? Math.sqrt(3) : 1.5;
         const heightUnit = orientation === 'pointy-top' ? 1.5 : Math.sqrt(3);
 
-        for (const row of rows) {
-            const r = row.axialR;
-            for (let q = row.qStart; q <= row.qEnd; q++) {
-                const x = orientation === 'pointy-top' ? widthUnit * (q + r / 2) : widthUnit * q;
-                const y = orientation === 'pointy-top' ? heightUnit * r : heightUnit * (r + q / 2);
-                coords.push({ q, r, x, y });
-                minX = Math.min(minX, x);
-                maxX = Math.max(maxX, x);
-                minY = Math.min(minY, y);
-                maxY = Math.max(maxY, y);
-            }
+        for (const { q, r } of list) {
+            const x = orientation === 'pointy-top' ? widthUnit * (q + r / 2) : widthUnit * q;
+            const y = orientation === 'pointy-top' ? heightUnit * r : heightUnit * (r + q / 2);
+            coords.push({ q, r, x, y });
+            minX = Math.min(minX, x);
+            maxX = Math.max(maxX, x);
+            minY = Math.min(minY, y);
+            maxY = Math.max(maxY, y);
         }
 
         return { coords, minX, maxX, minY, maxY };
@@ -248,6 +296,8 @@
         buildHexagonShapedGrid,
         buildCircleHexGrid,
         createHexagonRowPlan,
+        hexagonAroundCorner,
+        layoutOfCoords,
         computeHexagonAxialLayout,
         calculateHexagonCentering
     };

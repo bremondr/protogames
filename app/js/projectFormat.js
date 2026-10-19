@@ -17,9 +17,10 @@
  * read live app config inside them.
  */
 const ProjectFormat = (() => {
-    const CURRENT_VERSION = 6;
+    const CURRENT_VERSION = 7;
 
     const GRID_TYPES = ['hexagon', 'square', 'triangle'];
+    const BOARD_CENTERS = ['tile', 'point'];
     const BOARD_SHAPES = ['hexagon', 'rectangle', 'triangle', 'circle', 'infinite', 'country'];
     const COUNTRY_PARTS = ['main', 'nearby', 'all'];
     const MAX_COUNTRY_NAME = 100;
@@ -211,6 +212,23 @@ const ProjectFormat = (() => {
         return next;
     }
 
+    /**
+     * v6 -> v7: the centre of a board. Hexagon and circle boards are built around a tile or around the
+     * point where tiles meet, for every tile shape. Until now the tile shape decided: triangles were
+     * built around a point, everything else around a tile. The migration writes that down, so the
+     * board does not change.
+     */
+    function migrateV6toV7(project) {
+        const next = clone(project);
+        next.version = 7;
+        const config = isObject(next.appState) && isObject(next.appState.boardConfig) ? next.appState.boardConfig : null;
+        if (config && config.center === undefined) {
+            const central = config.boardShape === 'hexagon' || config.boardShape === 'circle';
+            config.center = central && config.gridType === 'triangle' ? 'point' : 'tile';
+        }
+        return next;
+    }
+
     /** MIGRATIONS[n] upgrades a version-n project to version n + 1. */
     const MIGRATIONS = {
         0: migrateV0toV1,
@@ -218,7 +236,8 @@ const ProjectFormat = (() => {
         2: migrateV2toV3,
         3: migrateV3toV4,
         4: migrateV4toV5,
-        5: migrateV5toV6
+        5: migrateV5toV6,
+        6: migrateV6toV7
     };
 
     /**
@@ -262,6 +281,7 @@ const ProjectFormat = (() => {
         if (!isObject(config)) fail('The project has no board settings (appState.boardConfig is missing).');
         if (!GRID_TYPES.includes(config.gridType)) fail(`The board has an unknown tile shape (${JSON.stringify(config.gridType)}).`);
         if (!BOARD_SHAPES.includes(config.boardShape)) fail(`The board has an unknown board shape (${JSON.stringify(config.boardShape)}).`);
+        if (!BOARD_CENTERS.includes(config.center)) fail(`The board has an unknown centre (${JSON.stringify(config.center)}).`);
         // Upper limits match what the board controls and share links can produce (a hexagon board of
         // radius 100 is 201 tiles wide); anything bigger would hang the tab when the board is rebuilt.
         for (const key of ['width', 'height']) {

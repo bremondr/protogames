@@ -60,8 +60,17 @@
                 <h2 id="board-setup-title">Board Setup</h2>
                 <form class="panel-form">
                     <label class="field">
-                        <span class="field-label">Board Shape</span>
-                        <select name="boardOutline" aria-label="Select board shape">
+                        <span class="field-label">Tile shape</span>
+                        <select name="gridType" aria-label="Select tile shape">
+                            <option value="hexagon" selected>Hexagon</option>
+                            <option value="square">Square</option>
+                            <option value="triangle">Triangle</option>
+                        </select>
+                    </label>
+                    <div class="field">
+                        <span class="field-label" id="boardShapeLabel">Board shape</span>
+                        <!-- The list with pictures (boardPicker.js) drives this select, which stays the single source of truth. -->
+                        <select name="boardOutline" class="visually-hidden" aria-hidden="true" tabindex="-1">
                             <option value="hexagon" selected>Hexagon</option>
                             <option value="rectangle">Rectangle</option>
                             <option value="triangle">Triangle</option>
@@ -69,39 +78,39 @@
                             <option value="infinite">Infinite canvas</option>
                             <option value="country">Country</option>
                         </select>
-                    </label>                    
-                    <label class="field">
-                        <span class="field-label">Tile shape</span>
-                        <select name="gridType" aria-label="Select grid type">
-                            <option value="hexagon" selected>Hexagon</option>
-                            <option value="square">Square</option>
-                            <option value="triangle">Triangle</option>
-                        </select>
-                    </label>
+                        <div id="boardShapePicker" class="board-picker" data-labelled-by="boardShapeLabel"></div>
+                    </div>
                     <label class="field" id="orientationField">
-                        <span class="field-label">Grid Orientation</span>
-                        <select name="gridOrientation" aria-label="Select grid orientation">
+                        <span class="field-label">Tile orientation</span>
+                        <select name="gridOrientation" aria-label="Select tile orientation">
                             <option value="pointy-top" selected>Pointy-top</option>
                             <option value="flat-top">Flat-top</option>
                             <!-- <option value="orthogonal">Orthogonal</option>
                             <option value="diagonal">Diagonal</option> -->
                         </select>
                     </label>
+                    <div class="field hidden" id="triangleOrientationField">
+                        <span class="field-label">Triangle orientation</span>
+                        <select name="triangleOrientation" aria-label="Select triangle orientation">
+                            <option value="point-up" selected>Point up</option>
+                            <option value="point-down">Point down</option>
+                        </select>
+                    </div>
+                    <div class="field hidden" id="centerField">
+                        <span class="field-label">Centre of the board</span>
+                        <select name="boardCenter" aria-label="What the board is built around">
+                            <option value="tile" selected>A tile</option>
+                            <option value="point">A point between tiles</option>
+                        </select>
+                    </div>
                     <div class="field hidden" id="radiusField">
-                        <span class="field-label" id="radiusLabel">Radius (tiles from center to edge)</span>
-                        <input type="number" name="boardRadius" min="1" step="1" value="5" aria-label="Board radius">
-                        <p class="field-hint">Number of tiles from center to edge</p>
+                        <span class="field-label" id="radiusLabel">Size (layers from the centre)</span>
+                        <input type="number" name="boardRadius" min="1" max="50" step="1" value="6" aria-label="Board size in layers from the centre">
+                        <p class="field-hint" id="radiusHint">Layer 1 is the centre; each layer adds a ring around it.</p>
                     </div>
                     <div class="field hidden" id="sizeField">
                         <span class="field-label" id="sizeLabel">Size (tiles per side)</span>
                         <input type="number" name="boardSize" min="1" step="1" value="10" aria-label="Board size">
-                    </div>
-                    <div class="field hidden" id="triangleOrientationField">
-                        <span class="field-label">Triangle Orientation</span>
-                        <select name="triangleOrientation" aria-label="Select triangle orientation">
-                            <option value="point-up" selected>Point Up</option>
-                            <option value="point-down">Point Down</option>
-                        </select>
                     </div>
                     <div class="hidden" id="countryFields">
                         <label class="field">
@@ -608,6 +617,7 @@
     <script src="js/playtest.js"></script>
     <script src="js/themeEditor.js"></script>
     <script src="js/infinite.js"></script>
+    <script src="js/boardPicker.js"></script>
     <script src="js/countryBoard.js"></script>
     <script src="js/countryRegions.js"></script>
     <script src="js/print.js"></script>
