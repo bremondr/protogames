@@ -17,7 +17,7 @@ function makeModal(id) {
 }
 
 function fresh({ hasWork = false, hash = '#b=AAAA', modals = [] } = {}) {
-    const calls = { confirms: [], restores: [], replaced: [] };
+    const calls = { confirms: [], restores: [], replaced: [], newProjects: 0 };
     const location = { hash, pathname: '/app/', search: '' };
     const document = { querySelectorAll: () => modals.filter((m) => !m.hidden && !m.removed) };
     const app = loadApp([...GEOMETRY_SCRIPTS, 'app/js/projectFormat.js', 'app/js/shareLink.js'], {
@@ -27,6 +27,7 @@ function fresh({ hasWork = false, hash = '#b=AAAA', modals = [] } = {}) {
         history: { replaceState: (...args) => { calls.replaced.push(args); location.hash = ''; } },
         FileManager: {
             hasUserWork: () => hasWork,
+            showAsNewProject: (show) => { calls.newProjects += 1; show(); },
             confirmReplace: (onConfirm, options) => calls.confirms.push({ onConfirm, options }),
             restoreState: (project) => calls.restores.push(project)
         },
@@ -57,33 +58,16 @@ async function untilRestored(env) {
     }
 }
 
-test('a link arriving after start-up opens straight away when there is nothing to lose', async () => {
-    const env = fresh({ hasWork: false });
-    env.location.hash = `#b=${await linkFor(env)}`;
-    env.ShareLink.onHashChange();
-    assert.equal(env.calls.confirms.length, 0);
-    await untilRestored(env);
-    assert.equal(env.calls.restores.length, 1);
-});
-
-test('a link arriving after start-up asks before replacing work, and cancelling drops the link', async () => {
-    const env = fresh({ hasWork: true });
-    env.location.hash = `#b=${await linkFor(env)}`;
-    env.ShareLink.onHashChange();
-    assert.equal(env.calls.confirms.length, 1);
-    assert.equal(env.calls.restores.length, 0, 'nothing is replaced before the answer');
-    env.calls.confirms[0].options.onCancel();
-    assert.equal(env.location.hash, '', 'the address is cleaned so the link is not offered again');
-    assert.equal(env.calls.restores.length, 0);
-});
-
-test('confirming the replacement opens the shared board', async () => {
-    const env = fresh({ hasWork: true });
-    env.location.hash = `#b=${await linkFor(env)}`;
-    env.ShareLink.onHashChange();
-    await env.calls.confirms[0].onConfirm();
-    await untilRestored(env);
-    assert.equal(env.calls.restores.length, 1);
+test('a link arriving after start-up opens as a new project, whether or not work is open: nothing is replaced, so nothing is asked', async () => {
+    for (const hasWork of [false, true]) {
+        const env = fresh({ hasWork });
+        env.location.hash = `#b=${await linkFor(env)}`;
+        env.ShareLink.onHashChange();
+        assert.equal(env.calls.confirms.length, 0, 'no confirmation dialog');
+        await untilRestored(env);
+        assert.equal(env.calls.restores.length, 1);
+        assert.equal(env.calls.newProjects, 1, 'the board went in as a project of its own');
+    }
 });
 
 test('opening a link removes the dialogs made on the fly but only hides the ones that live in the page', async () => {

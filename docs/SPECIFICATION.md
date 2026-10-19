@@ -4,7 +4,7 @@ Reference for formats that other code (and other people's saved files) depend on
 
 ## Project file format
 
-Projects are saved as `<name>.protogames.json` and the editor also keeps one copy per tab in `localStorage` (key `protogames_autosave:<tab id>`, see "Autosave storage") as an autosave. Both are produced and read by `js/projectFormat.js`; nothing else should build or inspect these objects by hand.
+Projects are saved as `<name>.protogames.json` and the editor also keeps every project in `localStorage` (key `protogames_project:<id>`, see "Projects in the browser") as an autosave. Both are produced and read by `js/projectFormat.js`; nothing else should build or inspect these objects by hand.
 
 ### Version
 
@@ -166,17 +166,20 @@ A tile's colour (`color`, a hex string) is its identity: it selects the texture 
 
 The same rule applies when a palette changes again: add a migration step that maps the retired colours, extend `tests/fixtures/` with a file in the previous format, and add the successor colours to this table. `tests/projectFormat.test.js` checks that every retired colour is really absent from the live palettes and every target colour is present.
 
-## Autosave storage
+## Projects in the browser
 
-localStorage is shared by every tab of the site, so each tab keeps its own autosave in `protogames_autosave:<tab id>` and never writes another tab's slot. The stored payload is the usual project object (see "Project file format"); only the key differs, so this needed no format version bump.
+Every board is a **project** kept in the browser's `localStorage`, one entry per project: `protogames_project:<id>`. The value is the usual project object with a `timestamp` (see "Project file format"), so this needed no format version bump; only where it is stored changed. `<id>` is a random id (letters, digits, `-` and `_`, 6 to 64 characters; anything else is refused, so an address cannot reach other storage entries). The code is `app/js/projectLibrary.js`, a script without dependencies that the landing page loads too (both pages share one origin).
 
-- The tab id is kept in `sessionStorage` (it survives a reload, not a new tab) and the tab holds a Web Lock `protogames-tab:<id>` while it is open; that is how other tabs tell a live slot from an orphan.
-- On start-up a tab offers its own slot (after a reload), otherwise the newest orphan: the slot of a tab that crashed or was closed. Adopting an orphan moves it into the tab's own slot. Slots of tabs that are still open are never offered or deleted.
-- The single key older versions used (`protogames_autosave`) is treated as an orphan and adopted once.
-- Orphans that are unreadable, older than 7 days or beyond the newest 5 are deleted.
-- Without Web Locks (an insecure page, an old browser) other tabs' slots are all treated as live: they are left alone, but a crashed tab's work cannot be recovered.
+- **The editor** works on one project, named in the address: `app/?project=<id>`. Every change is saved into that entry (a stroke, a setting, every 30 s), and nothing else is touched, so any number of projects can be open in different tabs. A project open in two tabs at once is saved by whichever tab wrote last.
+- **A new project must be named.** `app/` without a project (and without a share link or showcase) shows a blank board and asks for a name before anything is saved; "Back to home" leaves instead. The name is trimmed, whitespace is collapsed and it is cut to 80 characters. The Project panel in the editor renames the open project and starts another one.
+- **Opening something else makes a new project and never replaces one.** A share link (`#b=`, also one pasted into an open tab), a project file and a showcase each open as a new project (named after the link, file or showcase), and the project that was open is saved first and stays as it was. So opening never asks "replace the board?" (generating a new grid over painted work still does).
+- **Showcases** (`Config.SHOWCASES`, files in `app/showcases/`) are not in the editor's menu. The landing page links to one with `app/?showcase=<id>`, which opens it as a new project named after it and then replaces that address with `?project=<id>`, so a reload does not make another copy.
+- **The landing page lists the projects** (name, board, tile count, time of the last edit, newest first). Each is a link to `app/?project=<id>`; "Delete" asks twice. A project that is missing or cannot be read opens a message in the editor and is never deleted by it; an unreadable one can be deleted from the landing page. A project from a newer version of the app is kept and reported as such.
+- **Older autosaves become projects.** Versions before this kept one autosave per tab, `protogames_autosave:<tab id>`, and `protogames_autosave` before that. On start-up, in the editor and on the landing page, each readable one is copied into a project (id `recovered-<tab id>`, so doing it twice finds the project already there) and the old key is removed; an unreadable one is dropped.
+- **Storage is limited** (about 5 MB per site, shared by all projects). When a save fails because it is full, the editor says so once and suggests deleting projects on the home page or saving a file.
+- **Previews** (see docs/DEPLOYMENT.md) put their storage under their own prefix, on the landing page of the preview as well as in its editor, so a preview lists and saves its own projects only.
 
-The choice is the pure function `AutosaveSlots.choose` (`tests/autosaveSlots.test.js`).
+Tests: `tests/projectLibrary.test.js`, `tests/fileManager.test.js`, `tests/main.test.js` (the start-up order: share link, showcase, project, new project) and `tests/landing.test.js`.
 
 ## Share link format
 

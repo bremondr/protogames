@@ -43,8 +43,6 @@ const Main = (() => {
         ThemeEditor.init();
         ThemeManager.init()
             .catch((error) => console.error('Theme restore failed:', error))
-            .then(() => AutosaveSlots.claim())
-            .catch((error) => console.error('Autosave slot setup failed:', error))
             .finally(() => startBoard().catch((error) => console.error('Start-up failed:', error)));
     }
 
@@ -53,22 +51,25 @@ const Main = (() => {
 
         window.addEventListener('resize', debouncedResize);
 
-        const autoSaved = FileManager.loadAutoSave();
-        // A shared link wins over a saved autosave: the person opened it on purpose.
+        // Autosaves of older versions (one per tab) become projects.
+        ProjectLibrary.importLegacy();
+
+        // A shared link wins over everything else: the person opened it on purpose. It opens as a new project.
         if (ShareLink.hasLink()) {
             let opened = false;
             try { opened = await ShareLink.openFromHash(); } catch (error) { console.error('Share link failed:', error); }
             if (opened) return;
-            // The link was bad (the reason is already on screen): carry on as if there had been none,
-            // so the person gets their autosave offered or a fresh board instead of an empty canvas.
+            // The link was bad (the reason is already on screen): carry on as if there had been none.
         }
-        FileManager.showStartupMessage();
-        if (autoSaved) {
-            FileManager.promptAutosaveRestore(autoSaved);
-            return;
-        }
+        // A showcase opens as a new project named after it.
+        const showcase = FileManager.showcaseFromUrl();
+        if (showcase && await FileManager.openShowcase(showcase)) return;
+        // A project of the library.
+        const projectId = FileManager.projectIdFromUrl();
+        if (projectId && FileManager.openStoredProject(projectId)) return;
 
-        Interactions.generateBoard(AppState.getState().boardConfig, { skipDirtyFlag: true });
+        // Nothing to open: a new project, which has to be named.
+        FileManager.startNewProject();
     }
 
     document.addEventListener('DOMContentLoaded', initializeApp);

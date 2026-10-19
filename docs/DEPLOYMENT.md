@@ -41,7 +41,7 @@ python -m http.server 8000 --bind 127.0.0.1 --directory _site
 
 Production is the site exactly as committed (landing page at the root, the editor in `app/`), and a preview has the same layout. A preview differs in three ways, all added by the build and none present in the source:
 
-- **Separate saved data.** All versions share one browser origin, so without care a preview would read and overwrite production's autosave, themes and settings (and the project format is versioned, so an experiment may write data production cannot read). `preview-runtime.js` is the first script of a preview's `app/index.html` and gives every storage key a `preview:pr-<n>:` prefix, so a preview never sees or touches production's data or another preview's.
+- **Separate saved data.** All versions share one browser origin, so without care a preview would read and overwrite production's autosave, themes and settings (and the project format is versioned, so an experiment may write data production cannot read). `preview-runtime.js` is the first script of a preview's `app/index.html` and of its landing page (which lists the saved projects) and gives every storage key a `preview:pr-<n>:` prefix, so a preview never sees or touches production's data or another preview's.
 - **A badge**, so a preview is not mistaken for the real thing.
 - **No analytics, and `noindex`**, so experiments do not count as visits or show up in search.
 

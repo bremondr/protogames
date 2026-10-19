@@ -424,7 +424,8 @@ const ShareLink = (() => {
             if (polygons.length > MAX_TILES) fail('The board in the link is too large.');
             const project = ProjectFormat.parse(unpack(data, polygons, { defaultProjectName: Config.DEFAULT_PROJECT_NAME }));
             dismissModals();
-            FileManager.restoreState(project, { skipNotification: true });
+            // A shared board becomes a project of its own; the open project (if any) is saved and stays as it was.
+            FileManager.showAsNewProject(() => FileManager.restoreState(project, { skipNotification: true }));
             try { ViewControls.fit(); } catch (error) { /* view not ready */ }
             UI.showNotification('Shared board opened', 3500);
             return true;
@@ -439,21 +440,9 @@ const ShareLink = (() => {
         try { history.replaceState(null, '', location.pathname + location.search); } catch (error) { /* sandboxed frame */ }
     }
 
-    /**
-     * A link pasted into an already open tab changes only the hash. Like opening a file or a
-     * showcase, it must not silently replace work the person could lose.
-     */
+    /** A link pasted into an already open tab changes only the hash. It opens as a new project, so nothing is replaced. */
     function onHashChange() {
-        if (!hashPayload(location.hash)) return;
-        if (!FileManager.hasUserWork()) {
-            openFromHash();
-            return;
-        }
-        FileManager.confirmReplace(() => openFromHash(), {
-            message: 'Opening this shared link will replace your current board.',
-            confirmLabel: 'Open link',
-            onCancel: forgetHash
-        });
+        if (hashPayload(location.hash)) openFromHash();
     }
 
     function init() {
