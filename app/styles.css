@@ -176,13 +176,8 @@ button {
     flex: 1 1 auto;
     min-width: 0;
     min-height: 0;
-    background: repeating-linear-gradient(
-        45deg,
-        #fafbff,
-        #fafbff 12px,
-        #f1f3fa 12px,
-        #f1f3fa 24px
-    );
+    /* a plain, very light grey: the board is what the eye should rest on */
+    background: #f2f3f6;
     padding: 0;
     display: flex;
     flex-direction: column;
