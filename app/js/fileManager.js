@@ -432,6 +432,40 @@ const FileManager = (() => {
         }
     }
 
+    /** True when the tile has something a person did to it: a colour other than blank, an object or a start marker. */
+    const isPainted = (polygon) => Boolean(polygon.object || polygon.start || (polygon.color && polygon.color !== Config.DEFAULT_TILE_COLOR));
+
+    /**
+     * Lays a restored board out for the canvas it is shown on. The saved tiles carry the pixel coordinates of the
+     * canvas they were drawn on, so on a smaller or larger window they would run off the screen or float in a corner
+     * until the next resize. The grid is generated again for this canvas and the colours, objects and start markers
+     * are carried over by tile id (the same step a window resize takes).
+     *
+     * Left as saved: an infinite board (its tiles do not depend on the canvas), and a board whose painted tiles
+     * would not all be found again by id (boards saved by older versions have other ids; regenerating would lose their
+     * colours). A country board waits for its outlines, which may still have to be downloaded.
+     */
+    function refitToCanvas(saved) {
+        const state = AppState.getState();
+        const config = state.boardConfig;
+        if (typeof Geometry === 'undefined' || typeof Interactions === 'undefined' || !state.canvas || !config) return;
+        if (Infinite.isActive()) return;
+        const regenerate = () => {
+            const fresh = new Set(Geometry.generateGrid(AppState.getState().boardConfig, AppState.getState().canvas, null).map((p) => p.id));
+            if (!saved.every((polygon) => fresh.has(polygon.id) || !isPainted(polygon))) return;
+            Interactions.generateBoard(AppState.getState().boardConfig, { preserveColors: true, preserveHistory: true, skipDirtyFlag: true });
+        };
+        if (config.boardShape === 'country') {
+            if (typeof CountryBoard === 'undefined' || !CountryBoard.ready) return;
+            CountryBoard.ready().then((ok) => {
+                // Only if nothing has replaced the restored board in the meantime.
+                if (ok && AppState.getState().polygons === saved) regenerate();
+            });
+            return;
+        }
+        regenerate();
+    }
+
     function restoreState(payload, options = {}) {
         const statePayload = payload.appState;
         // Cloned before anything is changed, so a problem here cannot leave a half-loaded board.
@@ -455,8 +489,9 @@ const FileManager = (() => {
             setupAutoSave();
         }
         AppState.setPolygons(polygons);
-        // An infinite board has no fixed outline to frame: show what was drawn instead of the origin.
-        if (Infinite.isActive()) AppState.resetView();
+        // A loaded board is shown whole, whatever pan and zoom the board before it had (an infinite board has no
+        // outline to frame: what was drawn is shown instead of the origin).
+        AppState.resetView();
         AppState.setProjectName(payload.projectName || Config.DEFAULT_PROJECT_NAME);
 
         syncProjectPanel();
@@ -466,6 +501,7 @@ const FileManager = (() => {
         AppState.resetHistory();
         AppState.recordHistory();
         AppState.clearDirty();
+        refitToCanvas(AppState.getState().polygons);
         // A new design starts a new game: the running playtest (if any) belonged to the old one. Told last,
         // so the players panel and its hints see the new tiles.
         if (typeof Playtest !== 'undefined') Playtest.designChanged();
