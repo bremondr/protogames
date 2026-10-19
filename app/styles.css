@@ -35,6 +35,13 @@
    Neutral base rules so the experience behaves the same across
    browsers on desktop and tablets.
    ============================================================== */
+/* Every scrollable area (the dialogs, the lists, the menu) gets the slim, dark scrollbar of the sidebar: the browser's own
+   one is a wide white bar with arrows. The few areas with their own colour below still win, being more specific. */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+
 *, 
 *::before,
 *::after {
