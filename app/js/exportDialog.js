@@ -213,8 +213,8 @@ const ExportDialog = (() => {
             $('exportPngSummary').textContent = board ? `PNG, ${size.width} × ${size.height} px` : 'Generate a board first.';
             $('exportPngSummaryNote').textContent = board ? (options.background === 'transparent' ? 'Transparent where there is no tile.' : 'On a white background.') : '';
         } else {
-            $('exportSvgSummary').textContent = board ? 'SVG, flat colours' : 'Generate a board first.';
-            $('exportSvgSummaryNote').textContent = board ? (options.objects ? 'Objects are embedded pictures.' : 'Tiles only.') : '';
+            $('exportSvgSummary').textContent = board ? (options.textures ? 'SVG, with textures' : 'SVG, flat colours') : 'Generate a board first.';
+            $('exportSvgSummaryNote').textContent = board ? [options.textures ? 'Textures are embedded pictures.' : '', options.objects ? 'Objects and start markers are included.' : ''].filter(Boolean).join(' ') || 'Tiles only.' : '';
         }
         return board;
     }

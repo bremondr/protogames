@@ -63,11 +63,11 @@ test('PNG options are kept within what the export can do, anything odd becomes t
     assert.equal(Exporter.normalizePng({ grid: 'no' }).grid, true, 'a value that is not true or false is ignored');
 });
 
-test('SVG options default to what the SVG always was: grid lines, no objects, no background', () => {
+test('SVG options default to what the SVG always was: flat colours, grid lines, no objects, no background', () => {
     const { Exporter } = fresh({});
     const plain = (value) => JSON.parse(JSON.stringify(value));
-    assert.deepEqual(plain(Exporter.normalizeSvg()), { objects: false, grid: true, background: 'transparent' });
-    assert.deepEqual(plain(Exporter.normalizeSvg({ objects: true, grid: false, background: 'white' })), { objects: true, grid: false, background: 'white' });
+    assert.deepEqual(plain(Exporter.normalizeSvg()), { textures: false, objects: false, grid: true, background: 'transparent' });
+    assert.deepEqual(plain(Exporter.normalizeSvg({ textures: true, objects: true, grid: false, background: 'white' })), { textures: true, objects: true, grid: false, background: 'white' });
 });
 
 test('an SVG without grid lines strokes each tile in its own colour, so no gaps show between tiles', () => {
@@ -132,4 +132,60 @@ test('the SVG file is made from the chosen options', () => {
     assert.match(made.svg, /<rect [^>]*fill="#ffffff"/);
     assert.match(made.svg, /stroke="#abcdef"/);
     assert.equal(fresh({ canvas: null, polygons: [] }).Exporter.svgForBoard(), null, 'no board, no svg');
+});
+
+const square = (x, y, color, extra = {}) => ({ color, center: { x: x + 5, y: y + 5 }, vertices: [{ x, y }, { x: x + 10, y }, { x: x + 10, y: y + 10 }, { x, y: y + 10 }], ...extra });
+
+test('with textures every colour is a repeating picture that fills its tiles, one per colour', () => {
+    const images = { '#2d5016': { tile: 'data:image/png;base64,FOREST', feature: null, size: 128 }, '#7cb342': { tile: 'data:image/png;base64,GRASS', feature: null, size: 128 } };
+    const { Exporter } = fresh({});
+    const textures = { images: (hex) => images[hex.toLowerCase()] || null, scale: 0.5 };
+    const svg = Exporter.buildSvg([square(0, 0, '#2D5016'), square(10, 0, '#2d5016'), square(20, 0, '#7CB342'), square(30, 0, '#abcdef')], { width: 40, height: 10, viewBox: '0 0 40 10', textures });
+    assert.equal(svg.match(/<pattern /g).length, 2, 'one pattern per colour, whatever the letter case');
+    assert.match(svg, /<pattern id="t0" width="64.00" height="64.00" patternUnits="userSpaceOnUse"><image width="64.00" height="64.00" href="data:image\/png;base64,FOREST"\/><\/pattern>/, 'the picture is repeated at the size the board shows it');
+    assert.equal(svg.match(/fill="url\(#t0\)"/g).length, 2);
+    assert.equal(svg.match(/fill="url\(#t1\)"/g).length, 1);
+    assert.match(svg, /fill="#abcdef"/, 'a colour without a texture stays flat');
+    assert.ok(!Exporter.buildSvg([square(0, 0, '#2D5016')], { width: 10, height: 10, viewBox: '0 0 10 10' }).includes('<pattern'), 'flat colours unless textures are asked for');
+});
+
+test('with textures and no grid lines the seam-closing stroke is the flat colour, not the pattern', () => {
+    const { Exporter } = fresh({});
+    const textures = { images: () => ({ tile: 'data:image/png;base64,X', feature: null, size: 128 }), scale: 1 };
+    const svg = Exporter.buildSvg([square(0, 0, '#2d5016')], { width: 10, height: 10, viewBox: '0 0 10 10', textures, grid: false });
+    assert.match(svg, /fill="url\(#t0\)" stroke="#2d5016"/);
+});
+
+test('a colour with a picture of its own (a village) gets it laid over each tile, clipped to the tile', () => {
+    const images = { '#795548': { tile: 'data:image/png;base64,GROUND', feature: 'data:image/png;base64,HOUSES', size: 128 } };
+    const { Exporter } = fresh({});
+    const textures = { images: (hex) => images[hex.toLowerCase()] || null, scale: 1 };
+    const svg = Exporter.buildSvg([square(0, 0, '#795548'), square(10, 0, '#795548'), square(20, 0, '#111111')], { width: 30, height: 10, viewBox: '0 0 30 10', textures });
+    assert.equal(svg.match(/<symbol /g).length, 1, 'the picture is stored once');
+    assert.equal(svg.match(/<clipPath /g).length, 2, 'one clip per tile that has it');
+    assert.equal(svg.match(/<use href="#f0"/g).length, 2);
+    assert.match(svg, /<g clip-path="url\(#c0\)"><use href="#f0" x="0.25" y="0.25" width="9.50" height="9.50"\/><\/g>/, '95% of the tile, centred, clipped by a group (a clip on the use itself would move with its x and y)');
+    assert.ok(svg.indexOf('<use') > svg.indexOf('<path d='), 'over the tiles');
+});
+
+test('start markers are drawn with the objects: a white line under a coloured one, pulled in to 86% of the tile', () => {
+    const { Exporter } = fresh({});
+    const polygons = [square(0, 0, '#7cb342', { start: '#c62828' }), square(10, 0, '#7cb342')];
+    const svg = Exporter.buildSvg(polygons, { width: 20, height: 10, viewBox: '0 0 20 10', objects: true });
+    assert.equal(svg.match(/stroke-width="6"/g).length, 1);
+    assert.match(svg, /stroke="#c62828" stroke-width="3.5"/);
+    assert.match(svg, /M 0.70 0.70 L 9.30 0.70 L 9.30 9.30 L 0.70 9.30 Z/, 'the outline pulled in around the centre');
+    assert.ok(!Exporter.buildSvg(polygons, { width: 20, height: 10, viewBox: '0 0 20 10' }).includes('#c62828'), 'not without objects');
+});
+
+test('the borders between countries are lines over the tiles, a dark one under a light one, and nothing when there are none', () => {
+    const { Exporter } = fresh({});
+    const borders = { edges: [[{ x: 10, y: 0 }, { x: 10, y: 10 }], [{ x: 10, y: 10 }, { x: 20, y: 10 }]], color: 'rgba(255, 255, 255, 0.95)', shadow: 'rgba(10, 14, 22, 0.75)', width: 2.5 };
+    const svg = Exporter.buildSvg([square(0, 0, '#7cb342'), square(10, 0, '#2d5016')], { width: 20, height: 10, viewBox: '0 0 20 10', borders });
+    assert.match(svg, /<path d="M 10.00 0.00 L 10.00 10.00 M 10.00 10.00 L 20.00 10.00" fill="none" stroke="rgba\(10, 14, 22, 0.75\)" stroke-width="4.5" stroke-linecap="round"\/>/);
+    assert.match(svg, /stroke="rgba\(255, 255, 255, 0.95\)" stroke-width="2.5" stroke-linecap="round"/);
+    assert.ok(svg.lastIndexOf('stroke-width="1"') < svg.indexOf('stroke-width="4.5"'), 'drawn after the tiles');
+    assert.ok(!Exporter.buildSvg([square(0, 0, '#7cb342')], { width: 10, height: 10, viewBox: '0 0 10 10', borders: { ...borders, edges: [] } }).includes('stroke-linecap'));
+    const hostile = Exporter.buildSvg([square(0, 0, '#7cb342')], { width: 10, height: 10, viewBox: '0 0 10 10', borders: { ...borders, color: 'red" onload="x' } });
+    assert.ok(!/onload="x/.test(hostile), 'a border colour cannot break out of its attribute');
 });
