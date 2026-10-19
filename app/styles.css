@@ -3042,6 +3042,13 @@ kbd {
     display: none;
 }
 
+/* The panels below paint over anything that spills out of the one above (they have their own stacking context), so the
+   panel whose list is open is lifted above its neighbours while it is open. */
+.panel:has(.bp-list:not([hidden])) {
+    position: relative;
+    z-index: 50;
+}
+
 .bp-option {
     display: flex;
     flex-direction: column;

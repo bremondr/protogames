@@ -158,3 +158,13 @@ test('the board form has the tile shape first, the picture list for the board sh
     // the picker drives the native select, which every other module reads: it keeps its name and every option
     for (const value of Picker.SHAPES.map((s) => s.value)) assert.match(html, new RegExp(`<option value="${value}"`));
 });
+
+test('the panel whose list is open is lifted above the panels below, which would otherwise paint over the list', () => {
+    const css = fs.readFileSync(path.join(__dirname, '..', 'app', 'styles.css'), 'utf8');
+    const rule = /\.panel:has\(\.bp-list:not\(\[hidden\]\)\)\s*\{([^}]*)\}/.exec(css);
+    assert.ok(rule, 'the rule exists');
+    assert.match(rule[1], /position:\s*relative/);
+    assert.match(rule[1], /z-index:\s*(\d+)/);
+    const list = /\.bp-list\s*\{[^}]*z-index:\s*(\d+)/.exec(css);
+    assert.ok(list && Number(/z-index:\s*(\d+)/.exec(rule[1])[1]) >= Number(list[1]), 'the panel is at least as high as its list');
+});
