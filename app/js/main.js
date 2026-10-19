@@ -34,6 +34,7 @@ const Main = (() => {
         Toolbar.init();
         PlayersPanel.init();
         LabelsPanel.init();
+        BoardPicker.init();
         PlaytestTray.init();
         PlaytestDrag.init();
         Playtest.init();

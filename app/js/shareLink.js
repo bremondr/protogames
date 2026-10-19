@@ -141,7 +141,7 @@ const ShareLink = (() => {
     function estimateTiles(config) {
         const number = (key, fallback) => (Number.isFinite(config[key]) ? config[key] : fallback);
         let cells;
-        if (config.boardShape === 'hexagon' || config.boardShape === 'circle') cells = (2 * number('radius', 5) + 1) ** 2;
+        if (config.boardShape === 'hexagon' || config.boardShape === 'circle') cells = (2 * number('radius', 5) + 2) ** 2;
         else if (config.boardShape === 'square' || config.boardShape === 'triangle') cells = number('size', 10) ** 2;
         else cells = number('width', 11) * number('height', 11);
         return config.gridType === 'triangle' && config.boardShape !== 'triangle' ? cells * 6 : cells;

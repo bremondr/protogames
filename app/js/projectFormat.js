@@ -17,7 +17,7 @@
  * read live app config inside them.
  */
 const ProjectFormat = (() => {
-    const CURRENT_VERSION = 7;
+    const CURRENT_VERSION = 8;
 
     const GRID_TYPES = ['hexagon', 'square', 'triangle'];
     const BOARD_SHAPES = ['hexagon', 'rectangle', 'triangle', 'circle', 'infinite', 'country'];
@@ -25,6 +25,7 @@ const ProjectFormat = (() => {
     const MAX_COUNTRY_NAME = 100;
     const ORIENTATIONS = ['pointy-top', 'flat-top', 'orthogonal', 'diagonal'];
     const TRIANGLE_ORIENTATIONS = ['point-up', 'point-down'];
+    const BOARD_CENTERS = ['tile', 'point'];
     const MAX_BOARD_DIMENSION = 100; // same cap as share links
     const MAX_BOARD_SPAN = 2 * MAX_BOARD_DIMENSION + 1;
     const MAX_VERTICES = 64;
@@ -243,6 +244,22 @@ const ProjectFormat = (() => {
         return next;
     }
 
+    /**
+     * v7 -> v8: the centre of a hexagon or circle board. A board is built around a tile or around the point where tiles
+     * meet; before, the choice was fixed by the tile shape (triangles around a point, everything else around a tile), so
+     * existing boards get exactly that, written down. The tiles are not touched.
+     */
+    function migrateV7toV8(project) {
+        const next = clone(project);
+        next.version = 8;
+        const config = isObject(next.appState) && isObject(next.appState.boardConfig) ? next.appState.boardConfig : null;
+        if (config && config.center === undefined) {
+            const central = config.boardShape === 'hexagon' || config.boardShape === 'circle';
+            config.center = central && config.gridType === 'triangle' ? 'point' : 'tile';
+        }
+        return next;
+    }
+
     /** MIGRATIONS[n] upgrades a version-n project to version n + 1. */
     const MIGRATIONS = {
         0: migrateV0toV1,
@@ -251,7 +268,8 @@ const ProjectFormat = (() => {
         3: migrateV3toV4,
         4: migrateV4toV5,
         5: migrateV5toV6,
-        6: migrateV6toV7
+        6: migrateV6toV7,
+        7: migrateV7toV8
     };
 
     /**
@@ -310,6 +328,7 @@ const ProjectFormat = (() => {
         if (config.orientation !== undefined && !ORIENTATIONS.includes(config.orientation)) {
             fail(`The board has an unknown orientation (${JSON.stringify(config.orientation)}).`);
         }
+        if (!BOARD_CENTERS.includes(config.center)) fail(`The board has an unknown centre (${JSON.stringify(config.center)}).`);
         if (config.triangleOrientation !== undefined && !TRIANGLE_ORIENTATIONS.includes(config.triangleOrientation)) {
             fail(`The board has an unknown triangle orientation (${JSON.stringify(config.triangleOrientation)}).`);
         }

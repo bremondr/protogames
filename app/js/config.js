@@ -45,7 +45,8 @@ const Config = (() => {
         height: 11,
         radius: 5,
         size: 10,
-        triangleOrientation: 'point-up'
+        triangleOrientation: 'point-up',
+        center: 'tile'
     };
     /**
      * Themeable color palettes. Each palette carries an id, a human-friendly

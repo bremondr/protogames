@@ -31,6 +31,9 @@ const UI = (() => {
         elements.sizeLabel = document.getElementById('sizeLabel');
         elements.triangleOrientationSelect = document.querySelector('select[name="triangleOrientation"]');
         elements.triangleOrientationField = document.getElementById('triangleOrientationField');
+        elements.centerSelect = document.querySelector('select[name="boardCenter"]');
+        elements.centerField = document.getElementById('centerField');
+        elements.radiusHint = document.getElementById('radiusHint');
         elements.rectangularFields = document.getElementById('rectangularFields');
         elements.generateButton = document.querySelector('[data-action="generate-board"]');
         elements.undoButton = document.querySelector('[data-action="undo"]');
@@ -43,14 +46,22 @@ const UI = (() => {
         elements.exportSVGBtn = document.getElementById('exportSVGBtn');
         elements.notificationBar = document.getElementById('notificationBar');
 
-        elements.boardShapeSelect?.addEventListener('change', () => {
-            applyBoardShapeVisibility();
-            applyGridTypeRestrictions();
+        elements.boardShapeSelect?.addEventListener('change', refreshBoardForm);
+        elements.gridTypeSelect?.addEventListener('change', () => {
+            // Boards used to be built around a point for triangles and around a tile for the rest; that stays the start.
+            if (elements.centerSelect) elements.centerSelect.value = elements.gridTypeSelect.value === 'triangle' ? 'point' : 'tile';
+            refreshBoardForm();
         });
-        elements.gridTypeSelect?.addEventListener('change', applyGridTypeVisibility);
-        applyBoardShapeVisibility();
+        [elements.orientationSelect, elements.triangleOrientationSelect, elements.centerSelect].forEach((el) => el?.addEventListener('change', refreshBoardForm));
+        refreshBoardForm();
+    }
+
+    /** Brings every part of the board form (restrictions, visible fields, the picture list) in line with the choices. */
+    function refreshBoardForm() {
         applyGridTypeRestrictions();
+        applyBoardShapeVisibility();
         applyGridTypeVisibility();
+        if (typeof BoardPicker !== 'undefined') BoardPicker.refresh();
     }
 
     /**
@@ -158,11 +169,24 @@ const UI = (() => {
         return value;
     }
 
+    const isCentral = (boardShape) => boardShape === 'hexagon' || boardShape === 'circle';
+
+    /**
+     * The size people type is the number of layers from the centre (1 is the centre alone). The saved radius counts
+     * it from the first ring for hexagon and square tiles (radius 0 is one tile) and as the layer count for triangles
+     * (radius 1 is the first layer of triangles around a point), as it always has.
+     */
+    const radiusFromLayers = (gridType, layers) => (gridType === 'triangle' ? layers : layers - 1);
+    const layersFromRadius = (gridType, radius) => (gridType === 'triangle' ? radius : radius + 1);
+
     function getBoardConfig() {
         const boardShape = elements.boardShapeSelect?.value || Config.DEFAULT_BOARD_CONFIG.boardShape;
         const gridType = elements.gridTypeSelect?.value || Config.DEFAULT_BOARD_CONFIG.gridType;
         const orientation = elements.orientationSelect?.value || Config.DEFAULT_BOARD_CONFIG.orientation;
-        const radius = readBoardNumber(elements.radiusInput, Config.DEFAULT_BOARD_CONFIG.radius, MAX_BOARD_RADIUS);
+        const center = isCentral(boardShape) && elements.centerSelect?.value === 'point' ? 'point' : 'tile';
+        const defaultLayers = layersFromRadius(Config.DEFAULT_BOARD_CONFIG.gridType, Config.DEFAULT_BOARD_CONFIG.radius);
+        const layers = readBoardNumber(elements.radiusInput, defaultLayers, MAX_BOARD_RADIUS);
+        const radius = radiusFromLayers(gridType, layers);
         const size = readBoardNumber(elements.sizeInput, Config.DEFAULT_BOARD_CONFIG.size, MAX_BOARD_SIDE);
         let width = readBoardNumber(elements.widthInput, Config.DEFAULT_BOARD_CONFIG.width, MAX_BOARD_SIDE);
         let height = readBoardNumber(elements.heightInput, Config.DEFAULT_BOARD_CONFIG.height, MAX_BOARD_SIDE);
@@ -174,8 +198,8 @@ const UI = (() => {
                 break;
             case 'hexagon':
             case 'circle':
-                width = radius * 2 + 1;
-                height = radius * 2 + 1;
+                width = radius * 2 + (center === 'point' ? 2 : 1);
+                height = width;
                 break;
             default:
                 break;
@@ -189,7 +213,8 @@ const UI = (() => {
             height,
             radius,
             size,
-            triangleOrientation: elements.triangleOrientationSelect?.value || Config.DEFAULT_BOARD_CONFIG.triangleOrientation
+            triangleOrientation: elements.triangleOrientationSelect?.value || Config.DEFAULT_BOARD_CONFIG.triangleOrientation,
+            center
         };
     }
 
@@ -199,14 +224,13 @@ const UI = (() => {
         if (elements.boardShapeSelect) elements.boardShapeSelect.value = config.boardShape;
         if (elements.widthInput) elements.widthInput.value = config.width;
         if (elements.heightInput) elements.heightInput.value = config.height;
-        if (elements.radiusInput) elements.radiusInput.value = config.radius ?? Config.DEFAULT_BOARD_CONFIG.radius;
+        if (elements.centerSelect) elements.centerSelect.value = config.center === 'point' ? 'point' : 'tile';
+        if (elements.radiusInput) elements.radiusInput.value = layersFromRadius(config.gridType, config.radius ?? Config.DEFAULT_BOARD_CONFIG.radius);
         if (elements.sizeInput) elements.sizeInput.value = config.size ?? Config.DEFAULT_BOARD_CONFIG.size;
         if (elements.triangleOrientationSelect) {
             elements.triangleOrientationSelect.value = config.triangleOrientation || Config.DEFAULT_BOARD_CONFIG.triangleOrientation;
         }
-        applyBoardShapeVisibility();
-        applyGridTypeRestrictions();
-        applyGridTypeVisibility();
+        refreshBoardForm();
     }
 
     function setPaletteSelection(button) {
@@ -254,28 +278,20 @@ const UI = (() => {
      */
     function applyBoardShapeVisibility() {
         const boardShape = elements.boardShapeSelect?.value || Config.DEFAULT_BOARD_CONFIG.boardShape;
-        const showRadius = boardShape === 'hexagon' || boardShape === 'circle';
+        const gridType = elements.gridTypeSelect?.value || Config.DEFAULT_BOARD_CONFIG.gridType;
+        const center = elements.centerSelect?.value === 'point' ? 'point' : 'tile';
+        const showRadius = isCentral(boardShape);
         const showSize = boardShape === 'triangle';
-        const showTriangleOrientation = boardShape === 'triangle';
+        // Triangles point up or down: the whole triangle board, or the triangle a hexagon or circle board is built around.
+        const showTriangleOrientation = boardShape === 'triangle' || (showRadius && gridType === 'triangle' && center === 'tile');
 
         elements.radiusField?.classList.toggle('hidden', !showRadius);
+        elements.centerField?.classList.toggle('hidden', !showRadius);
         elements.sizeField?.classList.toggle('hidden', !showSize);
         elements.rectangularFields?.classList.toggle('hidden', showRadius || showSize || boardShape === 'infinite' || boardShape === 'country');
         elements.triangleOrientationField?.classList.toggle('hidden', !showTriangleOrientation);
 
-        if (elements.radiusLabel) {
-            elements.radiusLabel.textContent =
-                boardShape === 'hexagon'
-                    ? 'Radius (number of hexagons from center to edge, try 3-10)'
-                    : 'Radius (tiles from center to edge)';
-        }
-        if (elements.radiusInput) {
-            if (boardShape === 'hexagon') {
-                elements.radiusInput.placeholder = 'e.g., 3-10';
-            } else {
-                elements.radiusInput.removeAttribute('placeholder');
-            }
-        }
+        if (elements.radiusHint) elements.radiusHint.textContent = layersHint(gridType, center);
         if (elements.sizeLabel) {
             elements.sizeLabel.textContent =
                 boardShape === 'triangle' ? 'Base Size (tiles along bottom edge)' : 'Size (tiles per side)';
@@ -288,41 +304,44 @@ const UI = (() => {
         }
     }
 
+    /** What layer 1 and the next layers are, for the tile shape and centre chosen. */
+    function layersHint(gridType, center) {
+        const tile = { hexagon: 'hexagon', square: 'square', triangle: 'triangle' }[gridType] || 'tile';
+        if (center === 'tile') {
+            return gridType === 'triangle'
+                ? 'Layer 1 is the centre triangle alone; each layer adds the triangles that touch the last.'
+                : `Layer 1 is the centre ${tile} alone; each layer adds a ring of ${tile}s around it.`;
+        }
+        const first = { hexagon: 'the three hexagons', square: 'the four squares', triangle: 'the six triangles' }[gridType] || 'the tiles';
+        return `Layer 1 is ${first} that meet at the centre point; each layer adds the ring around the last.`;
+    }
+
     /**
      * Shows the grid-orientation dropdown only for hexagon grids, keeping the
      * controls minimal for other grid types.
      */
     function applyGridTypeVisibility() {
         const gridType = elements.gridTypeSelect?.value || Config.DEFAULT_BOARD_CONFIG.gridType;
-        const showOrientation = gridType === 'hexagon';
+        const boardShape = elements.boardShapeSelect?.value || Config.DEFAULT_BOARD_CONFIG.boardShape;
+        const center = elements.centerSelect?.value === 'point' ? 'point' : 'tile';
+        // Hexagon tiles are pointy or flat; triangles around a point are laid out as a pointy or a flat hexagon.
+        const showOrientation = gridType === 'hexagon' || (gridType === 'triangle' && isCentral(boardShape) && center === 'point');
         elements.orientationField?.classList.toggle('hidden', !showOrientation);
     }
 
     /**
-     * Restricts grid type choices for specific board shapes (e.g., hex outline)
-     * to prevent unsupported combinations and automatically switches to an
-     * allowed option if the current value becomes invalid.
+     * Square tiles cannot fill a hexagon outline, so the hexagon board shape is switched off for them (and a board that
+     * had it falls back to a rectangle) instead of taking the tile shape away.
      */
     function applyGridTypeRestrictions() {
-        const boardShape = elements.boardShapeSelect?.value || Config.DEFAULT_BOARD_CONFIG.boardShape;
-        const allowedForHexOutline = ['hexagon', 'triangle'];
-        const options = Array.from(elements.gridTypeSelect?.options || []);
-        let selectionChanged = false;
-
+        const gridType = elements.gridTypeSelect?.value || Config.DEFAULT_BOARD_CONFIG.gridType;
+        const options = Array.from(elements.boardShapeSelect?.options || []);
         options.forEach((option) => {
-            if (boardShape === 'hexagon') {
-                const disabled = !allowedForHexOutline.includes(option.value);
-                option.disabled = disabled;
-                if (disabled && option.selected) {
-                    selectionChanged = true;
-                }
-            } else {
-                option.disabled = false;
-            }
+            option.disabled = gridType === 'square' && option.value === 'hexagon';
         });
-
-        if (selectionChanged) {
-            elements.gridTypeSelect.value = allowedForHexOutline[0];
+        if (gridType === 'square' && elements.boardShapeSelect?.value === 'hexagon') {
+            elements.boardShapeSelect.value = 'rectangle';
+            applyBoardShapeVisibility();
         }
         applyGridTypeVisibility();
     }
