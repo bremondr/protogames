@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Sets up an Ubuntu machine for Protogames tactile-table (TMB) work.
-# Installs build tools, OpenCV (with aruco), Node 22, tmux, the GitHub CLI and
-# Claude Code, clones the repo and writes a hardware report.
-# Interactive steps: sudo password, `gh auth login`, `claude` login. Nothing else.
+# Installs build tools, OpenCV (with aruco), Node 22, tmux, an SSH server,
+# Tailscale, the GitHub CLI and Claude Code, clones the repo and writes a
+# hardware report.
+# Interactive steps: sudo password, Tailscale login, `gh auth login`, `claude`
+# login. Nothing else.
 # Safe to re-run: every step skips what is already done.
 set -euo pipefail
 
@@ -25,7 +27,22 @@ sudo apt-get update
 sudo apt-get install -y \
   git curl ca-certificates gnupg build-essential cmake pkg-config \
   libopencv-dev python3 python3-pip python3-venv python3-opencv \
-  v4l-utils liblo-dev tmux jq
+  v4l-utils liblo-dev tmux jq openssh-server
+
+say "SSH server (remote access to the table machine)"
+sudo systemctl enable --now ssh
+if sudo ufw status 2>/dev/null | grep -q '^Status: active'; then
+  sudo ufw allow OpenSSH
+fi
+
+say "Tailscale (open the login link it prints in any browser)"
+if ! command -v tailscale >/dev/null; then
+  curl -fsSL https://tailscale.com/install.sh | sh
+fi
+if ! tailscale status >/dev/null 2>&1; then
+  # --operator lets this user run tailscale commands without sudo
+  sudo tailscale up --operator="$USER"
+fi
 
 say "Camera access (video group)"
 if ! id -nG "$USER" | tr ' ' '\n' | grep -qx video; then
@@ -123,4 +140,7 @@ Done. Next:
   2. tmux new -s table
   3. cd $WORKDIR && claude        # then /remote-control to drive it from your other machine
   4. Tell Claude: "read machine-report.txt and docs/TABLETOP_INTEGRATION.md"
+
+SSH from another machine on this network: ssh $USER@$(hostname -I | awk '{print $1}')
+SSH from anywhere on the tailnet:          ssh $USER@$(hostname)
 EOF
