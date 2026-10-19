@@ -68,6 +68,12 @@ test('a Content-Security-Policy limits scripts to this site and the analytics sc
     }
 });
 
+test('the app scripts are deferred: over HTTP/2 a plain script tag is fetched one round trip after the other (8 s at 150 ms latency, 1 s deferred)', () => {
+    const own = [...html.matchAll(/<script\b([^>]*)>/gi)].map((m) => m[1]).filter((attrs) => /\bsrc="js\//.test(attrs));
+    assert.ok(own.length > 30, 'the app scripts are in the page');
+    assert.ok(own.every((attrs) => /\bdefer\b/.test(attrs)), 'every app script has defer, which keeps their order and runs them before DOMContentLoaded');
+});
+
 test('the page has favicons (small .ico and the logo png), and they are files that exist', () => {
     const hrefs = [...html.matchAll(/<link rel="icon"[^>]*href="([^"]+)"/g)].map((m) => m[1]);
     assert.ok(hrefs.some((h) => h.endsWith('.ico')), 'a .ico favicon');

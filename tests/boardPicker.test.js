@@ -153,7 +153,7 @@ test('the board form has the tile shape first, the picture list for the board sh
         assert.equal((html.match(new RegExp(`id="${id}"`, 'g')) || []).length, 1, `${id} appears once`);
     }
     assert.match(html, /name="boardCenter"[\s\S]*value="tile"[\s\S]*value="point"/);
-    assert.match(html, /<script src="js\/boardPicker\.js"><\/script>/);
+    assert.match(html, /<script defer src="js\/boardPicker\.js"><\/script>/);
     assert.ok(at('js/boardPicker.js') < at('js/countryBoard.js') && at('js/ui.js') < at('js/boardPicker.js'));
     // the picker drives the native select, which every other module reads: it keeps its name and every option
     for (const value of Picker.SHAPES.map((s) => s.value)) assert.match(html, new RegExp(`<option value="${value}"`));
