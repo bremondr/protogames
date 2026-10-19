@@ -16,7 +16,8 @@ Protogames lets designers sketch and iterate on board layouts quickly—no build
 - Painting: one drawing tool with a Brush / Fill / Line switch (and brush size, theme and colours) in its settings popover; the eraser has its own size; objects are placed one per click, ignoring the draw mode and size
 - Fill and line tools: flood-fill a connected region in one click, or drag from tile A to tile B to paint a gap-free tile path (works on hexagon, square and triangle grids; each is a single undo step; they apply to colours only)
 - Palettes: Switchable themed color palettes (e.g., Landscape, Space) with labeled swatches
-- History: Undo/redo, autosave to localStorage (one slot per tab, so several tabs never overwrite each other)
+- Projects: every board is a named project kept in the browser and autosaved as you work. The home page lists them (open, delete); a new project asks for a name; share links, project files and the showcase map open as new projects instead of replacing the one you are working on
+- History: Undo/redo
 - File ops: Save/load JSON projects; export PNG and SVG (SVG is a flat-colour outline of the tiles: no textures or objects)
 - Print: **Print…** makes a PDF at a real-world tile size (in mm): split across A4 / Letter / A3 home-printer pages with overlap, page labels and assembly hints, or one large sheet (fit to board, A3–A0) with crop marks; objects on the board, as cut-out tokens, or both; optional legend of the terrains and objects used; a live preview shows how the board sits on the paper. Settings are remembered per browser.
 - Sharing: **Share Link** puts the whole board in the address (nothing is uploaded); whoever opens it gets their own copy
@@ -84,8 +85,8 @@ protogames/
 │  │  ├─ toolbar.js         (the tool column and its settings popovers)
 │  │  ├─ shortcuts.js       (keyboard bindings)
 │  │  ├─ projectFormat.js   (project file format: versions, migrations, validation)
-│  │  ├─ autosaveSlots.js   (per-tab autosave slots)
-│  │  ├─ fileManager.js     (save/load, autosave)
+│  │  ├─ projectLibrary.js  (the projects kept in the browser; the home page uses it too)
+│  │  ├─ fileManager.js     (save/load files, autosave, opening projects)
 │  │  ├─ shareLink.js       (share links: board in the address hash)
 │  │  ├─ playtest.js        (locks editing, runs the game)
 │  │  ├─ playtestTray.js    (player trays and dice)

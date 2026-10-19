@@ -29,6 +29,13 @@ test('buildInfo gives every preview its own storage prefix and relative links', 
     assert.equal(a.indexUrl, '../../');
 });
 
+test('the landing page of a preview links back to production and the previews from its own place', () => {
+    const info = Site.buildInfo({ name: 'pr-9', label: 'PR #9', sha: 'abcdef0', page: 'landing' });
+    assert.equal(info.productionUrl, '../../');
+    assert.equal(info.indexUrl, '../');
+    assert.equal(info.storagePrefix, Site.buildInfo({ name: 'pr-9', label: 'x' }).storagePrefix, 'the same storage as the preview\'s app, so they share the projects');
+});
+
 test('a preview page gets the runtime first and loses analytics; the rest is untouched', () => {
     const html = '<!doctype html>\n<html>\n<head>\n    <title>x</title>\n</head>\n<body>\n<script src="app/js/config.js"></script>\n<script async src="https://scripts.simpleanalyticscdn.com/latest.js"></script>\n</body>\n</html>\n';
     const out = Site.previewIndexHtml(html);
@@ -177,6 +184,10 @@ test('a site build puts production at the root (landing page, app in app/) and p
             assert.ok(fs.existsSync(path.join(dir, 'index.html')) && fs.existsSync(path.join(dir, 'landing.js')), 'the landing page is part of production and of every preview');
         }
         assert.ok(fs.existsSync(path.join(out, 'preview', 'pr-66', 'app', 'preview-runtime.js')));
+        const landing = fs.readFileSync(path.join(out, 'preview', 'pr-66', 'index.html'), 'utf8');
+        assert.ok(/<script src="preview-runtime.js"><\/script>/.test(landing) && landing.indexOf('preview-runtime.js') < landing.indexOf('src="landing.js"'), 'the preview landing page isolates its storage before it lists projects');
+        assert.ok(fs.existsSync(path.join(out, 'preview', 'pr-66', 'preview-runtime.js')), 'and has the runtime beside it');
+        assert.ok(!fs.readFileSync(path.join(out, 'index.html'), 'utf8').includes('preview-runtime'), 'production landing page is as committed');
         assert.ok(!fs.existsSync(path.join(out, 'app', 'preview-runtime.js')), 'the runtime is not in production');
         assert.ok(!fs.existsSync(path.join(out, 'preview', 'pr-70')), 'a fork is not published');
         assert.ok(!fs.existsSync(path.join(out, 'tests')) && !fs.existsSync(path.join(out, 'scripts')), 'only the app is published');

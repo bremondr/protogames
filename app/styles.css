@@ -1356,44 +1356,6 @@ button:focus-visible {
 }
 
 /* ==============================================================
-   SHOWCASE PANEL
-   --------------------------------------------------------------
-   One-click example boards that ship with the app.
-   ============================================================== */
-.showcase-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.showcase-item {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.2rem;
-    padding: 0.6rem 0.75rem;
-    text-align: left;
-    border-radius: var(--radius-sm);
-    background: rgba(255, 255, 255, 0.08);
-    color: #f4f4f4;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    transition: background 0.2s ease;
-}
-
-.showcase-item:hover {
-    background: rgba(255, 255, 255, 0.2);
-}
-
-.showcase-name {
-    font-weight: 600;
-}
-
-.showcase-desc {
-    font-size: 0.8rem;
-    color: rgba(255, 255, 255, 0.6);
-}
-
-/* ==============================================================
    FOCUS MODE
    --------------------------------------------------------------
    Full-screen button in the workspace corner. In focus mode the
@@ -2947,4 +2909,23 @@ kbd {
     stroke: rgba(255, 255, 255, 0.35);
     stroke-width: 1;
     stroke-dasharray: 3 2;
+}
+
+/* Project panel: the name of the open project and the way to another one */
+.project-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.project-actions .secondary-button {
+    flex: 1 1 auto;
+    text-align: center;
+    text-decoration: none;
+}
+
+.modal-note {
+    margin: 0 0 0.6rem;
+    font-size: 0.85rem;
+    opacity: 0.8;
 }

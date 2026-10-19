@@ -1,15 +1,14 @@
 /**
  * PROTOGAMES FILE MANAGER
  * --------------------------------------------------------------
- * Handles persistence: auto-saving to localStorage, prompting the
- * user to save/load JSON project files, and restoring saved boards.
+ * Handles persistence: every board is a project in the browser's library
+ * (ProjectLibrary), auto-saved as it changes; project files can be saved
+ * and opened; saved boards are restored from either.
  */
 const FileManager = (() => {
+    const DEFAULT_NEW_NAME = 'Untitled board';
     let ui = null;
     let autoSaveIntervalId = null;
-    // Set when startup could not restore the autosave; shown once the UI is ready.
-    let pendingStartupMessage = null;
-
     function init(uiRefs) {
         ui = uiRefs;
         ui?.saveButton?.addEventListener('click', saveProjectFile);
@@ -17,23 +16,115 @@ const FileManager = (() => {
             ui.loadButton.addEventListener('click', () => ui.loadInput.click());
             ui.loadInput.addEventListener('change', handleFileUpload);
         }
-        renderShowcases();
+        wireProjectPanel();
     }
 
-    /** Builds the Showcase panel buttons from Config.SHOWCASES. */
-    function renderShowcases() {
-        const list = document.getElementById('showcaseList');
-        if (!list) return;
-        list.innerHTML = '';
-        Config.SHOWCASES.forEach((entry) => {
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'showcase-item';
-            button.innerHTML = '<span class="showcase-name"></span><span class="showcase-desc"></span>';
-            button.querySelector('.showcase-name').textContent = entry.name;
-            button.querySelector('.showcase-desc').textContent = entry.description;
-            button.addEventListener('click', () => openShowcase(entry));
-            list.appendChild(button);
+    function wireProjectPanel() {
+        const nameInput = document.getElementById('projectNameInput');
+        nameInput?.addEventListener('change', () => renameProject(nameInput.value));
+        document.getElementById('newProjectButton')?.addEventListener('click', () => {
+            autoSaveToLocalStorage(true);
+            location.assign(location.pathname);
+        });
+    }
+
+    /** Shows the open project's name in the Project panel. */
+    function syncProjectPanel() {
+        const nameInput = document.getElementById('projectNameInput');
+        if (nameInput) nameInput.value = AppState.getState().currentProjectName || '';
+    }
+
+    function renameProject(text) {
+        const name = ProjectLibrary.cleanName(text);
+        if (name) {
+            AppState.setProjectName(name);
+            autoSaveToLocalStorage(true);
+            UI?.showNotification('Project renamed', 2500);
+        }
+        syncProjectPanel();
+    }
+
+    // ---- Which project is open -----------------------------------------------------------------------------------
+
+    /** The project the address names (`?project=<id>`), or null. */
+    function projectIdFromUrl() {
+        const id = new URLSearchParams(location.search).get('project');
+        return ProjectLibrary.isValidId(id) ? id : null;
+    }
+
+    /** The showcase the address asks for (`?showcase=<id>`), or null. */
+    function showcaseFromUrl() {
+        return new URLSearchParams(location.search).get('showcase') || null;
+    }
+
+    /** Puts the project id into the address (and drops everything else, a share link's hash included). */
+    function setAddress(id) {
+        try { history.replaceState(null, '', location.pathname + (id ? `?project=${encodeURIComponent(id)}` : '')); } catch (error) { /* sandboxed frame */ }
+    }
+
+    /** Saves the open project and lets go of it, so the board can be replaced without touching its saved copy. */
+    function detachProject() {
+        autoSaveToLocalStorage(true);
+        AppState.setProjectId(null);
+    }
+
+    /** Makes the board on screen a project of its own in the library, named `name`, and saves it. Returns its id. */
+    function registerNewProject(name) {
+        const id = ProjectLibrary.newId();
+        AppState.setProjectId(id);
+        AppState.setProjectName(ProjectLibrary.cleanName(name) || DEFAULT_NEW_NAME);
+        setAddress(id);
+        syncProjectPanel();
+        autoSaveToLocalStorage(true);
+        return id;
+    }
+
+    /**
+     * Shows a board as a new project: the open project is saved and stays as it was, `show` puts the board
+     * on screen, and the new project takes its name from the board unless `name` is given. When `show`
+     * fails, the open project stays open.
+     */
+    function showAsNewProject(show, name) {
+        const previousId = AppState.getState().currentProjectId;
+        detachProject();
+        try {
+            show();
+        } catch (error) {
+            AppState.setProjectId(previousId);
+            throw error;
+        }
+        return registerNewProject(name === undefined ? AppState.getState().currentProjectName : name);
+    }
+
+    /** Shows a project from the library. Returns false (after saying why) when it cannot be opened. */
+    function openStoredProject(id) {
+        const raw = ProjectLibrary.read(id);
+        if (raw === null) {
+            showMessage('Project not found', 'This project is not in this browser any more. It may have been deleted, or it was made in another browser.');
+            return false;
+        }
+        try {
+            restoreState(ProjectFormat.parse(raw), { skipNotification: true });
+        } catch (error) {
+            console.error('Could not open the stored project.', error);
+            showMessage('This project could not be opened', `${error.message || 'It is damaged.'} It stays in your browser; the home page can delete it.`);
+            return false;
+        }
+        AppState.setProjectId(id);
+        syncProjectPanel();
+        return true;
+    }
+
+    /** A blank board and the question that every new project starts with: what is it called? */
+    async function startNewProject() {
+        Interactions.generateBoard(AppState.getState().boardConfig, { skipDirtyFlag: true });
+        await messageClosed;
+        promptForText('Name your project', DEFAULT_NEW_NAME, (name) => registerNewProject(name), {
+            confirmLabel: 'Create',
+            cancelLabel: 'Back to home',
+            required: true,
+            message: 'It is saved in this browser under this name; you can have as many projects as you like.',
+            onCancel: () => location.assign('../')
         });
     }
 
@@ -45,36 +136,35 @@ const FileManager = (() => {
         );
     }
 
-    function openShowcase(entry) {
-        if (hasUserWork()) {
-            confirmReplace(() => loadShowcase(entry));
-        } else {
-            loadShowcase(entry);
-        }
-    }
-
     /**
-     * Fetches a showcase project and shows it. The saved geometry belongs to
-     * the author's canvas size, so the grid is regenerated for this canvas
-     * with the showcase's colors and objects carried over by tile id.
+     * Opens a showcase board (see Config.SHOWCASES) as a new project named after it. The saved geometry
+     * belongs to the author's canvas size, so the grid is regenerated for this canvas with the showcase's
+     * colors and objects carried over by tile id. Returns true when it opened.
      */
-    async function loadShowcase(entry) {
+    async function openShowcase(id) {
+        const entry = Config.SHOWCASES.find((item) => item.id === id);
+        if (!entry) {
+            showMessage('Showcase not found', 'There is no showcase board with this name.');
+            return false;
+        }
         try {
             const response = await fetch(entry.file);
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const payload = ProjectFormat.parse(await response.text());
-            restoreState(payload, { skipNotification: true });
-            AppState.setProjectName(entry.id);
-            Interactions.generateBoard(AppState.getState().boardConfig, {
-                preserveColors: true,
-                preserveHistory: true,
-                skipDirtyFlag: true
-            });
-            autoSaveToLocalStorage(true);
-            UI?.showNotification(`Showcase "${entry.name}" loaded`, 3500);
+            showAsNewProject(() => {
+                restoreState(payload, { skipNotification: true });
+                Interactions.generateBoard(AppState.getState().boardConfig, {
+                    preserveColors: true,
+                    preserveHistory: true,
+                    skipDirtyFlag: true
+                });
+            }, entry.name);
+            UI?.showNotification(`Showcase "${entry.name}" opened as a new project`, 3500);
+            return true;
         } catch (error) {
             console.error('Showcase load error:', error);
-            UI?.showNotification('Could not load showcase. Serve the app over http(s) to use showcases.', 5000);
+            showMessage('Could not open the showcase', 'The example board could not be loaded. Serve the app over http(s) to use showcases.');
+            return false;
         }
     }
 
@@ -117,6 +207,8 @@ const FileManager = (() => {
         const state = AppState.getState();
         if (!state.autoSaveEnabled) return;
         if (!state.polygons.length) return;
+        // Nothing is saved before the project has a name and an id (see startNewProject).
+        if (!state.currentProjectId) return;
         if (!force && !state.isDirty) return;
 
         try {
@@ -126,14 +218,14 @@ const FileManager = (() => {
                 projectName: state.currentProjectName || Config.DEFAULT_PROJECT_NAME,
                 appState: serializeAppState()
             });
-            localStorage.setItem(AutosaveSlots.ownKey(), JSON.stringify(payload));
+            ProjectLibrary.write(state.currentProjectId, payload);
             AppState.clearDirty();
             quotaWarned = false;
         } catch (error) {
             // Every stroke and the 30 s timer retry the save, so the warning is shown once until a save works again.
             if (error && error.name === 'QuotaExceededError' && !quotaWarned) {
                 quotaWarned = true;
-                UI?.showNotification('Auto-save failed: browser storage is full. Save the project to a file so you do not lose work.', 8000);
+                UI?.showNotification('Auto-save failed: browser storage is full. Delete projects you no longer need on the home page, or save this one to a file so you do not lose work.', 8000);
             }
             console.error('Auto-save error:', error);
         }
@@ -141,37 +233,9 @@ const FileManager = (() => {
 
     let quotaWarned = false;
 
-    /** The slot offered at start-up, so a choice in the prompt can clean it up. */
-    let offeredSlot = null;
-
-    /**
-     * Looks for work to restore: this tab's own autosave (after a reload) or the newest one
-     * left behind by a tab that is gone. Other open tabs' autosaves are never touched.
-     */
-    function loadAutoSave() {
-        offeredSlot = null;
-        const slot = AutosaveSlots.takeRestorable();
-        if (!slot) return null;
-        try {
-            const project = ProjectFormat.parse(slot.raw);
-            offeredSlot = slot;
-            return project;
-        } catch (error) {
-            console.error('Could not restore the autosave.', error);
-            if (error instanceof ProjectFormat.ProjectFormatError) {
-                pendingStartupMessage = {
-                    title: 'Auto-saved work could not be restored',
-                    message: `${error.message} The next auto-save will replace it.`
-                };
-            }
-            // A newer version's autosave is not damaged, this (older, cached) copy of the app just cannot read it.
-            const unreadableHere = error instanceof ProjectFormat.ProjectFormatError && error.code === 'newer-version';
-            if (!slot.own && !unreadableHere) AutosaveSlots.remove(slot.key);
-            return null;
-        }
-    }
-
     let modalCount = 0;
+    /** Settles when the message on screen (if any) is dismissed, so a follow-up dialog does not stack on top of it. */
+    let messageClosed = Promise.resolve();
 
     /**
      * Makes a freshly built backdrop a proper modal dialog: role and label, Tab kept inside, focus
@@ -203,86 +267,53 @@ const FileManager = (() => {
     }
 
     /**
-     * Presents a clear autosave prompt with load/discard actions.
-     *
-     * @param {Object} payload - Autosave payload.
-     */
-    function promptAutosaveRestore(payload) {
-        const timestamp = Utils.formatTimestamp(payload.timestamp) || 'a previous session';
-        const modal = document.createElement('div');
-        modal.className = 'modal-backdrop';
-        modal.innerHTML = `
-            <div class="modal">
-                <h3>Auto-saved work found</h3>
-                <p>Auto-saved work found from ${timestamp}. What would you like to do?</p>
-                <div class="modal-actions">
-                    <button type="button" class="secondary-button" data-action="discard">Discard</button>
-                    <button type="button" class="primary-button" data-action="load">Load</button>
-                </div>
-            </div>
-        `;
-        const closeModal = presentModal(modal, {
-            initialFocus: modal.querySelector('[data-action="load"]'),
-            // Escape must not throw away work, so it takes the safe choice.
-            onEscape: () => handleChoice('load')
-        });
-
-        function handleChoice(action) {
-            closeModal();
-            const slot = offeredSlot;
-            offeredSlot = null;
-            if (action === 'load') {
-                // Restoring writes this tab's own slot; an adopted orphan is then redundant.
-                restoreState(payload, { skipNotification: true });
-                if (slot && !slot.own) AutosaveSlots.remove(slot.key);
-                UI?.showNotification('Autosave restored', 4000);
-            } else {
-                if (slot) AutosaveSlots.remove(slot.key);
-                UI?.showNotification('Autosave discarded', 2500);
-            }
-        }
-
-        modal.addEventListener('click', (event) => {
-            const button = event.target.closest('button[data-action]');
-            if (!button) return;
-            const action = button.dataset.action;
-            handleChoice(action);
-        });
-    }
-
-    /**
      * In-page replacement for window.prompt (unsupported in some embedded
      * browsers, where it silently returns null).
      *
      * @param {string} title - Dialog heading.
      * @param {string} defaultValue - Pre-filled input value.
      * @param {Function} onConfirm - Called with the entered text.
+     * @param {{confirmLabel?:string,cancelLabel?:string,message?:string,required?:boolean,onCancel?:Function}} [options]
+     *   `required` keeps the dialog open until the text is not empty.
      */
-    function promptForText(title, defaultValue, onConfirm) {
+    function promptForText(title, defaultValue, onConfirm, options = {}) {
+        const { confirmLabel = 'Save', cancelLabel = 'Cancel', message = '', required = false, onCancel } = options;
         const modal = document.createElement('div');
         modal.className = 'modal-backdrop';
         modal.innerHTML = `
             <form class="modal">
                 <h3></h3>
-                <input type="text" class="modal-input" aria-label="Project name">
+                <p class="modal-note" hidden></p>
+                <input type="text" class="modal-input" aria-label="Project name" maxlength="${ProjectLibrary.MAX_NAME_LENGTH}">
                 <div class="modal-actions">
-                    <button type="button" class="secondary-button" data-action="cancel">Cancel</button>
-                    <button type="submit" class="primary-button">Save</button>
+                    <button type="button" class="secondary-button" data-action="cancel"></button>
+                    <button type="submit" class="primary-button"></button>
                 </div>
             </form>
         `;
         modal.querySelector('h3').textContent = title;
+        const note = modal.querySelector('.modal-note');
+        if (message) { note.textContent = message; note.hidden = false; }
+        modal.querySelector('[data-action="cancel"]').textContent = cancelLabel;
+        modal.querySelector('[type="submit"]').textContent = confirmLabel;
         const input = modal.querySelector('input');
         input.value = defaultValue;
-        const close = presentModal(modal, { initialFocus: input, onEscape: () => close() });
+        let close = () => {};
+        const cancel = () => { close(); if (onCancel) onCancel(); };
+        close = presentModal(modal, { initialFocus: input, onEscape: cancel });
         input.select();
 
         modal.addEventListener('click', (event) => {
-            if (event.target === modal || event.target.closest('[data-action="cancel"]')) close();
+            if (event.target === modal || event.target.closest('[data-action="cancel"]')) cancel();
         });
         modal.querySelector('form').addEventListener('submit', (event) => {
             event.preventDefault();
-            const value = input.value.trim();
+            const value = ProjectLibrary.cleanName(input.value);
+            if (required && !value) {
+                input.setAttribute('aria-invalid', 'true');
+                input.focus();
+                return;
+            }
             close();
             onConfirm(value);
         });
@@ -303,18 +334,13 @@ const FileManager = (() => {
         `;
         modal.querySelector('h3').textContent = title;
         modal.querySelector('p').textContent = message;
-        const close = presentModal(modal, { initialFocus: modal.querySelector('[data-action="ok"]'), onEscape: () => close(), role: 'alertdialog' });
+        let resolveClosed = () => {};
+        messageClosed = new Promise((resolve) => { resolveClosed = resolve; });
+        const dismiss = () => { close(); resolveClosed(); };
+        const close = presentModal(modal, { initialFocus: modal.querySelector('[data-action="ok"]'), onEscape: () => dismiss(), role: 'alertdialog' });
         modal.addEventListener('click', (event) => {
-            if (event.target === modal || event.target.closest('[data-action="ok"]')) close();
+            if (event.target === modal || event.target.closest('[data-action="ok"]')) dismiss();
         });
-    }
-
-    /** Shows (once) the message recorded while trying to restore the autosave at startup. */
-    function showStartupMessage() {
-        if (!pendingStartupMessage) return;
-        const { title, message } = pendingStartupMessage;
-        pendingStartupMessage = null;
-        showMessage(title, message);
     }
 
     /** In-page replacement for window.confirm when loading over an existing board. */
@@ -355,6 +381,7 @@ const FileManager = (() => {
         const defaultName = state.currentProjectName || Config.DEFAULT_PROJECT_NAME;
         promptForText('Enter a project name', defaultName, (name) => {
             AppState.setProjectName(name || Config.DEFAULT_PROJECT_NAME);
+            syncProjectPanel();
             downloadProject();
         });
     }
@@ -387,19 +414,16 @@ const FileManager = (() => {
     }
 
     /**
-     * Shows a parsed project, asking first when it would replace work. The restore runs from the
-     * confirmation too, so a failure there is reported instead of vanishing into a click handler.
+     * Shows a parsed project file as a new project of its own: the open one is saved and stays as it was, so
+     * nothing is asked and nothing is lost. A failure is reported instead of vanishing into a click handler.
      */
     function openProject(payload) {
-        const open = () => {
-            try {
-                restoreState(payload);
-            } catch (error) {
-                console.error('Load error:', error);
-                showMessage('Could not open this file', error.message || 'Unable to load project file.');
-            }
-        };
-        if (hasUserWork()) confirmReplace(open); else open();
+        try {
+            showAsNewProject(() => restoreState(payload), payload.projectName || 'Opened project');
+        } catch (error) {
+            console.error('Load error:', error);
+            showMessage('Could not open this file', error.message || 'Unable to load project file.');
+        }
     }
 
     function restoreState(payload, options = {}) {
@@ -429,6 +453,7 @@ const FileManager = (() => {
         if (Infinite.isActive()) AppState.resetView();
         AppState.setProjectName(payload.projectName || Config.DEFAULT_PROJECT_NAME);
 
+        syncProjectPanel();
         UI?.updateBoardControls(AppState.getState().boardConfig);
         Renderer.renderBoard();
 
@@ -449,13 +474,18 @@ const FileManager = (() => {
         init,
         setupAutoSave,
         autoSaveToLocalStorage,
-        loadAutoSave,
+        projectIdFromUrl,
+        showcaseFromUrl,
+        openStoredProject,
+        startNewProject,
+        registerNewProject,
+        showAsNewProject,
+        openShowcase,
         restoreState,
         openProject,
         hasUserWork,
         confirmReplace,
         saveProjectFile,
-        promptAutosaveRestore,
-        showStartupMessage
+        showMessage
     };
 })();

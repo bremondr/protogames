@@ -60,6 +60,8 @@ const AppState = (() => {
         history: [],
         historyIndex: -1,
         currentProjectName: null,
+        /** Id of the project in the browser's library that autosave writes to; null until the project is named. */
+        currentProjectId: null,
         isDirty: false,
         /**
          * Indicates whether the user currently has a pointer pressed down
@@ -302,6 +304,11 @@ const AppState = (() => {
         state.currentProjectName = name;
     }
 
+    /** @param {string|null} id - Library id of the open project, null when it has none yet. */
+    function setProjectId(id) {
+        state.currentProjectId = id;
+    }
+
     /**
      * Toggles drawing mode when the user is actively brushing.
      *
@@ -454,6 +461,7 @@ const AppState = (() => {
         setCurrentPaletteId,
         setHoverPolygonId,
         setProjectName,
+        setProjectId,
         setDrawingActive,
         setLastColoredPolygonId,
         markDirty,

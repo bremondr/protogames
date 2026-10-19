@@ -156,8 +156,8 @@ const Config = (() => {
 
     /**
      * Showcase boards shipped with the app: project files in /showcases that
-     * every user can open from the Showcase panel. Add an entry (and the file)
-     * to publish another one.
+     * anyone can open as a new project with the address `app/?showcase=<id>`
+     * (the landing page links to them). Add an entry (and the file) to publish another one.
      *
      * @type {Array<{id:string,name:string,description:string,file:string}>}
      */

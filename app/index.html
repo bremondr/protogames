@@ -192,13 +192,23 @@
             </section>
 
             <!-- --------------------------------------------
-                 SHOWCASE
-                 Ready-made boards that ship with the app so
-                 everyone can open an example in one click.
+                 PROJECT
+                 Every board is a project saved in this browser.
+                 Rename it here, start another one, or go back to
+                 the home page to see them all.
                  -------------------------------------------- -->
-            <section class="panel" aria-labelledby="showcase-title">
-                <h2 id="showcase-title">Showcase</h2>
-                <div id="showcaseList" class="showcase-list"></div>
+            <section class="panel" aria-labelledby="project-title">
+                <h2 id="project-title">Project</h2>
+                <div class="panel-form">
+                    <label class="field">
+                        <span class="field-label">Name</span>
+                        <input type="text" id="projectNameInput" maxlength="80" autocomplete="off" aria-label="Project name">
+                    </label>
+                    <div class="project-actions">
+                        <button type="button" id="newProjectButton" class="secondary-button">New project</button>
+                        <a class="secondary-button" id="allProjectsLink" href="../">All projects</a>
+                    </div>
+                </div>
             </section>
 
             <!-- --------------------------------------------
@@ -602,7 +612,7 @@
     <script defer src="js/viewMath.js"></script>
     <script defer src="js/interactions.js"></script>
     <script defer src="js/projectFormat.js"></script>
-    <script defer src="js/autosaveSlots.js"></script>
+    <script defer src="js/projectLibrary.js"></script>
     <script defer src="js/shareLink.js"></script>
     <script defer src="js/fileManager.js"></script>
     <script defer src="js/exporter.js"></script>

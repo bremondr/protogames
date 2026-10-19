@@ -20,8 +20,10 @@ const { execFileSync } = require('node:child_process');
 const ROOT = path.resolve(__dirname, '..');
 /** What makes up the site: the landing page at the root and the app in app/. Everything else in the repo (tests, docs, dev tools) is not published. */
 const APP_PATHS = ['index.html', 'landing.js', 'app'];
-/** The app's page inside the site; the only page that gets the preview runtime. */
+/** The app's page inside the site. It and the landing page are the pages that get the preview runtime. */
 const APP_PAGE = 'app/index.html';
+/** The landing page lists the projects saved in the browser, so in a preview it needs the same isolated storage as the app. */
+const LANDING_PAGE = 'index.html';
 const MAX_PREVIEWS = 20;
 const ANALYTICS_PATTERN = /^[ \t]*<script[^>]*simpleanalyticscdn[^>]*><\/script>[ \t]*\r?\n?/m;
 
@@ -32,17 +34,20 @@ const escapeHtml = (text) => String(text).replace(/[&<>"']/g, (c) => ({ '&': '&a
 /** Folder name of a pull request preview. */
 const previewName = (number) => `pr-${Number(number)}`;
 
-/** The description a preview runs with: label, short commit, storage prefix and relative links. */
-function buildInfo({ name, label, sha }) {
+/**
+ * The description a preview runs with: label, short commit, storage prefix and relative links.
+ * `page` is where the script runs: the app (/preview/<name>/app/) or the landing page (/preview/<name>/).
+ */
+function buildInfo({ name, label, sha, page = 'app' }) {
     return {
         name,
         label,
         sha: sha ? String(sha).slice(0, 7) : '',
         // Keys are namespaced per preview, so previews never touch production or each other.
         storagePrefix: `preview:${name}:`,
-        // The app of a preview lives at /preview/<name>/app/, so these hold wherever the site is hosted.
-        productionUrl: '../../../app/',
-        indexUrl: '../../'
+        // A preview lives at /preview/<name>/, so these hold wherever the site is hosted.
+        productionUrl: page === 'landing' ? '../../' : '../../../app/',
+        indexUrl: page === 'landing' ? '../' : '../../'
     };
 }
 
@@ -91,6 +96,22 @@ ${body}
 </body>
 </html>
 `;
+}
+
+/**
+ * Gives the preview's landing page the runtime too, so the projects it lists are the preview's own (storage is shared by
+ * every version on one origin). A pull request whose landing page cannot take it is left as it is: the app still works.
+ */
+function addRuntimeToLanding(dir, template, { name, label, sha }) {
+    const landing = path.join(dir, LANDING_PAGE);
+    if (!fs.existsSync(landing)) return;
+    try {
+        const html = previewIndexHtml(fs.readFileSync(landing, 'utf8'));
+        fs.writeFileSync(path.join(dir, 'preview-runtime.js'), runtimeSource(template, buildInfo({ name, label, sha, page: 'landing' })));
+        fs.writeFileSync(landing, html);
+    } catch (error) {
+        console.warn(`The landing page of ${name} was left as it is: ${error.message}`);
+    }
 }
 
 /** Previews to publish: same-repository pull requests only, newest first, capped. */
@@ -151,6 +172,7 @@ function build({ out, main, previews = [], repo = '' }) {
             fs.writeFileSync(path.join(dir, 'app', 'preview-runtime.js'), runtimeSource(template, info));
             const indexFile = path.join(dir, APP_PAGE);
             fs.writeFileSync(indexFile, previewIndexHtml(fs.readFileSync(indexFile, 'utf8')));
+            addRuntimeToLanding(dir, template, { name, label: `PR #${preview.number}`, sha: commit });
             summary.previews.push({ name, sha: info.sha });
         } catch (error) {
             // A pull request without app/index.html or <head> must not stop production from being published.
@@ -184,4 +206,4 @@ function main() {
 
 if (require.main === module) main();
 
-module.exports = { APP_PATHS, APP_PAGE, MAX_PREVIEWS, escapeHtml, previewName, buildInfo, previewIndexHtml, runtimeSource, previewsIndexHtml, selectPreviews, build };
+module.exports = { APP_PATHS, APP_PAGE, LANDING_PAGE, MAX_PREVIEWS, escapeHtml, previewName, buildInfo, previewIndexHtml, runtimeSource, previewsIndexHtml, selectPreviews, build };
