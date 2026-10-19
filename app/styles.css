@@ -225,6 +225,58 @@ button {
     color: #f4f4f4;
 }
 
+/* The heading of a panel is a button that folds the panel up to it. */
+.panel-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-weight: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.panel-toggle:hover {
+    color: #fff;
+}
+
+.panel-toggle:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 4px;
+    border-radius: 4px;
+}
+
+.panel-toggle svg {
+    flex: none;
+    width: 18px;
+    height: 18px;
+    stroke: currentColor;
+    stroke-width: 2;
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.7;
+    transition: transform 0.15s ease;
+}
+
+.panel.collapsed .panel-toggle svg {
+    transform: rotate(-90deg);
+}
+
+.panel.collapsed > :not(h2) {
+    display: none;
+}
+
+.panel.collapsed h2 {
+    margin-bottom: 0;
+}
+
 .panel-form {
     display: flex;
     flex-direction: column;

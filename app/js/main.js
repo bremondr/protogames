@@ -17,6 +17,7 @@ const Main = (() => {
     function initializeApp() {
         UI.init();
         BoardPicker.init();
+        Panels.init();
         const uiRefs = UI.getElements();
         UI.initializePaletteSelector(Config.DEFAULT_PALETTE_ID);
         const defaultPalette = Config.getDefaultPalette();

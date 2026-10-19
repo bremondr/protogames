@@ -52,12 +52,34 @@
              ================================================ -->
         <aside class="sidebar" aria-label="Protogames toolbox">
             <!-- --------------------------------------------
+                 PROJECT
+                 The open project: its name, and the dialogs for
+                 exporting it (print, PNG, SVG, file), sharing a
+                 link to it and opening another project or file.
+                 -------------------------------------------- -->
+            <section class="panel" aria-labelledby="project-title">
+                <h2 id="project-title"><button type="button" class="panel-toggle" aria-expanded="true"><span>Project</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></h2>
+                <div class="panel-form">
+                    <label class="field">
+                        <span class="field-label">Name</span>
+                        <input type="text" id="projectNameInput" maxlength="80" autocomplete="off" aria-label="Project name">
+                    </label>
+                    <div class="stacked-buttons">
+                        <button type="button" id="exportButton" class="secondary-button menu-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>Export…</button>
+                        <button type="button" id="shareButton" class="secondary-button menu-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>Share Link</button>
+                        <button type="button" id="loadProjectBtn" class="secondary-button menu-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>Load…</button>
+                        <input type="file" id="loadProject" class="visually-hidden" aria-label="Load project file" accept=".json">
+                    </div>
+                </div>
+            </section>
+
+            <!-- --------------------------------------------
                  BOARD SETUP PANEL
                  Users configure the board grid, outline, and
                  overall dimensions before generating tiles.
                  -------------------------------------------- -->
             <section class="panel" aria-labelledby="board-setup-title">
-                <h2 id="board-setup-title">Board Setup</h2>
+                <h2 id="board-setup-title"><button type="button" class="panel-toggle" aria-expanded="true"><span>Board Setup</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></h2>
                 <form class="panel-form">
                     <label class="field">
                         <span class="field-label">Tile shape</span>
@@ -160,7 +182,7 @@
                  a set of pieces each. Used by playtest.
                  -------------------------------------------- -->
             <section class="panel" aria-labelledby="players-title">
-                <h2 id="players-title">Players</h2>
+                <h2 id="players-title"><button type="button" class="panel-toggle" aria-expanded="true"><span>Players</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></h2>
                 <p class="field-hint panel-intro">For playtest: each player has a colour, a seat at one edge of the screen and a set of pieces. Mark where a player starts with the Start tool.</p>
                 <div id="playersList" class="players-list"></div>
                 <p id="playersHints" class="field-hint players-hints" role="status"></p>
@@ -169,34 +191,12 @@
             </section>
 
             <!-- --------------------------------------------
-                 PROJECT
-                 The open project: its name, and the dialogs for
-                 exporting it (print, PNG, SVG, file), sharing a
-                 link to it and opening another project or file.
-                 -------------------------------------------- -->
-            <section class="panel" aria-labelledby="project-title">
-                <h2 id="project-title">Project</h2>
-                <div class="panel-form">
-                    <label class="field">
-                        <span class="field-label">Name</span>
-                        <input type="text" id="projectNameInput" maxlength="80" autocomplete="off" aria-label="Project name">
-                    </label>
-                    <div class="stacked-buttons">
-                        <button type="button" id="exportButton" class="secondary-button menu-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>Export…</button>
-                        <button type="button" id="shareButton" class="secondary-button menu-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>Share Link</button>
-                        <button type="button" id="loadProjectBtn" class="secondary-button menu-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>Load…</button>
-                        <input type="file" id="loadProject" class="visually-hidden" aria-label="Load project file" accept=".json">
-                    </div>
-                </div>
-            </section>
-
-            <!-- --------------------------------------------
                  THEMES
                  Import custom tile themes and object item sets
                  from JSON files or plain images.
                  -------------------------------------------- -->
             <section class="panel" aria-labelledby="themes-title">
-                <h2 id="themes-title">Themes</h2>
+                <h2 id="themes-title"><button type="button" class="panel-toggle" aria-expanded="true"><span>Themes</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></h2>
                 <p class="field-hint panel-intro">Import a JSON file or images. Images become tiles or items named after the file.</p>
                 <div class="theme-groups">
                     <div class="theme-group">
@@ -688,6 +688,7 @@
     <script defer src="js/exporter.js"></script>
     <script defer src="js/themeManager.js"></script>
     <script defer src="js/ui.js"></script>
+    <script defer src="js/panels.js"></script>
     <script defer src="js/viewControls.js"></script>
     <script defer src="js/shortcuts.js"></script>
     <script defer src="js/toolbar.js"></script>
