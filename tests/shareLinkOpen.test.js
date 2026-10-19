@@ -50,12 +50,19 @@ async function linkFor(env, mutate) {
     return ShareLink.encode(payload);
 }
 
+/** Opening a link decodes it asynchronously; wait for the restore instead of guessing a delay (a slow runner needs longer than 50 ms). */
+async function untilRestored(env) {
+    for (let waited = 0; env.calls.restores.length === 0 && waited < 5000; waited += 10) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+}
+
 test('a link arriving after start-up opens straight away when there is nothing to lose', async () => {
     const env = fresh({ hasWork: false });
     env.location.hash = `#b=${await linkFor(env)}`;
     env.ShareLink.onHashChange();
     assert.equal(env.calls.confirms.length, 0);
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await untilRestored(env);
     assert.equal(env.calls.restores.length, 1);
 });
 
@@ -75,7 +82,7 @@ test('confirming the replacement opens the shared board', async () => {
     env.location.hash = `#b=${await linkFor(env)}`;
     env.ShareLink.onHashChange();
     await env.calls.confirms[0].onConfirm();
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await untilRestored(env);
     assert.equal(env.calls.restores.length, 1);
 });
 
