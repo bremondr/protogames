@@ -54,34 +54,6 @@ test('the landing page loads the project library before its own script, and link
     assert.match(html, /id="projects"[^>]*\bhidden\b/, 'the project list is hidden until there are projects');
 });
 
-function helpers() {
-    const module = { exports: {} };
-    vm.runInNewContext(script, { location: { hash: '', search: '', replace() {} }, module });
-    return module.exports;
-}
-
-test('ages are told in plain words', () => {
-    const { describeAge } = helpers();
-    const now = Date.UTC(2026, 9, 19, 12, 0, 0);
-    assert.equal(describeAge(0, now), 'Never saved');
-    assert.equal(describeAge(now - 20 * 1000, now), 'Edited just now');
-    assert.equal(describeAge(now - 60 * 1000, now), 'Edited 1 minute ago');
-    assert.equal(describeAge(now - 5 * 60 * 1000, now), 'Edited 5 minutes ago');
-    assert.equal(describeAge(now - 3 * 3600 * 1000, now), 'Edited 3 hours ago');
-    assert.equal(describeAge(now - 30 * 3600 * 1000, now), 'Edited yesterday');
-    assert.equal(describeAge(now - 4 * 86400 * 1000, now), 'Edited 4 days ago');
-    assert.equal(describeAge(Date.UTC(2026, 6, 1), now), 'Edited 2026-07-01');
-    assert.equal(describeAge(now + 5000, now), 'Edited just now', 'a clock that is off does not make negative ages');
-});
-
-test('a project is described by its board and tiles', () => {
-    const { describeBoard } = helpers();
-    assert.equal(describeBoard({ readable: true, boardShape: 'hexagon', gridType: 'hexagon', tiles: 91 }), 'Hexagon board, 91 hexagon tiles');
-    assert.equal(describeBoard({ readable: true, boardShape: 'rectangle', gridType: 'square', tiles: 1 }), 'Rectangle board, 1 square tile');
-    assert.equal(describeBoard({ readable: true, boardShape: '', gridType: '', tiles: 4 }), '4 tiles');
-    assert.equal(describeBoard({ readable: false }), 'This project cannot be read');
-});
-
 /** Just enough of a document for the list: elements with children, text, classes and listeners. */
 function fakeDocument() {
     const byId = {};
@@ -106,7 +78,8 @@ function fakeDocument() {
 function visitWithProjects(entries) {
     const document = fakeDocument();
     const removed = [];
-    const ProjectLibrary = { KEY_PREFIX: 'protogames_project:', importLegacy() {}, list: () => entries.filter((e) => !removed.includes(e.id)), remove: (id) => removed.push(id) };
+    const real = require('./support/load').loadApp(['app/js/projectLibrary.js']).run('ProjectLibrary');
+    const ProjectLibrary = { KEY_PREFIX: 'protogames_project:', importLegacy() {}, list: () => entries.filter((e) => !removed.includes(e.id)), remove: (id) => removed.push(id), describeAge: real.describeAge, describeBoard: real.describeBoard };
     const events = {};
     vm.runInNewContext(script, { location: { hash: '', search: '', replace() {} }, document, ProjectLibrary, window: { addEventListener: (type, fn) => { events[type] = fn; } }, setTimeout, clearTimeout, Date });
     return { document, removed, events };

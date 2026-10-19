@@ -10,36 +10,6 @@
         return;
     }
 
-    const MINUTE = 60 * 1000;
-    const HOUR = 60 * MINUTE;
-    const DAY = 24 * HOUR;
-
-    /** "just now", "5 minutes ago", "yesterday", "3 days ago"; an old one becomes its date. */
-    function describeAge(timestamp, now) {
-        if (!timestamp) return 'Never saved';
-        const age = Math.max(0, now - timestamp);
-        const plural = (n, unit) => `${n} ${unit}${n === 1 ? '' : 's'} ago`;
-        if (age < MINUTE) return 'Edited just now';
-        if (age < HOUR) return `Edited ${plural(Math.floor(age / MINUTE), 'minute')}`;
-        if (age < DAY) return `Edited ${plural(Math.floor(age / HOUR), 'hour')}`;
-        if (age < 2 * DAY) return 'Edited yesterday';
-        if (age < 30 * DAY) return `Edited ${plural(Math.floor(age / DAY), 'day')}`;
-        return `Edited ${new Date(timestamp).toISOString().slice(0, 10)}`;
-    }
-
-    const BOARD_NAMES = { hexagon: 'Hexagon', rectangle: 'Rectangle', triangle: 'Triangle', circle: 'Circle', infinite: 'Infinite', country: 'Country' };
-    const TILE_NAMES = { hexagon: 'hexagon', square: 'square', triangle: 'triangle' };
-
-    /** "Hexagon board, 91 hexagon tiles" for a library entry. */
-    function describeBoard(entry) {
-        if (!entry.readable) return 'This project cannot be read';
-        const board = BOARD_NAMES[entry.boardShape];
-        const tile = TILE_NAMES[entry.gridType] ? `${TILE_NAMES[entry.gridType]} tile` : 'tile';
-        const tiles = `${entry.tiles} ${tile}${entry.tiles === 1 ? '' : 's'}`;
-        return board ? `${board} board, ${tiles}` : tiles;
-    }
-
-    if (typeof module !== 'undefined' && module.exports) module.exports = { describeAge, describeBoard };
     if (typeof document === 'undefined' || typeof ProjectLibrary === 'undefined') return;
 
     const section = document.getElementById('projects');
@@ -65,7 +35,7 @@
             const open = document.createElement('a');
             open.className = 'project-open';
             open.href = `app/?project=${encodeURIComponent(entry.id)}`;
-            for (const [tag, text] of [['strong', entry.name], ['span', describeBoard(entry)], ['span', describeAge(entry.timestamp, now)]]) {
+            for (const [tag, text] of [['strong', entry.name], ['span', ProjectLibrary.describeBoard(entry)], ['span', ProjectLibrary.describeAge(entry.timestamp, now)]]) {
                 const line = document.createElement(tag);
                 line.textContent = text;
                 open.appendChild(line);

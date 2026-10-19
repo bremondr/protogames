@@ -13,6 +13,8 @@
 const Renderer = (() => {
     const renderListeners = [];
     let frameRequested = false;
+    /** Longest side of an exported canvas in pixels; browsers refuse far larger canvases. */
+    const MAX_EXPORT_SIDE = 16000;
 
     /** Setting canvas.width/height resets the context state, so this runs again after every resize. */
     function applyContextDefaults(ctx) {
@@ -69,6 +71,8 @@ const Renderer = (() => {
      * @param {Array}  [scene.pieces]               playtest pieces: [{ id, kind, color, tileId }] (omit for exports)
      * @param {string[]|null} [scene.hiddenPieceIds] pieces being carried (left out; a ghost follows each pointer)
      * @param {string|null} [scene.selectedPieceId] piece that gets a selection ring
+     * @param {boolean} [scene.grid=true]           false: no grid lines (a seam-free stroke in the tile colour instead)
+     * @param {boolean} [scene.showObjects=true]    false: no objects and no start markers
      * @returns {{drawn:number,total:number}} how many tiles were actually drawn (the rest were off-screen)
      */
     function paint(ctx, scene) {
@@ -93,18 +97,19 @@ const Renderer = (() => {
         let drawn = 0;
         for (const polygon of polygons) {
             if (!inView(polygon)) continue;
-            drawPolygon(ctx, polygon, {}, view.scale);
+            drawPolygon(ctx, polygon, scene.grid === false ? { stroke: polygon.color || Config.DEFAULT_FILL } : {}, view.scale);
             drawn++;
         }
 
         // Start markers: a coloured outline inside the tile, above the terrain and below objects and pieces.
+        const showObjects = scene.showObjects !== false;
         for (const polygon of polygons) {
-            if (polygon.start && inView(polygon)) drawStartMarker(ctx, polygon, view.scale);
+            if (showObjects && polygon.start && inView(polygon)) drawStartMarker(ctx, polygon, view.scale);
         }
 
         // Object layer sits above all terrain; sorted top-to-bottom so lower objects overlap higher ones.
         // Objects reach up to about one tile beyond their tile, so cull with extra room.
-        if (typeof Objects !== 'undefined') {
+        if (showObjects && typeof Objects !== 'undefined') {
             const reach = polygons.length ? polygons[0].bounds.maxY - polygons[0].bounds.minY : 0;
             const objectView = {
                 minX: visible.minX - reach,
@@ -201,16 +206,35 @@ const Renderer = (() => {
      * generated, regardless of the current pan/zoom) and without hover or
      * preview overlays. This is what PNG/PDF exports use.
      */
-    function createExportCanvas() {
+    function createExportCanvas(options = {}) {
         const { canvas, polygons } = AppState.getState();
+        const wanted = Math.max(1, Math.floor(Number(options.scale) || 1));
+        // A canvas has a size limit; a large board at a high scale gets the highest scale that still fits.
+        let scale = wanted;
+        while (scale > 1 && Math.max(canvas.width, canvas.height) * scale > MAX_EXPORT_SIDE) scale -= 1;
         const out = document.createElement('canvas');
-        out.width = canvas.width;
-        out.height = canvas.height;
+        out.width = canvas.width * scale;
+        out.height = canvas.height * scale;
         // An infinite board has no outline to fit: frame what was drawn.
-        const scene = typeof Infinite !== 'undefined' && Infinite.isActive() ? Infinite.exportScene(out.width, out.height) : null;
-        paint(out.getContext('2d'), scene
-            ? { polygons: scene.polygons, width: out.width, height: out.height, view: scene.view }
-            : { polygons, width: out.width, height: out.height });
+        const scene = typeof Infinite !== 'undefined' && Infinite.isActive() ? Infinite.exportScene(canvas.width, canvas.height) : null;
+        const ctx = out.getContext('2d');
+        const layers = { grid: options.grid !== false, showObjects: options.objects !== false };
+        const base = scene
+            ? { polygons: scene.polygons, width: out.width, height: out.height, view: { ...scene.view, scale: scene.view.scale * scale, x: scene.view.x * scale, y: scene.view.y * scale } }
+            : { polygons, width: out.width, height: out.height, view: { scale, x: 0, y: 0 } };
+        if (options.background) {
+            // Painted onto a second canvas so the board keeps its transparency over the background colour.
+            const board = document.createElement('canvas');
+            board.width = out.width;
+            board.height = out.height;
+            paint(board.getContext('2d'), { ...base, ...layers });
+            ctx.fillStyle = options.background;
+            ctx.fillRect(0, 0, out.width, out.height);
+            ctx.drawImage(board, 0, 0);
+        } else {
+            paint(ctx, { ...base, ...layers });
+        }
+        out.exportScale = scale;
         return out;
     }
 
@@ -288,6 +312,7 @@ const Renderer = (() => {
         requestRender,
         onRender,
         createExportCanvas,
+        MAX_EXPORT_SIDE,
         drawPolygon
     };
 })();

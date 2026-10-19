@@ -101,7 +101,7 @@ const Toolbar = (() => {
         bindThemePanel();
         bindFocusMode();
         // The aria-modal dialogs keep Tab inside and hand focus back when they close.
-        ['printDialog', 'shareDialog', 'themeEditor'].forEach((id) => {
+        ['exportDialog', 'loadDialog', 'shareDialog', 'themeEditor'].forEach((id) => {
             FocusUtils.trapTab($(id));
             FocusUtils.restoreFocusOnHide($(id));
         });

@@ -4,14 +4,15 @@ const assert = require('node:assert/strict');
 const { loadApp } = require('./support/load');
 const { makeUI } = require('./support/fakes');
 
-function fresh(state) {
+function fresh(state, extra = {}) {
     const ui = makeUI();
     const downloads = [];
     const app = loadApp(['app/js/config.js', 'app/js/utils.js', 'app/js/exporter.js'], {
         AppState: { getState: () => state },
         UI: ui,
         Infinite: { isActive: () => false },
-        Renderer: {}
+        Renderer: {},
+        ...extra
     });
     app.run('Utils').triggerBlobDownload = (blob, name) => downloads.push({ blob, name });
     return { Exporter: app.run('Exporter'), Utils: app.run('Utils'), ui, downloads, Config: app.run('Config') };
@@ -47,4 +48,88 @@ test('escapeAttribute handles every character that matters in an attribute', () 
     const { Utils } = fresh({});
     assert.equal(Utils.escapeAttribute(`<a href="x">&'`), '&lt;a href=&quot;x&quot;&gt;&amp;&#39;');
     assert.equal(Utils.escapeAttribute(42), '42');
+});
+
+test('PNG options are kept within what the export can do, anything odd becomes the default', () => {
+    const { Exporter } = fresh({});
+    const plain = (value) => JSON.parse(JSON.stringify(value));
+    assert.deepEqual(plain(Exporter.normalizePng()), { scale: 1, textures: true, objects: true, grid: true, background: 'transparent' });
+    assert.deepEqual(plain(Exporter.normalizePng({ scale: '3', textures: false, objects: false, grid: false, background: 'white' })), { scale: 3, textures: false, objects: false, grid: false, background: 'white' });
+    assert.equal(Exporter.normalizePng({ scale: 99 }).scale, 4, 'at most 4 times');
+    assert.equal(Exporter.normalizePng({ scale: 0 }).scale, 1);
+    assert.equal(Exporter.normalizePng({ scale: 'big' }).scale, 1);
+    assert.equal(Exporter.normalizePng({ scale: 2.9 }).scale, 2);
+    assert.equal(Exporter.normalizePng({ background: 'url(x)' }).background, 'transparent', 'only the two backgrounds exist');
+    assert.equal(Exporter.normalizePng({ grid: 'no' }).grid, true, 'a value that is not true or false is ignored');
+});
+
+test('SVG options default to what the SVG always was: grid lines, no objects, no background', () => {
+    const { Exporter } = fresh({});
+    const plain = (value) => JSON.parse(JSON.stringify(value));
+    assert.deepEqual(plain(Exporter.normalizeSvg()), { objects: false, grid: true, background: 'transparent' });
+    assert.deepEqual(plain(Exporter.normalizeSvg({ objects: true, grid: false, background: 'white' })), { objects: true, grid: false, background: 'white' });
+});
+
+test('an SVG without grid lines strokes each tile in its own colour, so no gaps show between tiles', () => {
+    const { Exporter, Config } = fresh({});
+    const svg = Exporter.buildSvg([triangle('#7cb342')], { width: 10, height: 9, viewBox: '0 0 10 9', grid: false });
+    assert.match(svg, /fill="#7cb342" stroke="#7cb342"/);
+    assert.ok(!svg.includes(Config.GRID_STROKE));
+    assert.match(Exporter.buildSvg([triangle('#7cb342')], { width: 10, height: 9, viewBox: '0 0 10 9' }), /stroke="[^"]*"/);
+});
+
+test('an SVG background is a rectangle over the whole view box, also when the view box does not start at zero', () => {
+    const { Exporter } = fresh({});
+    const svg = Exporter.buildSvg([triangle('#7cb342')], { width: 40, height: 30, viewBox: '-5.5 12 40 30', background: '#ffffff' });
+    assert.match(svg, /<rect x="-5.5" y="12" width="40" height="30" fill="#ffffff"\/>/);
+    assert.ok(svg.indexOf('<rect') < svg.indexOf('<path'), 'behind the tiles');
+    assert.ok(!Exporter.buildSvg([triangle('#7cb342')], { width: 10, height: 9, viewBox: '0 0 10 9' }).includes('<rect'));
+});
+
+test('objects are embedded once per kind and placed where they are drawn on screen, lower ones over higher ones', () => {
+    const asked = [];
+    const Objects = { dataUrlFor: (id) => { asked.push(id); return id === 'missing' ? null : 'data:image/png;base64,AAAA'; } };
+    const { Exporter } = fresh({}, { Objects });
+    const tile = (x, y, object) => ({ color: '#7cb342', object, vertices: [{ x, y }, { x: x + 10, y }, { x: x + 10, y: y + 10 }, { x, y: y + 10 }] });
+    const polygons = [tile(0, 20, 'castle'), tile(0, 0, 'castle'), tile(20, 0, 'missing'), tile(30, 0)];
+    const svg = Exporter.buildSvg(polygons, { width: 40, height: 40, viewBox: '0 0 40 40', objects: true });
+    assert.equal(svg.match(/<symbol /g).length, 1, 'one picture for both castles');
+    assert.equal(svg.match(/<use /g).length, 2, 'an object without a picture and a tile without an object add nothing');
+    assert.ok(svg.indexOf('y="0.32"') < svg.indexOf('y="20.32"'), 'the higher tile first, so the lower one overlaps it');
+    assert.match(svg, /<use href="#o0" x="0.75" y="0.32" width="8.50" height="8.50"\/>/, 'size 85% of the tile, 55% of it above the centre');
+    assert.ok(!Exporter.buildSvg(polygons, { width: 40, height: 40, viewBox: '0 0 40 40' }).includes('<symbol'), 'objects are off unless asked for');
+});
+
+test('the PNG is made with the chosen options, and the colours-only view of the board comes back after it', () => {
+    const calls = [];
+    const flatCalls = [];
+    let flat = true; // the person's board view shows colours only
+    const Textures = { isFlat: () => flat, setFlat: (on) => { flatCalls.push(on); flat = on; } };
+    const Renderer = { createExportCanvas: (options) => { calls.push({ ...options, flatWhilePainting: flat }); return { toDataURL: () => 'data:image/png;base64,AAAA' }; } };
+    const state = { canvas: { width: 10, height: 10 }, polygons: [triangle('#fff')] };
+    const { Exporter, Utils } = fresh(state, { Renderer, Textures });
+    Exporter.pngCanvas({ scale: 2, textures: true, objects: false, grid: false, background: 'white' });
+    assert.deepEqual(JSON.parse(JSON.stringify(calls[0])), { scale: 2, objects: false, grid: false, background: '#ffffff', flatWhilePainting: false });
+    assert.equal(flat, true, 'restored');
+    Exporter.pngCanvas({ textures: false });
+    assert.equal(calls[1].flatWhilePainting, true);
+    assert.equal(calls[1].background, null, 'transparent means no background colour');
+    assert.equal(flat, true);
+    const names = [];
+    Utils.triggerDataUrlDownload = (url, name) => names.push(name);
+    state.currentProjectName = 'My board';
+    Exporter.exportToPNG({ scale: 3 });
+    assert.equal(calls[2].scale, 3);
+    assert.deepEqual(Array.from(names), ['My board.png'], 'a file named after the project');
+});
+
+test('the SVG file is made from the chosen options', () => {
+    const state = { canvas: { width: 20, height: 18 }, polygons: [triangle('#abcdef')], currentProjectName: 'Isle' };
+    const { Exporter } = fresh(state);
+    const made = Exporter.svgForBoard({ grid: false, background: 'white' });
+    assert.equal(made.width, 20);
+    assert.equal(made.height, 18);
+    assert.match(made.svg, /<rect [^>]*fill="#ffffff"/);
+    assert.match(made.svg, /stroke="#abcdef"/);
+    assert.equal(fresh({ canvas: null, polygons: [] }).Exporter.svgForBoard(), null, 'no board, no svg');
 });
