@@ -55,14 +55,14 @@ test('Simple nordic is a built-in palette of the same eight terrains as Landscap
     assert.equal(Config.getAllPalettes().some((p) => p.id === 'simple-nordic'), true, 'it is offered in the palette list');
 });
 
-test('every Simple nordic terrain draws, and the ones with a picture of their own are the pines, mountain, cabin and volcano', () => {
+test('every Simple nordic terrain draws, and the ones with a picture of their own are the pines, mountain, cabin and volcano (Grassland is plain)', () => {
     const { Config, Textures } = load();
     const withFeature = [];
     for (const color of nordicPalette(Config).colors) {
         assert.ok(Textures.dataUrlFor(color.hex), `${color.label} has a texture`);
         if (Textures.isFeature(color.hex)) withFeature.push(color.label);
     }
-    assert.deepEqual(withFeature, ['Forest', 'Grassland', 'Mountain', 'Village', 'Volcanic']);
+    assert.deepEqual(withFeature, ['Forest', 'Mountain', 'Village', 'Volcanic']);
 });
 
 test('the Landscape palette is drawn as before: only the village and the volcano are pictures', () => {
@@ -86,7 +86,7 @@ test('Simple nordic is an item set of its own, and every item in it draws', () =
     const { Objects } = load();
     assert.ok(plain(Objects.themes()).some((t) => t.id === 'simple-nordic' && t.name === 'Simple nordic'));
     const items = plain(Objects.list('simple-nordic'));
-    assert.deepEqual(items.map((i) => i.label), ['Cabin', 'Longhouse', 'Watchtower', 'Pine', 'Pine grove', 'Runestone', 'Campfire', 'Longship', 'Banner']);
+    assert.deepEqual(items.map((i) => i.label), ['Cabin', 'Longhouse', 'Watchtower', 'Pine', 'Dwarf birch', 'Pine grove', 'Runestone', 'Campfire', 'Longship', 'Banner']);
     const medieval = new Set(plain(Objects.list('medieval')).map((i) => i.id));
     for (const item of items) {
         assert.equal(medieval.has(item.id), false, `${item.id} does not collide with a medieval item`);

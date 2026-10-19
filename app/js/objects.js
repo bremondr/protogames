@@ -397,6 +397,20 @@ const Objects = (() => {
                 snowLine(ctx, [[-12, -16], [0, -30], [12, -16]], 2.8);
             });
         },
+        nordicBirch(ctx) {
+            // A dwarf birch (Betula nana): a low tangle of thin twigs with small round leaves, some turned to autumn amber.
+            shadow(ctx, 64, 104, 40);
+            nordic(ctx, 64, 98, 3.6, () => {
+                ctx.strokeStyle = NORD.trunk; ctx.lineWidth = 1.4;
+                ctx.beginPath();
+                [[-9, -8, -13, -17], [-4, -10, -5, -21], [2, -10, 5, -22], [6, -8, 12, -16], [0, -6, -1, -13]].forEach(([bx, by, tx, ty]) => { ctx.moveTo(0, 0); ctx.quadraticCurveTo(bx, by, tx, ty); });
+                ctx.stroke();
+                [[-13, -17], [-10, -20], [-15, -13], [-5, -21], [-8, -16], [-2, -23], [5, -22], [2, -18], [9, -19], [12, -16], [8, -13], [-1, -13], [-5, -10], [3, -11]].forEach(([x, y], i) => {
+                    ctx.fillStyle = i % 4 === 1 ? '#d9a05b' : i % 4 === 3 ? '#a3b78f' : '#7f9a72';
+                    ctx.beginPath(); ctx.arc(x, y, 3.1, 0, Math.PI * 2); ctx.fill(); inked(ctx, 0.7);
+                });
+            });
+        },
         nordicPine(ctx) {
             shadow(ctx, 64, 104, 26);
             nordic(ctx, 64, 59, 3.2, pine);
@@ -455,8 +469,8 @@ const Objects = (() => {
     });
     // The items stand a little smaller than the others, so the flat style does not crowd the tile: each drawing is shrunk
     // towards the point it stands on.
-    const NORDIC_SCALE = 0.86;
-    ['nordicCabin', 'nordicLonghouse', 'nordicWatchtower', 'nordicPine', 'nordicGrove', 'nordicRunestone', 'nordicFire', 'nordicLongship', 'nordicBanner'].forEach((id) => {
+    const NORDIC_SCALE = 0.80;
+    ['nordicCabin', 'nordicLonghouse', 'nordicWatchtower', 'nordicPine', 'nordicBirch', 'nordicGrove', 'nordicRunestone', 'nordicFire', 'nordicLongship', 'nordicBanner'].forEach((id) => {
         const draw = G[id];
         G[id] = (ctx) => {
             ctx.save();
@@ -470,6 +484,7 @@ const Objects = (() => {
         { id: 'nordicLonghouse', label: 'Longhouse' },
         { id: 'nordicWatchtower', label: 'Watchtower' },
         { id: 'nordicPine', label: 'Pine' },
+        { id: 'nordicBirch', label: 'Dwarf birch' },
         { id: 'nordicGrove', label: 'Pine grove' },
         { id: 'nordicRunestone', label: 'Runestone' },
         { id: 'nordicFire', label: 'Campfire' },
