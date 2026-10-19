@@ -52,7 +52,9 @@ const Config = (() => {
      * Themeable color palettes. Each palette carries an id, a human-friendly
      * name/description, and labeled swatches for clarity in the UI.
      *
-     * @type {Array<{id:string,name:string,description:string,colors:Array<{label:string,hex:string}>}>}
+     * A palette may also carry `style: 'nordic'` to be drawn in the flat style of js/textures.js (nordic generators).
+     *
+     * @type {Array<{id:string,name:string,description:string,style?:string,colors:Array<{label:string,hex:string}>}>}
      */
     const COLOR_PALETTES = [
         {
@@ -68,6 +70,22 @@ const Config = (() => {
                 { label: 'Snow', hex: '#E8EAF6' },
                 { label: 'Village', hex: '#795548' },
                 { label: 'Volcanic', hex: '#BF360C' }
+            ]
+        },
+        {
+            id: 'simple-nordic',
+            name: 'Simple nordic',
+            description: 'The landscape terrains in flat colours and plain shapes: snowy pines, a log cabin, a dark fjord.',
+            style: 'nordic',
+            colors: [
+                { label: 'Forest', hex: '#1F4A3A' },
+                { label: 'Grassland', hex: '#5D7A63' },
+                { label: 'Water', hex: '#1C3A52' },
+                { label: 'Mountain', hex: '#6C7787' },
+                { label: 'Desert', hex: '#B8A88A' },
+                { label: 'Snow', hex: '#A9C9D8' },
+                { label: 'Village', hex: '#7A6A4F' },
+                { label: 'Volcanic', hex: '#3E2B30' }
             ]
         },
         {
