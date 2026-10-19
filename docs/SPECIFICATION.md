@@ -8,25 +8,26 @@ Projects are saved as `<name>.protogames.json` and the editor also keeps one cop
 
 ### Version
 
-Every file has a top-level integer `version`. The current version is **6**.
+Every file has a top-level integer `version`. The current version is **7**.
 
 | `version` in the file | Meaning |
 |---|---|
 | missing, or the string `"1.0"` | **v0**: written before versioning existed. Migrated to v1 on load. |
 | integer `1` | migrated to v2 on load (Space/Arctic colours, see below), then to v3 |
-| integer `2` | migrated to v3, v4, v5, then v6 on load (only the version number changes until v5) |
-| integer `3` | migrated to v4, v5, then v6 on load |
-| integer `4` | migrated to v5 (a square board becomes a rectangle, see below), then v6 on load |
-| integer `5` | migrated to v6 on load: gets no players and the standard dice, see "Playtest data" |
-| integer `6` | current format |
+| integer `2` | migrated to v3, v4, v5, v6, then v7 on load (only the version number changes until v5) |
+| integer `3` | migrated to v4, v5, v6, then v7 on load |
+| integer `4` | migrated to v5 (a square board becomes a rectangle, see below), then v6 and v7 on load |
+| integer `5` | migrated to v6 (no players and the standard dice, see "Playtest data"), then v7 on load |
+| integer `6` | migrated to v7 on load: gets the centre its board always had written down, see "Boards built from the middle" |
+| integer `7` | current format |
 | integer greater than the app's current version | rejected: "saved by a newer version of Protogames, update to open it" |
 | anything else (`1.5`, `-1`, `"abc"`, `null`, ...) | rejected as unreadable |
 
-### Project file (v6)
+### Project file (v7)
 
 ```jsonc
 {
-  "version": 6,
+  "version": 7,
   "projectName": "my board",
   "created": "2026-10-02T13:31:51.661Z",     // ISO time of the save
   "appState": {
@@ -34,7 +35,8 @@ Every file has a top-level integer `version`. The current version is **6**.
       "gridType": "hexagon",                 // tile shape: hexagon | square | triangle
       "boardShape": "hexagon",               // hexagon | rectangle | triangle | circle | infinite | country
       "orientation": "pointy-top",           // pointy-top | flat-top (hexagon tiles / boards)
-      "triangleOrientation": "point-up",     // point-up | point-down (triangle boards)
+      "triangleOrientation": "point-up",     // point-up | point-down (triangle boards, or the triangle a board is built around)
+      "center": "tile",                      // tile | point: what a hexagon or circle board is built around (see "Boards built from the middle")
       "width": 11, "height": 11,             // columns / rows (derived from radius or size for some shapes)
       "radius": 5, "size": 10
     },
@@ -97,6 +99,7 @@ Migrations are frozen history: do not edit one after it has been released, and d
 | 4 | New board shape `country` (see "Country boards"). Same kind of bump: nothing in existing projects changes. |
 | 5 | The board shapes `square` and `rectangle` were united: a square is a rectangle with equal sides. Migration turns `boardShape: "square"` into `"rectangle"` with `width` and `height` both set to the old `size`; the tiles are not touched. `square` is no longer a valid board shape (the **tile** shape `square` is unchanged). |
 | 6 | Playtest: `appState.players` and `appState.dice`, and the optional tile field `start` (see "Playtest data"). Migration adds `players: []` and the standard dice (a frozen copy of d3, d4, d6, d8, d10, d12, d20). |
+| 7 | The centre of hexagon and circle boards (`boardConfig.center`, see "Boards built from the middle"): a board is built around a tile or around the point where tiles meet, for every tile shape, and the size is counted in layers from the centre. Migration writes down the centre each board always had (triangles around a point, everything else around a tile); the tiles are not touched. |
 
 ### Playtest data
 
@@ -206,6 +209,26 @@ Tile geometry is not stored: the board is regenerated from `c`, which fixes the 
 Links are not capped, but the dialog warns about length: a note above 2,000 characters and a stronger one above 8,000 (rules of thumb for chat and email apps), always with a "Download project file instead" button. The link stays copyable at every size.
 
 When the link format changes, bump `v` (and keep reading the old one), or, if only the project format changed, nothing is needed here: `f` already routes old links through the project migrations. `tests/shareLink.test.js` covers both.
+
+## Boards built from the middle: centre and size
+
+Hexagon and circle boards are built outwards from a centre, in **layers**. The board form asks for the tile shape first, then the board shape (a list with a small picture of every layout), then these:
+
+- **Centre of the board** (`boardConfig.center`): `tile` builds the board around one tile, `point` around the point where tiles meet (the corner shared by three hexagons, six triangles or four squares). Only hexagon and circle boards have a centre; every other shape stores `tile`.
+- **Size** (what people type) is the number of **layers from the centre**: layer 1 is the centre itself (one tile, or the tiles that meet at the middle point), and each next layer adds the tiles that share a corner with the previous one.
+- **Orientation**: hexagon tiles are pointy-top or flat-top; triangles point up or down (`triangleOrientation`): the whole board for a triangle board, or the triangle a board is built around (hexagon and circle boards around a tile). Triangles built around a point are laid out as a pointy-top or flat-top hexagon (`orientation`).
+
+| Tiles | Layer 1 (around a tile) | Layer 1 (around a point) | Layers 1, 2, 3, 4 add (around a tile) | Layers 1, 2, 3, 4 add (around a point) | Symmetry (tile / point) |
+|---|---|---|---|---|---|
+| Hexagons | 1 hexagon | 3 hexagons | 1, 6, 12, 18 | 3, 9, 15, 21 | 6-fold / 3-fold |
+| Triangles | 1 triangle | 6 triangles | 1, 12, 24, 36 | 6, 18, 30, 42 | 3-fold / 6-fold |
+| Squares | 1 square | 4 squares | a square, 2n - 1 across | a square, 2n across | 4-fold / 4-fold |
+
+The hexagon board follows the layers exactly (a hexagon of tiles for hexagons and triangles, a square for squares clipped by the outline). The circle board keeps every tile whose centre lies within a distance of the middle, chosen so that no tile sits exactly on the edge and the board has the symmetry of the lattice at that point.
+
+**Stored values.** The saved `radius` counts from the first ring for hexagon and square tiles (`radius` 0 is layer 1) and as the layer count for triangles (`radius` 1 is layer 1), exactly as before; the panel converts (hexagon and square tiles: layers = `radius` + 1, triangles: layers = `radius`). `width` and `height` of a hexagon or circle board are the diameter in tiles: `2 * radius + 1` around a tile, `2 * radius + 2` around a point.
+
+**Older boards.** Before format 7 the centre was fixed by the tile shape: triangles were built around a point and everything else around a tile. The migration writes exactly that into `center`, so existing boards are unchanged. The generator also reads a missing `center` that way, so an old share link builds the same blank board before it is migrated.
 
 ## Square and rectangle boards
 

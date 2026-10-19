@@ -154,6 +154,30 @@
         return dx * dx + dy * dy <= circle.radius * circle.radius;
     }
 
+    /**
+     * What a hexagon or circle board is built around: 'tile' (one tile in the middle, so layer 1 is that tile) or 'point'
+     * (the corner where tiles meet, so layer 1 is the 3 hexagons, 6 triangles or 4 squares around it). Boards saved before
+     * the choice existed have none: triangle tiles were always built around a point, the others around a tile.
+     */
+    function resolveCenter(config) {
+        if (config.center === 'tile' || config.center === 'point') return config.center;
+        const central = config.boardShape === 'hexagon' || config.boardShape === 'circle';
+        return central && config.gridType === 'triangle' ? 'point' : 'tile';
+    }
+
+    /**
+     * A distance limit for a disc that no tile sits exactly on. Takes the achievable squared distances from the middle
+     * and a wanted squared limit, and returns a squared limit halfway between the two achievable values around it
+     * (rounding makes values that differ only by float noise count as one).
+     */
+    function limitBetween(squaredDistances, wantedSquared) {
+        const unique = [...new Set(squaredDistances.map((d) => Math.round(d * 1e6) / 1e6))].sort((a, b) => a - b);
+        const above = unique.findIndex((d) => d > wantedSquared);
+        if (above < 0) return unique[unique.length - 1] + 0.5;
+        if (above === 0) return unique[0] / 2;
+        return (unique[above - 1] + unique[above]) / 2;
+    }
+
     function normalizeBoardDimensions(config) {
         const width = Math.max(1, Math.round(config.width));
         const height = Math.max(1, Math.round(config.height));
@@ -169,7 +193,8 @@
                 return { cols: size, rows: size };
             case 'hexagon':
             case 'circle': {
-                const diameter = radius * 2 + 1;
+                // Built around a tile the board is 2 * radius + 1 tiles across, around a point 2 * radius + 2.
+                const diameter = radius * 2 + (resolveCenter(config) === 'point' ? 2 : 1);
                 return { cols: diameter, rows: diameter };
             }
             default:
@@ -269,6 +294,8 @@
         createBoardHexOutline,
         createBoardTriangleOutline,
         isPointInCircle,
+        resolveCenter,
+        limitBetween,
         normalizeBoardDimensions,
         createHexVertices,
         boundsOf,

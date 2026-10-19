@@ -55,7 +55,7 @@ test('a legacy v0 project (string version "1.0") still loads and keeps its data'
     assert.equal(loaded.projectName, 'legacy-board');
     assert.equal(loaded.created, legacy.created);
     assert.equal(loaded.appState.polygons.length, legacy.appState.polygons.length);
-    assert.deepEqual(loaded.appState.boardConfig, legacy.appState.boardConfig);
+    assert.deepEqual(loaded.appState.boardConfig, { ...legacy.appState.boardConfig, center: 'tile' }, 'the board is untouched, the centre written down');
     assert.equal(loaded.appState.polygons[0].color, '#2D5016');
     assert.equal(loaded.appState.polygons[2].object, 'castle');
 });
@@ -553,6 +553,7 @@ test('older files that name the square board go through every step to a rectangl
 // ---- v5 -> v6: players, start markers and dice ------------------------------------------------------------
 
 const v5Project = () => fixture('v5-space-arctic.protogames.json');
+const v6Project = () => fixture('v6-space-arctic.protogames.json');
 const STANDARD_DICE = [3, 4, 6, 8, 10, 12, 20].map((sides) => ({ sides }));
 const RED = '#c62828';
 const BLUE = '#1565c0';
@@ -596,7 +597,7 @@ test('v5 to v6 keeps players and dice a file already has', () => {
 test('a v5 file loads through parse() as a current project with the standard dice', () => {
     const loaded = plain(PF.parse(JSON.stringify(v5Project())));
     assert.equal(loaded.version, PF.CURRENT_VERSION);
-    assert.equal(PF.CURRENT_VERSION, 6);
+    assert.equal(PF.CURRENT_VERSION, 7);
     assert.deepEqual(loaded.appState.players, []);
     assert.deepEqual(loaded.appState.dice, STANDARD_DICE);
 });
@@ -694,4 +695,66 @@ test('dice are checked: a list of different dice with 2 to 1000 sides', () => {
     delete project.appState.dice;
     throwsFormatError(() => PF.validate(project), 'invalid', /no dice list/);
     assert.doesNotThrow(() => PF.validate(withPlayers([], Array.from({ length: 20 }, (_, i) => ({ sides: i + 2 })))));
+});
+
+// ---- v6 -> v7: the centre of a board -----------------------------------------------------------------------------
+
+const withBoard = (patch) => {
+    const project = v6Project();
+    project.appState.boardConfig = { ...project.appState.boardConfig, ...patch };
+    return project;
+};
+
+test('v6 to v7 writes down the centre a board always had: triangles around a point, everything else around a tile', () => {
+    const centerOf = (patch) => plain(PF.MIGRATIONS[6](withBoard(patch))).appState.boardConfig.center;
+    assert.equal(centerOf({ boardShape: 'hexagon', gridType: 'hexagon' }), 'tile');
+    assert.equal(centerOf({ boardShape: 'circle', gridType: 'hexagon' }), 'tile');
+    assert.equal(centerOf({ boardShape: 'circle', gridType: 'square' }), 'tile');
+    assert.equal(centerOf({ boardShape: 'hexagon', gridType: 'triangle' }), 'point');
+    assert.equal(centerOf({ boardShape: 'circle', gridType: 'triangle' }), 'point');
+    // other shapes have no centre to choose; they get the plain default
+    for (const boardShape of ['rectangle', 'triangle', 'infinite', 'country']) {
+        for (const gridType of ['hexagon', 'square', 'triangle']) assert.equal(centerOf({ boardShape, gridType }), 'tile', `${boardShape} ${gridType}`);
+    }
+});
+
+test('v6 to v7 changes nothing else, keeps a centre a file already has, and does not mutate its input', () => {
+    const source = withBoard({ boardShape: 'hexagon', gridType: 'triangle', radius: 4 });
+    const migrated = plain(PF.MIGRATIONS[6](source));
+    assert.equal(migrated.version, 7);
+    const expected = JSON.parse(JSON.stringify(source));
+    expected.version = 7;
+    expected.appState.boardConfig.center = 'point';
+    assert.deepEqual(migrated, expected);
+    assert.equal(source.version, 6, 'the input is not mutated');
+    assert.equal(source.appState.boardConfig.center, undefined);
+    assert.equal(plain(PF.MIGRATIONS[6](withBoard({ boardShape: 'hexagon', gridType: 'triangle', center: 'tile' }))).appState.boardConfig.center, 'tile');
+    assert.equal(plain(PF.MIGRATIONS[6]({ version: 6 })).version, 7, 'incomplete data does not throw');
+    assert.equal(plain(PF.MIGRATIONS[6]({ version: 6, appState: { boardConfig: null } })).version, 7);
+});
+
+test('every older fixture arrives with a centre', () => {
+    for (const name of ['v0-legacy-project.protogames.json', 'v1-space-arctic.protogames.json', 'v2-space-arctic.protogames.json', 'v3-space-arctic.protogames.json', 'v4-space-arctic.protogames.json', 'v4-square-board.protogames.json', 'v5-space-arctic.protogames.json', 'v6-space-arctic.protogames.json']) {
+        const loaded = plain(PF.parse(JSON.stringify(fixture(name))));
+        assert.equal(loaded.version, PF.CURRENT_VERSION, name);
+        assert.ok(['tile', 'point'].includes(loaded.appState.boardConfig.center), name);
+    }
+});
+
+test('the centre is checked', () => {
+    const project = plain(PF.parse(JSON.stringify(v6Project())));
+    for (const center of ['tile', 'point']) {
+        project.appState.boardConfig.center = center;
+        assert.doesNotThrow(() => PF.validate(project), center);
+    }
+    for (const bad of ['middle', '', null, 3, undefined]) {
+        project.appState.boardConfig.center = bad;
+        throwsFormatError(() => PF.validate(project), 'invalid', /unknown centre/);
+    }
+});
+
+test('a legacy triangle hexagon board keeps its tiles: the file loads and its tile count still matches the saved board', () => {
+    const loaded = plain(PF.parse(JSON.stringify(withBoard({ boardShape: 'hexagon', gridType: 'triangle' }))));
+    assert.equal(loaded.appState.boardConfig.center, 'point');
+    assert.equal(loaded.appState.polygons.length, v6Project().appState.polygons.length, 'the tiles are untouched');
 });

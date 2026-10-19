@@ -10,7 +10,9 @@
         normalizeBoardDimensions,
         createTriangleVertices,
         boundsCenter,
-        isPointInPolygon
+        isPointInPolygon,
+        resolveCenter,
+        limitBetween
     } = helpers;
 
     function buildTriangleGrid(config, canvas, colorMap) {
@@ -101,17 +103,19 @@
      *
      * @param {Object} options
      * @param {number} options.span       how many lattice steps to scan in each direction
-     * @param {Function} options.accepts  (x, y) => boolean
+     * @param {Function} options.accepts  (x, y, triangle) => boolean; x and y are the centroid relative to `origin`
+     *                                    (in triangle sides), triangle is { i, j, kind }
+     * @param {{x:number,y:number}} [options.origin] the middle of the board in lattice units (default: the vertex at 0, 0)
      * @param {boolean} [options.rotate]  rotate the finished layout by 90 degrees
      * @param {string} options.idPrefix
      */
     function buildLatticeTriangles(canvas, colorMap, options) {
-        const { span, accepts, rotate = false, idPrefix } = options;
+        const { span, accepts, rotate = false, idPrefix, origin = { x: 0, y: 0 } } = options;
         const side = 100;
         const rowHeight = (Math.sqrt(3) / 2) * side;
         const cx = canvas.width / 2;
         const cy = canvas.height / 2;
-        const point = (i, j) => ({ x: (i + j / 2) * side, y: j * rowHeight });
+        const point = (i, j) => ({ x: (i + j / 2) * side - origin.x * side, y: j * rowHeight - origin.y * side });
         const place = (p) => (rotate ? { x: cx - p.y, y: cy + p.x } : { x: cx + p.x, y: cy + p.y });
 
         const polygons = [];
@@ -127,7 +131,7 @@
                         x: (corners[0].x + corners[1].x + corners[2].x) / 3,
                         y: (corners[0].y + corners[1].y + corners[2].y) / 3
                     };
-                    if (!accepts(centroid.x / side, centroid.y / side)) continue;
+                    if (!accepts(centroid.x / side - origin.x, centroid.y / side - origin.y, { i, j, kind })) continue;
 
                     const id = `${idPrefix}_${j}_${i}_${kind}`;
                     polygons.push(
@@ -146,6 +150,74 @@
         return polygons;
     }
 
+    const ROW = Math.sqrt(3) / 2; // height of a triangle, in triangle sides
+
+    /** The middle (centroid) of the lattice triangle { i: 0, j: 0, kind }, in triangle sides. */
+    function seedOrigin(kind) {
+        return kind === 'up' ? { x: 1, y: (2 * ROW) / 3 } : { x: 0.5, y: ROW / 3 };
+    }
+
+    /** The three lattice corners of a triangle (lattice points are integer pairs). */
+    function cornersOf(i, j, kind) {
+        return kind === 'down' ? [[i, j], [i + 1, j], [i, j + 1]] : [[i + 1, j], [i + 1, j + 1], [i, j + 1]];
+    }
+
+    const triangleKey = (i, j, kind) => `${j},${i},${kind}`;
+
+    /**
+     * The triangles within `layers` layers of a starting triangle: layer 1 is that triangle, every next layer adds the
+     * triangles that share a corner with the previous one. Same rule that makes hexagons grow in rings.
+     */
+    function layersAroundTriangle(layers, kind) {
+        const span = layers * 2 + 2;
+        const atCorner = new Map();
+        const all = [];
+        for (let j = -span; j <= span; j++) {
+            for (let i = -span; i <= span; i++) {
+                for (const k of ['down', 'up']) {
+                    const key = triangleKey(i, j, k);
+                    all.push({ i, j, kind: k, key });
+                    for (const [a, b] of cornersOf(i, j, k)) {
+                        const corner = `${a},${b}`;
+                        if (!atCorner.has(corner)) atCorner.set(corner, []);
+                        atCorner.get(corner).push(key);
+                    }
+                }
+            }
+        }
+        const cornersByKey = new Map(all.map((t) => [t.key, cornersOf(t.i, t.j, t.kind).map(([a, b]) => `${a},${b}`)]));
+        const layerOf = new Map([[triangleKey(0, 0, kind), 1]]);
+        let frontier = [triangleKey(0, 0, kind)];
+        for (let layer = 2; layer <= layers; layer++) {
+            const next = [];
+            for (const key of frontier) {
+                for (const corner of cornersByKey.get(key)) {
+                    for (const other of atCorner.get(corner)) {
+                        if (!layerOf.has(other)) { layerOf.set(other, layer); next.push(other); }
+                    }
+                }
+            }
+            frontier = next;
+        }
+        return new Set(layerOf.keys());
+    }
+
+    /** Squared distances (in triangle sides) of every triangle centroid near a middle, for picking a tie-free disc. */
+    function centroidDistances(span, origin) {
+        const list = [];
+        for (let j = -span; j <= span; j++) {
+            for (let i = -span; i <= span; i++) {
+                for (const kind of ['down', 'up']) {
+                    const [a, b, c] = cornersOf(i, j, kind).map(([p, q]) => ({ x: p + q / 2, y: q * ROW }));
+                    const x = (a.x + b.x + c.x) / 3 - origin.x;
+                    const y = (a.y + b.y + c.y) / 3 - origin.y;
+                    list.push(x * x + y * y);
+                }
+            }
+        }
+        return list;
+    }
+
     /**
      * Hexagon-shaped board tiled with triangles: exactly 6 * radius^2 tiles.
      *
@@ -158,6 +230,17 @@
             1,
             Number.isFinite(radius) ? Math.floor(radius) : Config.DEFAULT_BOARD_CONFIG.radius
         );
+        if (resolveCenter(config) === 'tile') {
+            // Around one triangle (pointing up or down): layer 1 is that triangle, each layer the triangles touching the last.
+            const kind = config.triangleOrientation === 'point-down' ? 'down' : 'up';
+            const keys = layersAroundTriangle(rings, kind);
+            return buildLatticeTriangles(canvas, colorMap, {
+                span: rings * 2 + 2,
+                origin: seedOrigin(kind),
+                idPrefix: 'triangle_hex',
+                accepts: (x, y, t) => keys.has(triangleKey(t.i, t.j, t.kind))
+            });
+        }
         const half = Math.sqrt(3) / 2;
         return buildLatticeTriangles(canvas, colorMap, {
             span: rings * 2 + 1,
@@ -178,6 +261,21 @@
      */
     function buildCircleTriangleGrid(config, canvas, colorMap, radius) {
         if (!canvas) return [];
+        if (resolveCenter(config) === 'tile') {
+            // Around one triangle: every triangle whose centroid lies within (radius - 0.5) sides of its centroid, so
+            // radius 1 is that triangle alone; no triangle can sit exactly on the edge.
+            const kind = config.triangleOrientation === 'point-down' ? 'down' : 'up';
+            const origin = seedOrigin(kind);
+            const span = radius * 2 + 2;
+            const wanted = Math.max(0, radius - 0.5);
+            const limit2 = limitBetween(centroidDistances(span, origin), wanted * wanted);
+            return buildLatticeTriangles(canvas, colorMap, {
+                span,
+                origin,
+                idPrefix: 'triangle_disc',
+                accepts: (x, y) => x * x + y * y <= limit2
+            });
+        }
         const limitSquared = (Math.floor(3 * radius * radius) + 0.5) / 3;
         return buildLatticeTriangles(canvas, colorMap, {
             span: radius * 2 + 2,
@@ -237,6 +335,7 @@
         buildTriangleGrid,
         buildHexagonTriangleGrid,
         buildCircleTriangleGrid,
-        buildTessellatedTriangle
+        buildTessellatedTriangle,
+        layersAroundTriangle
     };
 })(typeof window !== 'undefined' ? window : globalThis);
