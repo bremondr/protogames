@@ -52,6 +52,28 @@
              ================================================ -->
         <aside class="sidebar" aria-label="Protogames toolbox">
             <!-- --------------------------------------------
+                 PROJECT
+                 The open project: its name, and the dialogs for
+                 exporting it (print, PNG, SVG, file), sharing a
+                 link to it and opening another project or file.
+                 -------------------------------------------- -->
+            <section class="panel" aria-labelledby="project-title">
+                <h2 id="project-title"><button type="button" class="panel-toggle" aria-expanded="true"><span>Project</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></h2>
+                <div class="panel-form">
+                    <label class="field">
+                        <span class="field-label">Name</span>
+                        <input type="text" id="projectNameInput" maxlength="80" autocomplete="off" aria-label="Project name">
+                    </label>
+                    <div class="stacked-buttons">
+                        <button type="button" id="exportButton" class="secondary-button menu-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>Export…</button>
+                        <button type="button" id="shareButton" class="secondary-button menu-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>Share Link</button>
+                        <button type="button" id="loadProjectBtn" class="secondary-button menu-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>Load…</button>
+                        <input type="file" id="loadProject" class="visually-hidden" aria-label="Load project file" accept=".json">
+                    </div>
+                </div>
+            </section>
+
+            <!-- --------------------------------------------
                  BOARD SETUP PANEL
                  Users configure the board grid, outline, and
                  overall dimensions before generating tiles.
@@ -166,28 +188,6 @@
                 <p id="playersHints" class="field-hint players-hints" role="status"></p>
                 <button type="button" id="addPlayer" class="secondary-button add-player-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>Add player</button>
                 <p id="playersTotal" class="field-hint"></p>
-            </section>
-
-            <!-- --------------------------------------------
-                 PROJECT
-                 The open project: its name, and the dialogs for
-                 exporting it (print, PNG, SVG, file), sharing a
-                 link to it and opening another project or file.
-                 -------------------------------------------- -->
-            <section class="panel" aria-labelledby="project-title">
-                <h2 id="project-title"><button type="button" class="panel-toggle" aria-expanded="true"><span>Project</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button></h2>
-                <div class="panel-form">
-                    <label class="field">
-                        <span class="field-label">Name</span>
-                        <input type="text" id="projectNameInput" maxlength="80" autocomplete="off" aria-label="Project name">
-                    </label>
-                    <div class="stacked-buttons">
-                        <button type="button" id="exportButton" class="secondary-button menu-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>Export…</button>
-                        <button type="button" id="shareButton" class="secondary-button menu-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>Share Link</button>
-                        <button type="button" id="loadProjectBtn" class="secondary-button menu-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>Load…</button>
-                        <input type="file" id="loadProject" class="visually-hidden" aria-label="Load project file" accept=".json">
-                    </div>
-                </div>
             </section>
 
             <!-- --------------------------------------------
