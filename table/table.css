@@ -1,0 +1,10 @@
+html, body { margin: 0; height: 100%; background: #0b0d12; overflow: hidden; font: 14px/1.4 system-ui, sans-serif; color: #dfe4ee; }
+canvas { display: block; width: 100vw; height: 100vh; }
+#hud { position: fixed; left: 12px; bottom: 8px; margin: 0; font: 13px/1.35 ui-monospace, monospace; color: #8b94a8; pointer-events: none; }
+#hud.hidden { display: none; }
+#calibration { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 58vw; padding: 14px 18px; background: #151922ee; border: 1px solid #343b4d; border-radius: 10px; text-align: center; }
+#calibration[hidden] { display: none; }
+#calibrationFrame { position: relative; line-height: 0; cursor: crosshair; }
+#calibrationImage { width: 100%; }
+.dot { position: absolute; width: 18px; height: 18px; margin: -9px 0 0 -9px; border: 2px solid #ffb020; border-radius: 50%; color: #ffb020; font: 700 11px/14px system-ui; text-align: center; background: #0008; pointer-events: none; }
+button { font: inherit; padding: 4px 12px; border-radius: 6px; border: 1px solid #4a5370; background: #232938; color: inherit; cursor: pointer; }

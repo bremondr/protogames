@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Protogames table demo</title>
+<link rel="stylesheet" href="table.css">
+</head>
+<body>
+<canvas id="board"></canvas>
+<pre id="hud"></pre>
+<div id="calibration" hidden>
+    <p id="calibrationHelp"></p>
+    <div id="calibrationFrame"><img id="calibrationImage" alt="tracking camera"><div id="calibrationDots"></div></div>
+    <p><button id="calibrationReset">Start over</button> <button id="calibrationClose">Close (C)</button></p>
+</div>
+<script src="../js/config.js"></script>
+<script src="../js/geometry/helpers.js"></script>
+<script src="../js/geometry/hex.js"></script>
+<script src="../js/geometry/triangle.js"></script>
+<script src="../js/geometry/square.js"></script>
+<script src="../js/geometry/neighbors.js"></script>
+<script src="../js/geometry.js"></script>
+<script src="table.js"></script>
+</body>
+</html>
