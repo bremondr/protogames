@@ -128,6 +128,29 @@ test('triangle tiles in a circle are symmetric left to right (regression for #4 
     }
 });
 
+test('a triangle circle has no spikes: every tile touches at least two others, at every size, centre and orientation (#4)', () => {
+    const Neighbors = loadGeometry().Neighbors;
+    for (const center of ['tile', 'point']) {
+        for (const orientation of ['point-up', 'point-down']) {
+            for (let radius = 1; radius <= 12; radius++) {
+                const polygons = generate(Checks.makeConfig('circle', 'triangle', 'pointy-top', orientation, { radius, center }));
+                const adjacency = Neighbors.buildAdjacency(polygons);
+                const hanging = polygons.filter((p, i) => adjacency.neighbors[i].length < 2).map((p) => p.id);
+                // the middle of a board of one triangle has nobody to touch
+                if (polygons.length === 1) continue;
+                assert.equal(hanging.length, 0, `${center} ${orientation} radius ${radius}: tiles with fewer than two neighbours: ${hanging.join(', ')}`);
+            }
+        }
+    }
+});
+
+test('removing the spikes of a triangle circle keeps its ids and its layout: the board is the disc minus the tiles that stuck out', () => {
+    const polygons = generate(Checks.makeConfig('circle', 'triangle', 'pointy-top', 'point-up', { radius: 3, center: 'point' }));
+    assert.equal(polygons.length, 54, 'was 60 with six spikes');
+    assert.equal(new Set(polygons.map((p) => p.id)).size, polygons.length);
+    assert.ok(polygons.every((p) => /^triangle_disc_-?\d+_-?\d+_(up|down)$/.test(p.id)), 'ids keep their form, so colours carry over when a board is regenerated');
+});
+
 test('rectangular hex layouts no longer overflow the canvas by the half-tile row shift', () => {
     for (const orientation of ['pointy-top', 'flat-top']) {
         const config = Checks.makeConfig('rectangle', 'hexagon', orientation, 'point-up', { width: 8, height: 8 });

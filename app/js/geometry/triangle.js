@@ -250,6 +250,45 @@
         });
     }
 
+    /** The lattice cell of a generated triangle, read back from its id (`<prefix>_<row>_<column>_<up|down>`). */
+    function latticeCellOf(polygon) {
+        const match = /_(-?\d+)_(-?\d+)_(up|down)$/.exec(polygon.id);
+        return match ? { j: Number(match[1]), i: Number(match[2]), kind: match[3] } : null;
+    }
+
+    /** The triangles that share an edge with a lattice triangle. */
+    function edgeNeighbours({ i, j, kind }) {
+        return kind === 'down'
+            ? [[i, j - 1, 'up'], [i, j, 'up'], [i - 1, j, 'up']]
+            : [[i, j + 1, 'down'], [i, j, 'down'], [i + 1, j, 'down']];
+    }
+
+    /**
+     * Leaves out the tiles at the rim of a cut-out disc that touch only one other tile (or none): they stick out as
+     * spikes. Removing one can leave another hanging by a single edge, so it repeats until every tile touches two.
+     * A board of one tile is left alone. The rule looks at the tile and its neighbours only, so the symmetry of the
+     * disc is kept.
+     */
+    function withoutSpikes(polygons) {
+        if (polygons.length < 2) return polygons;
+        const cells = new Map();
+        polygons.forEach((polygon) => {
+            const cell = latticeCellOf(polygon);
+            if (cell) cells.set(triangleKey(cell.i, cell.j, cell.kind), polygon);
+        });
+        const touching = (polygon) => edgeNeighbours(latticeCellOf(polygon)).filter(([i, j, kind]) => cells.has(triangleKey(i, j, kind))).length;
+        let spikes;
+        do {
+            spikes = [...cells].filter(([, polygon]) => touching(polygon) < 2);
+            spikes.forEach(([key]) => cells.delete(key));
+        } while (spikes.length && cells.size > 1);
+        const kept = new Set(cells.keys());
+        return polygons.filter((polygon) => {
+            const { i, j, kind } = latticeCellOf(polygon);
+            return kept.has(triangleKey(i, j, kind));
+        });
+    }
+
     /**
      * Circle-shaped board tiled with triangles: every triangle whose centroid lies
      * within `radius` triangle sides of the lattice vertex in the middle. Because the
@@ -269,19 +308,19 @@
             const span = radius * 2 + 2;
             const wanted = Math.max(0, radius - 0.5);
             const limit2 = limitBetween(centroidDistances(span, origin), wanted * wanted);
-            return buildLatticeTriangles(canvas, colorMap, {
+            return withoutSpikes(buildLatticeTriangles(canvas, colorMap, {
                 span,
                 origin,
                 idPrefix: 'triangle_disc',
                 accepts: (x, y) => x * x + y * y <= limit2
-            });
+            }));
         }
         const limitSquared = (Math.floor(3 * radius * radius) + 0.5) / 3;
-        return buildLatticeTriangles(canvas, colorMap, {
+        return withoutSpikes(buildLatticeTriangles(canvas, colorMap, {
             span: radius * 2 + 2,
             idPrefix: 'triangle_disc',
             accepts: (x, y) => x * x + y * y <= limitSquared
-        });
+        }));
     }
 
     function buildTessellatedTriangle(config, canvas, colorMap, baseSize, triangleOrientation) {
