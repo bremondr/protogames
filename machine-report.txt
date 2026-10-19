@@ -1,0 +1,36 @@
+# machine report 2026-10-19T19:26:40+02:00
+Distributor ID:	Ubuntu
+Description:	Ubuntu 24.04.3 LTS
+Release:	24.04
+Codename:	noble
+Linux gglab-nuc17 7.0.0-34-generic #34~24.04.1-Ubuntu SMP PREEMPT_DYNAMIC Fri Sep  4 15:38:29 UTC 2 x86_64 x86_64 x86_64 GNU/Linux
+
+## CPU / RAM
+CPU(s):                                  4
+Model name:                              Intel(R) Pentium(R) Silver N6005 @ 2.00GHz
+CPU(s) scaling MHz:                      100%
+               total        used        free      shared  buff/cache   available
+Mem:           7.5Gi       2.6Gi       587Mi       620Mi       5.3Gi       4.9Gi
+
+## Cameras
+HD Pro Webcam C920 (usb-0000:00:14.0-6):
+	/dev/video0
+	/dev/video1
+	/dev/media0
+
+
+## Displays
+Screen 0: minimum 16 x 16, current 1920 x 1080, maximum 32767 x 32767
+HDMI-1 connected primary 1920x1080+0+0 inverted (normal left inverted right x axis y axis) 600mm x 340mm
+
+## OpenCV C++
+4.6.0
+
+## OpenCV python aruco
+4.6.0 aruco: True
+
+## Versions
+v22.23.3
+10.9.9
+git version 2.43.0
+gh version 2.102.0 (2026-09-30)
