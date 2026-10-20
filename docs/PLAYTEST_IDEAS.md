@@ -62,11 +62,12 @@ Needs: pieces.
 ## 10. Seeded shuffles and hidden information
 Needs: decks or hidden pieces, neither of which exists.
 - Fog of war (tiles or pieces hidden per player) and a hot-seat screen cover.
+- Secret cards per player on their own phone, over a direct browser-to-browser connection with no server: proposed in [PLAYTEST_DEVICES.md](PLAYTEST_DEVICES.md).
 - Seeded randomness so a game can be replayed or two strategies compared on the same order.
 
 ## 11. Solo seats and online sessions
 - Solo: switch between player seats quickly.
-- Online: a shared session link for remote playtesters. Large, needs a server or peer-to-peer, and sync of every state above. Keep for last.
+- Online: a shared session link for remote playtesters. Large, needs a server or peer-to-peer, and sync of every state above. Keep for last. (The connection layer of [PLAYTEST_DEVICES.md](PLAYTEST_DEVICES.md) is the first step towards it.)
 
 ## Out of scope unless the tool grows beyond boards
 - Decks, hands, discard piles, draw and shuffle actions, card editing. This is a separate subsystem (a card model, art, layout, print), not an add-on to playtest.
