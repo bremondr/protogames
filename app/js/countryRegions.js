@@ -167,5 +167,10 @@ const CountryRegions = (() => {
 
     document.addEventListener('DOMContentLoaded', () => { wrapUI(); bindControl(); });
 
-    return { REGIONS, borderEdges };
+    /** The lines between countries as drawn on screen (none unless the board is a region with borders switched on), and how they are drawn. */
+    function activeBorders(polygons) {
+        return { edges: active() ? borderEdges(polygons) : [], color: BORDER_COLOR, shadow: BORDER_SHADOW, width: BORDER_PX };
+    }
+
+    return { REGIONS, borderEdges, activeBorders };
 })();

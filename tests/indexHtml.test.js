@@ -134,7 +134,7 @@ test('the Export dialog has the tabs Print, PNG, SVG and Project file, each tied
     // the print controls are still all there, the picture tabs have their options
     for (const pr of ['tileMm', 'paper', 'overlapMm', 'marginMm', 'textures', 'legend']) assert.ok(dialog.includes(`data-pr="${pr}"`), pr);
     assert.deepEqual([...dialog.matchAll(/data-ex-group="(\w+)"/g)].map((m) => m[1]), ['scale', 'background', 'background']);
-    assert.deepEqual([...dialog.matchAll(/data-ex="(\w+)"/g)].map((m) => m[1]), ['textures', 'objects', 'grid', 'objects', 'grid']);
+    assert.deepEqual([...dialog.matchAll(/data-ex="(\w+)"/g)].map((m) => m[1]), ['textures', 'objects', 'grid', 'textures', 'objects', 'grid']);
 });
 
 test('the Load dialog offers the projects of this browser, a file import, a new project and the home page', () => {

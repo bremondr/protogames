@@ -940,6 +940,18 @@ const Textures = (() => {
         if (!d) return null; // not cached, like tileFor
         return urls.set(key, TextureUtils.toObjectUrl(d));
     }
+    /**
+     * The seamless texture of a colour and the single-tile picture over it (if the colour has one) as image data URLs,
+     * for the SVG export. Unlike urlFor these do not follow the colours-only view: whether to use them is the caller's choice.
+     * Returns null when the colour has no texture at all.
+     */
+    function svgImages(hex) {
+        const t = tileFor(hex);
+        if (!t) return null;
+        if (!t.tileUrl) t.tileUrl = t.canvas.toDataURL('image/png');
+        if (t.feature && !t.featureUrl) t.featureUrl = t.feature.toDataURL('image/png');
+        return { tile: t.tileUrl, feature: t.feature ? t.featureUrl : null, size: S };
+    }
     function isFeature(hex) { const t = tileFor(hex); return !!(t && t.feature); }
 
     /** Draws a centered single-tile feature clipped to the polygon. Call after the base fill path is set. */
@@ -958,5 +970,5 @@ const Textures = (() => {
         return true;
     }
 
-    return { registerImage, unregister, resetLabels, patternFor, dataUrlFor, urlFor, isFeature, drawFeature, setFlat, isFlat, patternScale, REF_TILE_PX };
+    return { registerImage, unregister, resetLabels, patternFor, dataUrlFor, urlFor, svgImages, isFeature, drawFeature, setFlat, isFlat, patternScale, REF_TILE_PX };
 })();
