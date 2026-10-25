@@ -25,8 +25,11 @@ const PlaytestDrag = (() => {
     let canvas = null;
     let trayLayer = null;
     let list = null;
-    // pointerId -> { pieceId, kind, color, origin: 'board' | 'tray', startX, startY, active, ghost }
+    // pointerId -> { pieceId, kind, color, origin: 'board' | 'tray', startX, startY, active, ghost, button (tray origin) }
     const drags = new Map();
+    // Pointers whose drag was cancelled with Escape and that are still down: their release does nothing. The
+    // tray button keeps the pointer captured, so without this the release would still be a click on it.
+    const cancelled = new Set();
     let suppressClick = false;
 
     const state = () => AppState.getState();
@@ -96,7 +99,7 @@ const PlaytestDrag = (() => {
 
     // ---- Starting, moving and ending a drag --------------------------------------------------------
 
-    function begin(event, piece, origin) {
+    function begin(event, piece, origin, button = null) {
         const drag = {
             pieceId: piece.id,
             kind: piece.kind,
@@ -105,8 +108,10 @@ const PlaytestDrag = (() => {
             startX: event.clientX,
             startY: event.clientY,
             active: false,
-            ghost: null
+            ghost: null,
+            button
         };
+        cancelled.delete(event.pointerId);
         drags.set(event.pointerId, drag);
         if (origin === 'board') AppState.setSelectedPiece(piece.id);
         return drag;
@@ -144,7 +149,7 @@ const PlaytestDrag = (() => {
         const group = Play.trayGroups(game(), button.dataset.color).find((g) => g.kind === button.dataset.kind);
         const piece = group && Play.find(game(), group.ids[0]);
         if (!piece) return;
-        begin(event, piece, 'tray');
+        begin(event, piece, 'tray', button);
         try { button.setPointerCapture(event.pointerId); } catch (error) { /* synthetic events */ }
     }
 
@@ -168,16 +173,21 @@ const PlaytestDrag = (() => {
     }
 
     function onPointerUp(event) {
+        if (cancelled.delete(event.pointerId)) {
+            // Escape already took the piece back: releasing must not place it or count as a move.
+            suppressClickOnce();
+            return;
+        }
         const drag = finish(event.pointerId);
         if (!drag) return;
         if (!drag.active) {
-            // A press without a drag: on the board it only selects. In a tray nothing is redrawn, so the click
-            // that follows still lands on the button and sends the piece to a start.
+            // A press without a drag: on the board it only selects; in a tray it is a tap, which sends the piece to
+            // a start. That happens here and not on `click`, because two fingers tapping at once produce no click.
             if (drag.origin === 'board') Renderer.renderBoard();
+            else if (drag.button && typeof PlaytestTray !== 'undefined') PlaytestTray.tapPiece(event, drag.button);
             return;
         }
-        suppressClick = true;
-        setTimeout(() => { suppressClick = false; }, 0);
+        suppressClickOnce();
         const piece = Play.find(game(), drag.pieceId);
         const target = document.elementFromPoint(event.clientX, event.clientY);
         const tray = target && target.closest ? target.closest('.tray') : null;
@@ -194,12 +204,25 @@ const PlaytestDrag = (() => {
                 message = `${name} moved to ${Pieces.tileLabel(state().polygons, tile)}.`;
             }
         }
+        // A drop that changed nothing (off the board, on a foreign tray) puts the piece back: say so.
+        if (!message) message = dropMessage(name, drag.origin);
         AppState.setDrag(null);
         Playtest.refresh();
         if (message) Playtest.announce(message);
     }
 
+    /** What a screen reader hears when a drag ended without moving the piece. */
+    function dropMessage(name, origin) {
+        return `${name} was put back ${origin === 'tray' ? 'in its tray' : 'where it was'}.`;
+    }
+
+    function suppressClickOnce() {
+        suppressClick = true;
+        setTimeout(() => { suppressClick = false; }, 0);
+    }
+
     function onPointerCancel(event) {
+        cancelled.delete(event.pointerId);
         if (!drags.has(event.pointerId)) return;
         finish(event.pointerId);
         syncHidden();
@@ -209,7 +232,10 @@ const PlaytestDrag = (() => {
     /** Puts every carried piece back where it came from (Escape, leaving playtest). */
     function cancel() {
         if (!drags.size) return false;
-        [...drags.keys()].forEach(finish);
+        [...drags.keys()].forEach((pointerId) => {
+            finish(pointerId);
+            cancelled.add(pointerId);
+        });
         AppState.setDrag(null);
         Renderer.renderBoard();
         return true;
@@ -228,26 +254,41 @@ const PlaytestDrag = (() => {
 
     // ---- Keyboard: the list of pieces on the board -------------------------------------------------
 
+    // The tile set the list was built from: on an infinite board panning loads other tiles, and the list follows.
+    let listedPolygons = null;
+    let listTimer = null;
+
     function renderBoardPieces() {
         if (!list) return;
         const focused = document.activeElement && list.contains(document.activeElement) ? document.activeElement.dataset.pieceId : null;
         list.innerHTML = '';
         const s = state();
+        listedPolygons = s.polygons;
         if (!s.playtest || !s.play) return;
-        const byId = Pieces.polygonMap(s.polygons);
         for (const piece of s.play.pieces) {
-            const tile = piece.tileId === null ? null : byId.get(piece.tileId);
-            if (!tile) continue;
+            if (piece.tileId === null) continue;
+            // A piece on an infinite board can stand on a tile that is not loaded right now; it is still listed.
+            const label = Pieces.tileLabelById(s.polygons, piece.tileId);
+            if (!label) continue;
             const item = document.createElement('li');
             const button = document.createElement('button');
             button.type = 'button';
             button.dataset.pieceId = piece.id;
-            button.textContent = `${Players.colorName(piece.color)} ${kindName(piece.kind)} at ${Pieces.tileLabel(s.polygons, tile)}`;
+            button.textContent = `${Players.colorName(piece.color)} ${kindName(piece.kind)} at ${label}`;
             button.setAttribute('aria-description', 'Arrow keys move it to the next tile. Delete puts it back in its tray.');
             item.appendChild(button);
             list.appendChild(item);
         }
         if (focused) Array.from(list.querySelectorAll('button')).find((b) => b.dataset.pieceId === focused)?.focus();
+    }
+
+    /** After a pan or zoom ends, rebuilds the list when the loaded tiles changed (infinite boards only). */
+    function refreshListSoon() {
+        if (listTimer || !state().playtest || state().polygons === listedPolygons) return;
+        listTimer = setTimeout(() => {
+            listTimer = null;
+            if (state().playtest && state().polygons !== listedPolygons) renderBoardPieces();
+        }, 150);
     }
 
     const ARROWS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
@@ -260,6 +301,10 @@ const PlaytestDrag = (() => {
         const name = `${Players.colorName(piece.color)} ${kindName(piece.kind)}`;
         if (ARROWS[event.key]) {
             event.preventDefault();
+            if (!Pieces.polygonMap(state().polygons).has(piece.tileId)) {
+                Playtest.announce(`${name} is on a part of the board that is not shown. Pan the board to it, or press Delete to put it back in its tray.`);
+                return;
+            }
             const [dx, dy] = ARROWS[event.key];
             const { adjacency } = AppState.getTopology();
             const next = Pieces.neighborInDirection(state().polygons, adjacency, piece.tileId, dx, dy);
@@ -268,9 +313,8 @@ const PlaytestDrag = (() => {
                 return;
             }
             Play.move(game(), piece.id, next);
-            const tile = Pieces.polygonMap(state().polygons).get(next);
             Playtest.refresh();
-            Playtest.announce(`${name} moved to ${Pieces.tileLabel(state().polygons, tile)}.`);
+            Playtest.announce(`${name} moved to ${Pieces.tileLabelById(state().polygons, next)}.`);
         } else if (event.key === 'Delete' || event.key === 'Backspace') {
             event.preventDefault();
             Play.move(game(), piece.id, null);
@@ -291,6 +335,10 @@ const PlaytestDrag = (() => {
         document.addEventListener('pointermove', onPointerMove);
         document.addEventListener('pointerup', onPointerUp);
         document.addEventListener('pointercancel', onPointerCancel);
+        // Panning and zooming an infinite board load other tiles; the list of pieces follows once it settles.
+        document.addEventListener('pointerup', refreshListSoon);
+        document.addEventListener('wheel', refreshListSoon, { passive: true });
+        document.addEventListener('keyup', refreshListSoon);
         // Registered before Playtest's own Escape handler, so Escape cancels a drag without also leaving playtest.
         document.addEventListener('keydown', (event) => {
             if (event.key === 'Escape' && drags.size && cancel()) event.preventDefault();
