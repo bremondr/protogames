@@ -201,3 +201,54 @@ test('a link made now carries generator 2 and opens with it; a link from a newer
     assert.equal(await env.ShareLink.openFromHash(), false);
     assert.equal(env.calls.restores.length, 1, 'nothing was opened');
 });
+
+// ---- Country boards: the outlines have to be had before the grid can be made ---------------------------------------
+
+/** A link for a country board; the board itself is never built in these tests, so the polygons do not matter. */
+const countryLink = (env) => linkFor(env, (d) => { d.v = 3; d.c = { ...d.c, boardShape: 'country', country: 'Czechia', width: 24, height: 15, countryParts: 'nearby' }; });
+
+/** The 8 s wait for outlines is a timer the test controls: `expire()` lets it run out at once, nothing else is delayed. */
+function withOutlines(env, ready) {
+    let expire;
+    env.app.context.setTimeout = (fn, ms) => { if (ms === 8000) { expire = fn; return 0; } return setTimeout(fn, ms); };
+    env.app.context.CountryBoard = { ready };
+    env.app.context.Geometry.generateGrid = () => { throw new Error('the grid was generated'); };
+    return { expire: () => expire() };
+}
+
+test('a country link whose outlines cannot be downloaded is reported, and nothing is opened or generated', async () => {
+    const env = fresh();
+    env.location.hash = `#b=${await countryLink(env)}`;
+    withOutlines(env, () => Promise.resolve(false));
+    assert.equal(await env.ShareLink.openFromHash(), false);
+    assert.equal(env.calls.restores.length, 0);
+    assert.equal(env.calls.newProjects, 0);
+    assert.match(env.ui.notes[0], /outlines of Czechia could not be downloaded.*open the link again/);
+});
+
+test('a country link that waits too long for the outlines is refused after the wait runs out', async () => {
+    const env = fresh();
+    env.location.hash = `#b=${await countryLink(env)}`;
+    const outlines = withOutlines(env, () => new Promise(() => {})); // never answers
+    const opening = env.ShareLink.openFromHash();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    outlines.expire();
+    assert.equal(await opening, false);
+    assert.equal(env.calls.restores.length, 0);
+    assert.match(env.ui.notes[0], /could not be downloaded/);
+});
+
+test('a country link in a build without the outlines module is refused with its own message', async () => {
+    const env = fresh();
+    env.location.hash = `#b=${await countryLink(env)}`;
+    assert.equal(await env.ShareLink.openFromHash(), false);
+    assert.match(env.ui.notes[0], /needs the country outlines, which are not available/);
+});
+
+test('a country link whose outlines are there goes on to build the board', async () => {
+    const env = fresh();
+    env.location.hash = `#b=${await countryLink(env)}`;
+    withOutlines(env, () => Promise.resolve(true));
+    assert.equal(await env.ShareLink.openFromHash(), false, 'the stand-in generator stops it');
+    assert.match(env.ui.notes[0], /the grid was generated/, 'so the outlines were accepted and the grid was asked for');
+});

@@ -871,3 +871,29 @@ test('the board size caps are shared: share links read them from here', () => {
     assert.equal(PF.MAX_BOARD_DIMENSION, 100);
     assert.equal(PF.MAX_BOARD_SPAN, 201);
 });
+
+test('a migration that forgets to set the version is caught (bad-migration), and a missing step is reported (no-migration)', () => {
+    const original = PF.MIGRATIONS[7];
+    try {
+        PF.MIGRATIONS[7] = (project) => JSON.parse(JSON.stringify(project)); // upgrades nothing, keeps version 7
+        throwsFormatError(() => PF.migrate({ version: 7, projectName: 'x', appState: {} }), 'bad-migration', /did not set the version/);
+        delete PF.MIGRATIONS[7];
+        throwsFormatError(() => PF.migrate({ version: 7, projectName: 'x', appState: {} }), 'no-migration', /No migration is available from file format 7/);
+    } finally {
+        PF.MIGRATIONS[7] = original;
+    }
+    assert.equal(PF.migrate({ version: 7, projectName: 'x', appState: {} }).version, PF.CURRENT_VERSION, 'the real step is back');
+});
+
+test('parse never mutates its input, not even a current-version object whose tile bounds it has to fix', () => {
+    const project = currentProject();
+    delete project.appState.polygons[0].bounds;
+    project.appState.polygons[1].bounds = { minX: 0, minY: 0, maxX: 1e9, maxY: 1e9 }; // disagrees with the vertices
+    const before = JSON.stringify(project);
+    const parsed = PF.parse(project);
+    assert.equal(JSON.stringify(project), before, 'the caller\'s object is untouched');
+    assert.notEqual(parsed, project);
+    assert.ok(parsed.appState.polygons[0].bounds, 'the copy got its bounds');
+    assert.ok(parsed.appState.polygons[1].bounds.maxX < 1e9, 'and the wrong ones were recomputed');
+    assert.notEqual(parsed.appState.polygons, project.appState.polygons);
+});

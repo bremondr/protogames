@@ -273,3 +273,50 @@ test('undo un-paints tiles that were loaded after the snapshot, with their objec
     assert.equal(redone.get(painted[1]).object, 'tree');
     assert.equal(redone.get(painted[2]).start, '#c62828');
 });
+
+test('coordinates that are not safe integers, or a hair past the bound, are refused, and nothing is silently renamed', () => {
+    for (const id of ['inf_s_1000000000000000000000000000000_0', 'inf_s_0_-1000000000000000000000000000000', 'inf_hp_9007199254740993_0', 'inf_t_0_1000000001_down', 'inf_s_-1000000001_0']) {
+        assert.equal(Infinite.fromId(id), null, id);
+    }
+    assert.equal(Infinite.fromId('inf_s_-1000000000_1000000000')?.id, 'inf_s_-1000000000_1000000000', 'the bound itself keeps its name');
+});
+
+// ---- sync: the loaded area snaps to chunks and is rebuilt only when it changes ------------------------------
+
+function infiniteBoard() {
+    const state = AppState.getState();
+    state.canvas = { width: CANVAS.width, height: CANVAS.height };
+    AppState.setPolygons(Geometry.generateGrid(config('square'), state.canvas, null));
+    AppState.resetView();
+    return state;
+}
+
+test('sync reuses the loaded tiles while the view stays in the same chunks, and says so', () => {
+    const state = infiniteBoard();
+    AppState.setView({ scale: 1, x: 0, y: 0 });
+    const loaded = state.polygons;
+    AppState.setView({ scale: 1, x: -7, y: -9 }); // a pan of a few pixels
+    assert.equal(state.polygons, loaded, 'the same array: nothing was rebuilt');
+    assert.equal(Infinite.sync(), false, 'nothing to do');
+    assert.equal(state.polygons, loaded);
+    assert.equal(Infinite.sync(true), true, 'forced: rebuilt');
+    assert.notEqual(state.polygons, loaded, 'a new array, so cached adjacency and bounds are rebuilt');
+    assert.equal(Infinite.sync(), false, 'and the key is remembered again');
+});
+
+test('a tile that is still in view is the same object after a rebuild, a painted one far away is kept, a blank one is dropped', () => {
+    const state = infiniteBoard();
+    AppState.setView({ scale: 1, x: 0, y: 0 });
+    const near = state.polygons.find((p) => p.center.x > 100 && p.center.x < 300 && p.center.y > 100 && p.center.y < 300);
+    const far = state.polygons.reduce((a, b) => (b.center.x > a.center.x ? b : a));
+    near.color = '#123456';
+    far.color = '#654321';
+    const blankFar = state.polygons.find((p) => p !== far && p.center.x > far.center.x - 60 && p.center.x < far.center.x && !Infinite.isPainted(p));
+    AppState.setView({ scale: 1, x: -20000, y: 0 }); // a different chunk range
+    const ids = new Map(state.polygons.map((p) => [p.id, p]));
+    assert.ok(ids.has(far.id) && ids.get(far.id) === far, 'a painted tile stays loaded wherever it is');
+    assert.ok(ids.has(near.id), 'painted tiles are not forgotten');
+    assert.equal(ids.has(blankFar.id), false, 'a blank tile out of view is let go');
+    AppState.setView({ scale: 1, x: 0, y: 0 });
+    assert.equal(state.polygons.find((p) => p.id === near.id), near, 'coming back finds the painted tile object again');
+});

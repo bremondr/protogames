@@ -323,3 +323,36 @@ test('the export scene of an infinite board is built once until what is painted 
     env.Renderer.exportScene(1000, 800);
     assert.equal(env.app.context.__builds, 3);
 });
+
+test('resizing the canvas puts the context defaults back: setting the size resets them in a browser', () => {
+    const env = setup();
+    // A canvas that forgets its context settings whenever its size is assigned, as real ones do.
+    const ctx = recordingContext();
+    const canvas = {
+        style: {},
+        parentElement: { getBoundingClientRect: () => ({ width: 640.7, height: 480.2 }) },
+        getContext: () => ctx,
+        set width(value) { this._width = value; ctx.lineJoin = 'miter'; ctx.lineCap = 'butt'; ctx.imageSmoothingEnabled = false; },
+        get width() { return this._width; },
+        height: 0
+    };
+    env.setState({ canvas, ctx, setCanvas() {} });
+    const size = env.Renderer.resizeCanvas();
+    assert.deepEqual(plain(size), { width: 640, height: 480, changed: true });
+    assert.equal(ctx.lineJoin, 'round');
+    assert.equal(ctx.lineCap, 'round');
+    assert.equal(ctx.imageSmoothingEnabled, true);
+    assert.equal(env.Renderer.resizeCanvas().changed, false, 'the same size again is reported as unchanged');
+    assert.equal(ctx.lineJoin, 'round');
+});
+
+test('initializing the canvas sets the context defaults before the first paint', () => {
+    const env = setup();
+    const ctx = recordingContext();
+    const canvas = { style: {}, parentElement: null, getContext: () => ctx, width: 10, height: 10 };
+    env.app.run(`AppState.setCanvas = (canvas, ctx) => { globalThis.__state = { canvas, ctx }; }; void 0;`);
+    env.Renderer.initializeCanvas(canvas);
+    assert.equal(canvas.style.touchAction, 'none');
+    assert.equal(ctx.lineJoin, 'round');
+    assert.equal(ctx.imageSmoothingEnabled, true);
+});

@@ -113,8 +113,9 @@ test('registerNewProject names the open board, gives it an id, puts it in the ad
 test('autosave writes into the open project only, and does nothing before there is one', () => {
     const env = fresh();
     env.FileManager.restoreState(project(env));
-    env.FileManager.autoSaveToLocalStorage(true);
+    assert.equal(env.FileManager.autoSaveToLocalStorage(true), false);
     assert.deepEqual(env.storage.dump(), {}, 'no project, no save');
+    assert.deepEqual(env.ui.notes.filter((n) => /not available|storage is full/.test(n)), [], 'and that is not reported as a failed save');
     const a = env.FileManager.registerNewProject('A');
     const b = env.FileManager.registerNewProject('B');
     env.AppState.getState().polygons[0].color = '#abcdef';
@@ -415,4 +416,82 @@ test('earlier autosaves that were recovered are announced once; the ones that co
     full.FileManager.recoverLegacyProjects();
     assert.ok(full.ui.notes.some((n) => /could not be copied/.test(n)));
     assert.ok('protogames_autosave:tab9' in full.storage.dump(), 'the original stays');
+});
+
+// ---- restoreState: what a loaded project resets ------------------------------------------------------------------
+
+test('restoring a project shows it whole: the pan and zoom of the board before it are dropped', () => {
+    const env = fresh();
+    env.FileManager.restoreState(project(env));
+    env.AppState.setView({ scale: 2.5, x: 120, y: -80 });
+    env.FileManager.restoreState(project(env));
+    assert.deepEqual(JSON.parse(JSON.stringify(env.AppState.getState().view)), { scale: 1, x: 0, y: 0 });
+});
+
+test('restoring a project starts its undo history over, so undo cannot step back into the project before it', () => {
+    const env = fresh();
+    env.FileManager.restoreState(project(env));
+    const state = env.AppState.getState();
+    for (const color of ['#111111', '#222222', '#333333']) {
+        state.polygons[0].color = color;
+        env.AppState.recordHistory();
+    }
+    assert.ok(state.history.length >= 4);
+    env.FileManager.restoreState(env.ProjectFormat.parse(fixture('v0-legacy-project.protogames.json')));
+    assert.equal(state.history.length, 1, 'only the loaded board');
+    assert.equal(state.historyIndex, 0);
+    assert.equal(env.AppState.undo(), null, 'nothing to undo');
+    assert.equal(state.isDirty, false, 'and a loaded project is not edited');
+});
+
+test('restoring a project tells a running playtest that the design changed, after the new tiles are in place', () => {
+    const env = fresh();
+    const told = [];
+    env.app.context.Playtest = { designChanged: () => told.push(env.AppState.getState().polygons.length) };
+    env.FileManager.restoreState(project(env));
+    assert.deepEqual(told, [env.AppState.getState().polygons.length], 'told once, with the new board already loaded');
+    assert.ok(told[0] > 0);
+});
+
+test('a board with players on it is work to lose even when every tile is blank', () => {
+    const env = fresh();
+    env.FileManager.restoreState(project(env));
+    env.AppState.getState().polygons.forEach((p) => { p.color = env.Config.DEFAULT_TILE_COLOR; delete p.object; delete p.start; });
+    assert.equal(env.FileManager.hasUserWork(), false);
+    env.AppState.setPlayers([{ id: 'p1', name: 'Red', color: '#c62828', pieces: [] }]);
+    assert.equal(env.FileManager.hasUserWork(), true);
+    env.AppState.setPlayers([]);
+    assert.equal(env.FileManager.hasUserWork(), false);
+});
+
+// ---- Opening a file -----------------------------------------------------------------------------------------------
+
+/** init() wires the file input; this returns it and a way to make the person "choose" a file with the given text. */
+function fileInput(env, text) {
+    let handler;
+    const input = { value: 'C:\fakepath\board.protogames.json', files: [{ name: 'board.protogames.json' }], addEventListener: (type, fn) => { if (type === 'change') handler = fn; } };
+    env.app.context.FileReader = class { readAsText() { this.onload({ target: { result: text } }); } };
+    env.FileManager.init({ loadInput: input });
+    return { input, choose: () => handler({ target: input }) };
+}
+
+test('after a file is chosen the input is cleared, so the same file can be chosen again: after a good file and after a bad one', () => {
+    const good = fresh();
+    const goodInput = fileInput(good, fixture('v0-legacy-project.protogames.json'));
+    goodInput.choose();
+    assert.equal(good.AppState.getState().currentProjectName, 'legacy-board', 'the file opened');
+    assert.equal(goodInput.input.value, '');
+    const bad = fresh();
+    const badInput = fileInput(bad, '{nope');
+    badInput.choose();
+    assert.equal(bad.calls.modals.length, 1, 'the person is told why it did not open');
+    assert.equal(badInput.input.value, '', 'cleared when the file could not be read too');
+});
+
+test('choosing nothing in the file dialog does nothing', () => {
+    const env = fresh();
+    let handler;
+    env.FileManager.init({ loadInput: { addEventListener: (type, fn) => { handler = fn; } } });
+    assert.doesNotThrow(() => handler({ target: { files: [], value: 'x' } }));
+    assert.equal(env.AppState.getState().currentProjectId, null);
 });
