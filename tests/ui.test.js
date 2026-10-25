@@ -74,3 +74,12 @@ test('the orientation control is for hexagon tiles and hexagon boards of triangl
     form('boardOutline').value = 'rectangle';
     assert.equal(shown(), false);
 });
+
+test('a board generated from the controls is made by the current generator', () => {
+    const { UI, form } = fresh();
+    const current = loadApp(['app/js/config.js']).run('Config.GENERATOR_VERSION');
+    for (const outline of ['circle', 'hexagon', 'rectangle']) {
+        form('boardOutline').value = outline;
+        assert.equal(UI.getBoardConfig().generator, current, outline);
+    }
+});

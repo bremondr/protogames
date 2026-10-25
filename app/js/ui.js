@@ -214,7 +214,9 @@ const UI = (() => {
             radius,
             size,
             triangleOrientation: elements.triangleOrientationSelect?.value || Config.DEFAULT_BOARD_CONFIG.triangleOrientation,
-            center
+            center,
+            // A board generated here is a new board: it gets the current generator (a regenerated saved board keeps its own).
+            generator: Config.GENERATOR_VERSION
         };
     }
 

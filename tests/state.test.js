@@ -285,3 +285,14 @@ test('discarding the last step at the history limit brings back the oldest step'
     assert.equal(state.history[0][0].color, '#000000', 'and is back');
     assert.equal(state.historyIndex, Config.HISTORY_LIMIT - 1);
 });
+
+test('the board configuration keeps its generator version: a new state has the current one, a restored board its own', () => {
+    const { AppState, Config } = fresh();
+    assert.equal(AppState.getState().boardConfig.generator, Config.GENERATOR_VERSION);
+    AppState.setBoardConfig({ boardShape: 'circle', gridType: 'hexagon', radius: 20, generator: 1 });
+    assert.equal(AppState.getState().boardConfig.generator, 1);
+    AppState.updateBoardConfig({ radius: 21 });
+    assert.equal(AppState.getState().boardConfig.generator, 1, 'regenerating a board keeps its generator');
+    AppState.setBoardConfig({ boardShape: 'circle', gridType: 'hexagon', radius: 20 });
+    assert.equal(AppState.getState().boardConfig.generator, Config.GENERATOR_VERSION, 'nothing is inherited from the previous board');
+});

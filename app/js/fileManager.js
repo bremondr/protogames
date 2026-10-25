@@ -133,7 +133,8 @@ const FileManager = (() => {
 
     /** A blank board and the question that every new project starts with: what is it called? */
     async function startNewProject() {
-        Interactions.generateBoard(AppState.getState().boardConfig, { skipDirtyFlag: true });
+        // A new board is made by the current generator, whatever board was open before.
+        Interactions.generateBoard({ ...AppState.getState().boardConfig, generator: Config.GENERATOR_VERSION }, { skipDirtyFlag: true });
         await messageClosed;
         promptForText('Name your project', DEFAULT_NEW_NAME, (name) => registerNewProject(name), {
             confirmLabel: 'Create',

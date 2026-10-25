@@ -375,6 +375,7 @@
         buildHexagonTriangleGrid,
         buildCircleTriangleGrid,
         buildTessellatedTriangle,
-        layersAroundTriangle
+        layersAroundTriangle,
+        withoutSpikes
     };
 })(typeof window !== 'undefined' ? window : globalThis);
