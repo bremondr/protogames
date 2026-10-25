@@ -12,6 +12,8 @@
     // Vertices closer than this (in canvas pixels) are treated as the same point.
     const WELD_EPSILON = 0.05;
     const WELD_CELL = 0.5;
+    // Most cells one tile may occupy in the point locator (a normal tile touches one to four).
+    const MAX_CELLS_PER_TILE = 64;
 
     /** Gives every distinct vertex position a stable integer id. */
     function createVertexWelder() {
@@ -225,12 +227,21 @@
             sample.reduce((sum, p) => sum + Math.min(p.bounds.maxX - p.bounds.minX, p.bounds.maxY - p.bounds.minY), 0) / sample.length;
         const cell = Math.max(4, average || 4);
         const buckets = new Map();
+        // A tile whose box spans more cells than this (imported data with a huge box) would cost memory
+        // and time proportional to its area, so it is tested linearly instead of being bucketed.
+        const large = [];
         const key = (cx, cy) => `${cx},${cy}`;
 
         for (const polygon of polygons) {
             const { minX, maxX, minY, maxY } = polygon.bounds;
-            for (let cx = Math.floor(minX / cell); cx <= Math.floor(maxX / cell); cx++) {
-                for (let cy = Math.floor(minY / cell); cy <= Math.floor(maxY / cell); cy++) {
+            const x0 = Math.floor(minX / cell), x1 = Math.floor(maxX / cell);
+            const y0 = Math.floor(minY / cell), y1 = Math.floor(maxY / cell);
+            if (!((x1 - x0 + 1) * (y1 - y0 + 1) <= MAX_CELLS_PER_TILE)) { // also catches NaN and Infinity
+                large.push(polygon);
+                continue;
+            }
+            for (let cx = x0; cx <= x1; cx++) {
+                for (let cy = y0; cy <= y1; cy++) {
                     const k = key(cx, cy);
                     if (!buckets.has(k)) buckets.set(k, []);
                     buckets.get(k).push(polygon);
@@ -240,10 +251,10 @@
 
         function locate(point) {
             const bucket = buckets.get(key(Math.floor(point.x / cell), Math.floor(point.y / cell)));
-            if (!bucket) return null;
+            if (!bucket && !large.length) return null;
             let best = null;
             let bestDistance = Infinity;
-            for (const polygon of bucket) {
+            for (const polygon of bucket && large.length ? bucket.concat(large) : bucket || large) {
                 const b = polygon.bounds;
                 if (point.x < b.minX || point.x > b.maxX || point.y < b.minY || point.y > b.maxY) continue;
                 if (!global.GeometryHelpers.isPointInPolygon(point, polygon.vertices)) continue;

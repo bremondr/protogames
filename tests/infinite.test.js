@@ -169,3 +169,107 @@ test('a tile with a start marker counts as drawn, so it is saved and kept when t
     assert.equal(Infinite.isPainted(marked), true);
     assert.deepEqual(plain(Infinite.paintedTiles(tiles).map((t) => t.id)), [marked.id]);
 });
+
+// ---- Hostile input (audit H1): none of these may loop or allocate without end -------------------------
+
+test('tile ids beyond the lattice bound are refused', () => {
+    for (const id of ['inf_s_9007199254740991_0', 'inf_s_0_-9007199254740991', 'inf_hp_1000000001_0', 'inf_t_0_1000000001_up', 'inf_hf_-1000000001_5']) {
+        assert.equal(Infinite.fromId(id), null, id);
+    }
+    assert.ok(Infinite.fromId('inf_s_1000000000_-1000000000'), 'the bound itself is allowed');
+    assert.ok(Infinite.fromId('inf_s_10000000_10000000'), 'far-away tiles of a legitimate board load');
+});
+
+test('lattice scans of non-finite or huge rectangles build nothing and return at once', () => {
+    const huge = 1e18;
+    const rects = [
+        { minX: -huge, minY: -huge, maxX: huge, maxY: huge },
+        { minX: 0, minY: 0, maxX: Infinity, maxY: 10 },
+        { minX: NaN, minY: 0, maxX: 10, maxY: 10 },
+        { minX: 1e17, minY: 1e17, maxX: 1e17 + 100, maxY: 1e17 + 100 },
+        { minX: 0, minY: 0, maxX: 1e8, maxY: 1e8 }
+    ];
+    for (const family of FAMILIES) {
+        for (const rect of rects) assert.equal(Infinite.cellsIn(family, rect).length, 0, `${family} ${JSON.stringify(rect)}`);
+    }
+});
+
+test('a tile at the edge of the double lattice or a view at 1e300 does not hang the board', () => {
+    const state = AppState.getState();
+    state.canvas = { width: CANVAS.width, height: CANVAS.height };
+    AppState.setPolygons(Geometry.generateGrid(config('square'), state.canvas, null));
+    const far = Infinite.fromId('inf_s_1000000000_0');
+    far.color = '#ff0000';
+    AppState.setPolygons([far]);
+    AppState.resetView();
+    assert.ok(state.polygons.some((p) => p.id === far.id));
+    for (const view of [{ scale: 1, x: 1e300, y: 0 }, { scale: 1, x: NaN, y: 0 }, { scale: 0.4, x: -1e18, y: -1e18 }]) {
+        AppState.setView(view);
+        assert.ok(state.polygons.length < 100000);
+    }
+});
+
+test('a painted tile stored at 1e18 gives a finite view instead of looping', () => {
+    const state = AppState.getState();
+    state.canvas = { width: CANVAS.width, height: CANVAS.height };
+    AppState.setPolygons(Geometry.generateGrid(config('square'), state.canvas, null));
+    const tile = Infinite.fromId('inf_s_0_0');
+    const R = 1e18;
+    tile.color = '#ff0000';
+    tile.center = { x: R, y: R };
+    tile.vertices = [{ x: R, y: R }, { x: R + 56, y: R }, { x: R + 56, y: R + 56 }, { x: R, y: R + 56 }];
+    tile.bounds = { minX: R, maxX: R + 56, minY: R, maxY: R + 56 };
+    AppState.setPolygons([tile]);
+    AppState.resetView();
+    assert.ok(state.polygons.length < 100000);
+});
+
+// ---- Empty board export (audit L1) -----------------------------------------------------------------
+
+test('empty infinite board, large canvas: the export still has tiles and a view', () => {
+    const state = AppState.getState();
+    const cases = [['triangle', 3840, 2160], ['square', 5120, 2880], ['hexagon', 5120, 2880]];
+    for (const [gridType, w, h] of cases) {
+        state.canvas = { width: w, height: h };
+        AppState.setPolygons(Geometry.generateGrid(config(gridType), state.canvas, null));
+        AppState.setView({ scale: 0.4, x: 0, y: 0 });
+        const scene = Infinite.exportScene(1000, 800);
+        assert.ok(scene.polygons.length > 0, `${gridType} exports tiles`);
+        assert.ok(scene.bounds && Number.isFinite(scene.view.scale) && scene.view.scale > 0, `${gridType} has a view`);
+    }
+});
+
+// ---- Undo across loaded tiles (audit M1) ------------------------------------------------------------
+
+test('undo un-paints tiles that were loaded after the snapshot, with their objects and start markers', () => {
+    const state = AppState.getState();
+    state.canvas = { width: CANVAS.width, height: CANVAS.height };
+    AppState.setPolygons(Geometry.generateGrid(config('square'), state.canvas, null));
+    AppState.resetHistory();
+    AppState.recordHistory(); // the blank board
+    AppState.setView({ scale: 1, x: -30000, y: -30000 }); // loads tiles the snapshot has never seen
+    const fresh = state.polygons.filter((p) => p.center.x > 29000 && p.center.y > 29000);
+    assert.ok(fresh.length > 10);
+    fresh[0].color = '#7CB342';
+    fresh[1].object = 'tree';
+    fresh[2].start = '#c62828';
+    fresh[3].color = '#E53935';
+    AppState.recordHistory();
+    const painted = fresh.slice(0, 4).map((p) => p.id);
+
+    AppState.restoreSnapshot(AppState.undo());
+    const after = new Map(state.polygons.map((p) => [p.id, p]));
+    for (const id of painted) {
+        const p = after.get(id);
+        assert.ok(p, `${id} is still loaded`);
+        assert.equal(Infinite.isPainted(p), false, `${id} is blank again`);
+        assert.equal(String(p.color).toLowerCase(), String(Config.DEFAULT_FILL).toLowerCase());
+        assert.equal(p.object, undefined);
+        assert.equal(p.start, undefined);
+    }
+    AppState.restoreSnapshot(AppState.redo());
+    const redone = new Map(state.polygons.map((p) => [p.id, p]));
+    assert.equal(redone.get(painted[0]).color, '#7CB342');
+    assert.equal(redone.get(painted[1]).object, 'tree');
+    assert.equal(redone.get(painted[2]).start, '#c62828');
+});
