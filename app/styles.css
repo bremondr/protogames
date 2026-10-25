@@ -2412,7 +2412,7 @@ kbd {
 /* Playtest layout: the board gives up room on every edge where a player sits */
 .workspace {
     --tray-band: 10.5rem;
-    --tray-band-collapsed: 3.1rem;
+    --tray-band-collapsed: 3.8rem;
 }
 
 .playtest .canvas-wrapper {
@@ -2475,6 +2475,7 @@ kbd {
     position: absolute;
     display: flex;
     gap: 0.5rem;
+    justify-content: center;
     pointer-events: none;
     height: calc(var(--band) - 1rem);
 }
@@ -2602,8 +2603,63 @@ kbd {
     transform: rotate(180deg);
 }
 
+/* A folded tray is one strip: name and fold button, the dice and the last result (the pieces are hidden) */
+.tray-seat.collapsed .tray {
+    max-width: 30rem;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.tray-seat.collapsed .tray-head {
+    flex: 0 0 auto;
+}
+
+.tray-seat.collapsed .tray-name {
+    flex: 0 1 auto;
+    max-width: 6rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .tray-seat.collapsed .tray-body {
+    flex: 1 1 0;
+    flex-direction: row;
+    align-items: center;
+    min-width: 0;
+}
+
+.tray-seat.collapsed .tray-pieces,
+.tray-seat.collapsed .tray-note {
     display: none;
+}
+
+.tray-seat.collapsed .tray-dice {
+    flex: 1 1 0;
+    flex-wrap: nowrap;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.tray-seat.collapsed .die {
+    flex: 0 0 auto;
+    min-width: 34px;
+    height: 30px;
+}
+
+.tray-seat.collapsed .roll-result {
+    position: sticky;
+    right: 0;
+    flex: 0 0 auto;
+    padding-left: 0.3rem;
+    background: #151b26;
+}
+
+.tray-seat.collapsed .roll-value {
+    font-size: 1.2rem;
 }
 
 .tray-body {
@@ -2751,7 +2807,12 @@ kbd {
 }
 
 @media (pointer: coarse) {
-    .die {
+    .workspace {
+        --tray-band-collapsed: 4.6rem;
+    }
+
+    .die,
+    .tray-seat.collapsed .die {
         min-width: 42px;
         height: 40px;
     }
@@ -2759,6 +2820,33 @@ kbd {
     .tray-toggle {
         width: 40px;
         height: 32px;
+    }
+}
+
+/* A landscape phone leaves a board a few hundred px high: no room for the minimap on top of the trays */
+@media (max-height: 520px) {
+    .playtest .minimap {
+        display: none;
+    }
+}
+
+/* Small screens: the dice are one row that scrolls sideways instead of wrapping into a tray that is not tall enough */
+@media (max-width: 760px), (max-height: 520px) {
+    .tray-dice {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .die {
+        flex: 0 0 auto;
+    }
+
+    .roll-result {
+        position: sticky;
+        right: 0;
+        background: #151b26;
+        padding-left: 0.3rem;
     }
 }
 
@@ -2773,6 +2861,42 @@ kbd {
 
     .roll-value {
         font-size: 1.4rem;
+    }
+
+    .tray-seat.collapsed .tray-name {
+        display: none;
+    }
+
+    /* The pill stays between the left edge of the board and the full-screen button instead of running under it */
+    .playtest .playtest-pill {
+        max-width: calc(100% - 5.5rem - var(--tray-left, 0px) - var(--tray-right, 0px));
+    }
+
+    .playtest-pill {
+        flex-wrap: wrap;
+        row-gap: 6px;
+        border-radius: 20px;
+    }
+
+    .playtest-pill strong {
+        display: none;
+    }
+
+    /* The zoom buttons wrap into two rows rather than spill over a narrow board and the trays beside it */
+    .playtest .zoom-controls {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        max-width: calc(100% - 2rem - var(--tray-left, 0px) - var(--tray-right, 0px));
+    }
+
+    .playtest .minimap {
+        bottom: calc(1rem + 84px + var(--tray-bottom, 0px));
+    }
+
+    .playtest-pill .muted {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
 }
 

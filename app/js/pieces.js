@@ -334,10 +334,33 @@ const Pieces = (() => {
     const labelCache = new WeakMap();
 
     /**
+     * Column and row of a tile of an infinite board, counted from its origin tile, read from the tile id
+     * (inf_hp_q_r, inf_hf_q_r, inf_s_x_y, inf_t_i_j_up|down) so it does not depend on which tiles are loaded.
+     * Columns follow the tile centres left to right (hex rows and triangle rows are offset half a step),
+     * rows top to bottom. Null for any other id.
+     */
+    function latticeCell(id) {
+        const m = /^inf_(hp|hf|s|t)_(-?\d+)_(-?\d+)(?:_(up|down))?$/.exec(String(id));
+        if (!m || (m[1] === 't') !== Boolean(m[4])) return null;
+        const a = Number(m[2]);
+        const b = Number(m[3]);
+        switch (m[1]) {
+            case 'hp': return { column: Math.floor(a + b / 2), row: b };
+            case 'hf': return { column: a, row: Math.floor(b + a / 2) };
+            case 's': return { column: a, row: b };
+            default: return { column: 2 * a + b + (m[4] === 'up' ? 1 : 0), row: b };
+        }
+    }
+
+    /**
      * "column 4, row 3" for a tile: its place among the distinct centre positions of the board, which
-     * reads naturally on every grid and is what a screen reader announces after a move.
+     * reads naturally on every grid and is what a screen reader announces after a move. On an infinite
+     * board the loaded tiles come and go while panning, so the place is the tile's lattice position
+     * counted from the origin tile instead ("column -2, row 5"); it never changes.
      */
     function tileLabel(polygons, polygon) {
+        const cell = latticeCell(polygon.id);
+        if (cell) return `column ${cell.column}, row ${cell.row}`;
         let axes = labelCache.get(polygons);
         if (!axes) {
             const unique = (values) => [...new Set(values.map((v) => Math.round(v * 2) / 2))].sort((a, b) => a - b);
@@ -352,5 +375,13 @@ const Pieces = (() => {
         return `column ${nearest(axes.xs, polygon.center.x) + 1}, row ${nearest(axes.ys, polygon.center.y) + 1}`;
     }
 
-    return { SIZE_FACTOR, tileSize, pieceSize, offsets, placements, hitTest, sorted, shade, draw, drawAll, iconUrl, neighborInDirection, tileLabel, polygonMap };
+    /** The label of a tile by id, also for a tile of an infinite board that is not loaded right now; null when unknown. */
+    function tileLabelById(polygons, id) {
+        const polygon = polygonMap(polygons).get(id);
+        if (polygon) return tileLabel(polygons, polygon);
+        const cell = latticeCell(id);
+        return cell ? `column ${cell.column}, row ${cell.row}` : null;
+    }
+
+    return { SIZE_FACTOR, tileSize, pieceSize, offsets, placements, hitTest, sorted, shade, draw, drawAll, iconUrl, neighborInDirection, tileLabel, tileLabelById, latticeCell, polygonMap };
 })();
