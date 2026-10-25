@@ -36,7 +36,10 @@ const ExportDialog = (() => {
     // ---- Settings ---------------------------------------------------------------------------------
 
     function loadSaved(key) {
-        try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (e) { return {}; }
+        try {
+            const value = JSON.parse(localStorage.getItem(key) || '{}');
+            return value !== null && typeof value === 'object' && !Array.isArray(value) ? value : {};
+        } catch (e) { return {}; }
     }
 
     /** Remembers the print settings between sessions; textures follow the board view instead. */

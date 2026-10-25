@@ -31,22 +31,25 @@ const Print = (() => {
         objects: 'board', // 'board' | 'tokens' | 'both'
         textures: true,
         labels: true,
+        startOutlines: true, // the coloured outline of a start tile; follows this switch in every mode
         legend: false, // list the terrains (and objects) used, with their names
         legendPlace: 'sheet' // single sheet: 'sheet' (below the board) | 'page' (separate page)
     };
     const LEGEND = { colW: 64, rowH: 10, head: 11, swatch: 7 };
     const TOKEN_GAP_MM = 3;
     const PAGE_DPI = 200;
+    const FIT_SLACK_MM = 0.01;
     const MAX_SHEET_PX = 9000;
     const MAX_CANVAS_PX = 16 * 1024 * 1024; // iOS Safari refuses canvases above ~16.7 million pixels
     const MAX_PAGES = 300;
+    const MAX_PDF_PAGE_MM = 5080; // 14,400 pt: the page size some PDF viewers (Acrobat, Preview) refuse to open above
 
     // ---- Board source and scale ---------------------------------------------------------
 
     function sourcePolygons() {
         const s = AppState.getState();
         if (!s.canvas || !s.polygons.length) return [];
-        if (typeof Infinite !== 'undefined' && Infinite.isActive()) return Infinite.exportScene(s.canvas.width, s.canvas.height).polygons;
+        if (typeof Infinite !== 'undefined' && Infinite.isActive()) return Renderer.exportScene(s.canvas.width, s.canvas.height).polygons;
         return s.polygons;
     }
 
@@ -83,10 +86,13 @@ const Print = (() => {
 
     // ---- Legend ---------------------------------------------------------------------------
 
+    /** hex -> name. A colour shared by two palettes (#C62828) takes its name from the board's own palette first. */
     function terrainLabels() {
         const map = new Map();
-        const palettes = typeof Config.getAllPalettes === 'function' ? Config.getAllPalettes() : Config.COLOR_PALETTES;
-        (palettes || []).forEach((p) => (p.colors || []).forEach((c) => { const k = String(c.hex).toLowerCase(); if (!map.has(k)) map.set(k, c.label); }));
+        const all = (typeof Config.getAllPalettes === 'function' ? Config.getAllPalettes() : Config.COLOR_PALETTES) || [];
+        const activeId = typeof AppState !== 'undefined' ? AppState.getState().currentPaletteId : null;
+        const palettes = [...all.filter((p) => p.id === activeId), ...all.filter((p) => p.id !== activeId)];
+        palettes.forEach((p) => (p.colors || []).forEach((c) => { const k = String(c.hex).toLowerCase(); if (!map.has(k)) map.set(k, c.label); }));
         return map;
     }
 
@@ -125,8 +131,9 @@ const Print = (() => {
     }
 
     function pagesAlong(length, printable, overlap) {
-        if (length <= printable) return 1;
-        return Math.ceil((length - printable) / (printable - overlap)) + 1;
+        // 0.01 mm of slack, as in the sheet layout: float noise must not turn an exact fit into a second page.
+        if (length <= printable + FIT_SLACK_MM) return 1;
+        return Math.ceil((length - printable - FIT_SLACK_MM) / (printable - overlap)) + 1;
     }
 
     function tiledLayout(b, s) {
@@ -169,8 +176,8 @@ const Print = (() => {
             paperW = landscape ? h : w; paperH = landscape ? w : h; name = s.sheet;
         }
         const printW = paperW - mg * 2, printH = paperH - mg * 2;
-        const fits = b.wMm <= printW + 0.01 && b.hMm + band <= printH + 0.01;
-        const boardFits = b.wMm <= printW + 0.01 && b.hMm <= printH + 0.01;
+        const fits = b.wMm <= printW + FIT_SLACK_MM && b.hMm + band <= printH + FIT_SLACK_MM;
+        const boardFits = b.wMm <= printW + FIT_SLACK_MM && b.hMm <= printH + FIT_SLACK_MM;
         return { paperW, paperH, name, printW, printH, fits, boardFits, band, pages: [{ label: 'Sheet', x0: -(printW - b.wMm) / 2, y0: -(printH - band - b.hMm) / 2 }] };
     }
 
@@ -183,6 +190,12 @@ const Print = (() => {
         const perPage = cols * rows;
         const count = b.tokens.length;
         return { paperW: w, paperH: h, cols, rows, perPage, count, pages: perPage > 0 ? Math.ceil(count / perPage) : 0 };
+    }
+
+    /** Pixel size of a page at a resolution, rounded down so the 16 MP cap still holds after rounding. */
+    function pageSurfaceSize(wMm, hMm, dpi) {
+        const k = dpi / 25.4;
+        return { pxW: Math.max(1, Math.floor(wMm * k)), pxH: Math.max(1, Math.floor(hMm * k)) };
     }
 
     /** Resolution for a page of this size: PAGE_DPI, lowered so one canvas stays within the browser limits. */
@@ -206,6 +219,7 @@ const Print = (() => {
         s.objects = oneOf(s.objects, ['board', 'tokens', 'both'], DEFAULTS.objects);
         s.legendPlace = oneOf(s.legendPlace, ['sheet', 'page'], DEFAULTS.legendPlace);
         for (const key of ['cropMarks', 'textures', 'labels', 'legend']) s[key] = Boolean(s[key]);
+        if (typeof s.startOutlines !== 'boolean') s.startOutlines = DEFAULTS.startOutlines; // settings saved before the switch existed
         s.tileMm = num(s.tileMm, 5, 200, DEFAULTS.tileMm);
         s.marginMm = num(s.marginMm, 0, 30, DEFAULTS.marginMm);
         s.overlapMm = num(s.overlapMm, 0, 30, DEFAULTS.overlapMm);
@@ -225,9 +239,7 @@ const Print = (() => {
         if (s.legend && !entries.length) warnings.push(warning('Nothing is painted yet, so the legend would be empty.'));
         let legendOnSheet = s.mode === 'sheet' && s.legendPlace === 'sheet' && entries.length > 0;
         let layout = s.mode === 'sheet' ? sheetLayout(b, s, legendOnSheet ? entries.length : 0) : tiledLayout(b, s);
-        if (legendOnSheet && layout && !layout.fits && layout.boardFits === false) {
-            // keep the board warning below
-        } else if (legendOnSheet && layout && !layout.fits) {
+        if (legendOnSheet && layout && !layout.fits) {
             warnings.push(warning(`The legend does not fit on ${layout.name} below the board, so it goes on a separate page.`));
             legendOnSheet = false;
             layout = sheetLayout(b, s, 0);
@@ -253,6 +265,8 @@ const Print = (() => {
         if (layout && s.mode === 'sheet') {
             const dpi = pageDpi(layout.paperW, layout.paperH);
             if (dpi < PAGE_DPI - 1) warnings.push(warning(`This sheet is too large to print at full resolution; it will be made at about ${Math.round(dpi)} dpi.`));
+            const longSide = Math.max(layout.paperW, layout.paperH);
+            if (longSide > MAX_PDF_PAGE_MM) warnings.push(warning(`This sheet is ${fmt(longSide)} on its long side; some PDF viewers cannot open pages this large. Use smaller tiles if the file will not open.`));
         }
         return { settings: s, board: b, layout, tokens, legend, boardPages, pageCount, warnings, blocked: warnings.some((w) => w.blocking), measureLabel: measureLabel(b.type), sizeText: `${fmt(b.wMm)} × ${fmt(b.hMm)}` };
     }
@@ -269,8 +283,8 @@ const Print = (() => {
     /** A canvas and its 2D context, or a clear error when the browser refuses (too large, out of memory). */
     function createSurface(w, h) {
         const c = document.createElement('canvas');
-        c.width = Math.max(1, Math.round(w));
-        c.height = Math.max(1, Math.round(h));
+        c.width = Math.max(1, Math.floor(w));
+        c.height = Math.max(1, Math.floor(h));
         const ctx = c.getContext('2d');
         if (!ctx) throw new Error('The browser could not allocate a drawing surface this large. Pick a smaller sheet or smaller tiles.');
         return { c, ctx };
@@ -284,18 +298,20 @@ const Print = (() => {
             x: -(b.bounds.minX * b.mmPerWorld + region.x0) * pxPerMm,
             y: -(b.bounds.minY * b.mmPerWorld + region.y0) * pxPerMm
         };
-        const polygons = s.objects === 'tokens' ? b.polygons.map((p) => (p.object ? { ...p, object: undefined } : p)) : b.polygons;
-        withTextures(s.textures, () => Renderer.paint(ctx, { polygons, width: c.width, height: c.height, view }));
+        // Tokens-only hides the objects, but start outlines follow their own switch.
+        withTextures(s.textures, () => Renderer.paint(ctx, { polygons: b.polygons, width: c.width, height: c.height, view, showObjects: s.objects !== 'tokens', showStartMarkers: s.startOutlines }));
         return c;
     }
 
     function newPage(wMm, hMm, dpi) {
-        const k = Math.min(dpi, pageDpi(wMm, hMm)) / 25.4;
-        const { c, ctx } = createSurface(wMm * k, hMm * k);
+        const used = Math.min(dpi, pageDpi(wMm, hMm));
+        const size = pageSurfaceSize(wMm, hMm, used);
+        const { c, ctx } = createSurface(size.pxW, size.pxH);
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, c.width, c.height);
-        ctx.scale(k, k); // draw in mm from here on
-        return { c, ctx, k };
+        // Scaled per axis: flooring the size must not shift the right and bottom edges by a pixel.
+        ctx.scale(c.width / wMm, c.height / hMm); // draw in mm from here on
+        return { c, ctx, k: used / 25.4 };
     }
 
     function text(ctx, str, x, y, size, weight = 400, color = '#333', align = 'left') {
@@ -331,17 +347,31 @@ const Print = (() => {
         return c;
     }
 
-    function cropMarks(ctx, x, y, w, h, mg) {
-        const len = Math.min(6, mg - 1), gap = 1.5;
-        if (len <= 1) return;
+    /**
+     * Corner marks around a board at (x, y) of size w x h, as [x1, y1, x2, y2] segments in mm. Each mark is as long
+     * as the free space on its own axis allows (at most 6 mm) and stops short of `area` (the page, or the legend).
+     */
+    function cropMarkLines(x, y, w, h, area) {
+        const gap = 1.5, clear = 0.5, maxLen = 6, minLen = 1;
+        const lines = [];
+        const mark = (x1, y1, dx, dy, free) => {
+            const len = Math.min(maxLen, free - gap - clear);
+            if (len >= minLen) lines.push([x1 + dx * gap, y1 + dy * gap, x1 + dx * (gap + len), y1 + dy * (gap + len)]);
+        };
+        for (const [cx, cy, dx, dy] of [[x, y, -1, -1], [x + w, y, 1, -1], [x, y + h, -1, 1], [x + w, y + h, 1, 1]]) {
+            mark(cx, cy, dx, 0, dx < 0 ? cx - area.x0 : area.x1 - cx);
+            mark(cx, cy, 0, dy, dy < 0 ? cy - area.y0 : area.y1 - cy);
+        }
+        return lines;
+    }
+
+    function cropMarks(ctx, x, y, w, h, area) {
+        const lines = cropMarkLines(x, y, w, h, area);
+        if (!lines.length) return;
         ctx.save();
         ctx.lineWidth = 0.2;
         ctx.strokeStyle = '#000';
-        const line = (x1, y1, x2, y2) => { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); };
-        for (const [cx, cy, dx, dy] of [[x, y, -1, -1], [x + w, y, 1, -1], [x, y + h, -1, 1], [x + w, y + h, 1, 1]]) {
-            line(cx + dx * gap, cy, cx + dx * (gap + len), cy);
-            line(cx, cy + dy * gap, cx, cy + dy * (gap + len));
-        }
+        for (const [x1, y1, x2, y2] of lines) { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); }
         ctx.restore();
     }
 
@@ -352,7 +382,7 @@ const Print = (() => {
         const page = layout.pages[0];
         const img = renderRegion(b, s, { x0: page.x0, y0: page.y0, w: layout.printW, h: layout.printH }, k);
         ctx.drawImage(img, mg, mg, layout.printW, layout.printH);
-        if (s.cropMarks) cropMarks(ctx, mg - page.x0, mg - page.y0, b.wMm, b.hMm, mg - page.x0);
+        if (s.cropMarks) cropMarks(ctx, mg - page.x0, mg - page.y0, b.wMm, b.hMm, { x0: 0, y0: 0, x1: layout.paperW, y1: images ? mg + layout.printH - layout.band + 4 : layout.paperH });
         if (images) drawLegend(ctx, p.legend.entries, images, mg, mg + layout.printH - layout.band + 4, layout.printW, 'Legend');
         return c;
     }
@@ -600,5 +630,5 @@ const Print = (() => {
         return p;
     }
 
-    return { PAPERS, DEFAULTS, plan, drawPreview, toPdf, buildPdf, normalize, rowName };
+    return { PAPERS, DEFAULTS, plan, drawPreview, toPdf, buildPdf, normalize, rowName, pageSurfaceSize, pageDpi, cropMarkLines };
 })();
