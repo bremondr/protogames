@@ -250,3 +250,78 @@ test('the landing page and the app folder (which holds data/, the country outlin
     for (const name of ['index.html', 'landing.js', 'app']) assert.ok(Site.APP_PATHS.includes(name), name);
     for (const name of ['tests', 'scripts', 'docs', '.github', 'dev']) assert.ok(!Site.APP_PATHS.includes(name), `${name} is not part of the app`);
 });
+
+// ---- Skipping, the cap and the build summary --------------------------------------------------------------------
+
+test('references of a page: local scripts, styles and images only, resolved from the page', () => {
+    const html = '<!-- <script src="old.js"></script> -->\n<link rel="icon" href="images/a b.png?v=2"><link href=\'css/x.css\' rel=stylesheet>\n<script defer src=js/a.js></script><script src="https://cdn.example/x.js"></script><script src="/abs.js"></script>\n<img src="data:image/png;base64,AA"><img alt="x" src="../up.png"><a href="app/">not a file</a><script>inline()</script>';
+    assert.deepEqual(Site.localReferences(html, 'app/index.html').sort(), ['app/css/x.css', 'app/images/a b.png', 'app/js/a.js', 'up.png']);
+    assert.deepEqual(Site.missingReferences(html, 'app/index.html', ['app/js/a.js', 'up.png']).sort(), ['app/css/x.css', 'app/images/a b.png']);
+});
+
+/** Unreferenced commits made from HEAD: `remove` lists paths (files or folders) left out. Needs git, but no identity from the machine. */
+function commitWithout(remove) {
+    const identity = { GIT_AUTHOR_NAME: 'test', GIT_AUTHOR_EMAIL: 'test@example.com', GIT_COMMITTER_NAME: 'test', GIT_COMMITTER_EMAIL: 'test@example.com' };
+    const indexDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-index-'));
+    const env = { ...process.env, ...identity, GIT_INDEX_FILE: path.join(indexDir, 'index') };
+    const run = (args) => execFileSync('git', args, { cwd: ROOT, env }).toString().trim();
+    try {
+        run(['read-tree', 'HEAD']);
+        for (const entry of remove) run(['rm', '-r', '-q', '--cached', '--ignore-unmatch', '--', entry]);
+        return run(['commit-tree', run(['write-tree']), '-m', 'test']);
+    } finally {
+        fs.rmSync(indexDir, { recursive: true, force: true });
+    }
+}
+
+const withQuietBuild = (previews, options = {}) => {
+    const out = fs.mkdtempSync(path.join(os.tmpdir(), 'pg-site-'));
+    const warn = console.warn;
+    const warnings = [];
+    try {
+        console.warn = (message) => warnings.push(message);
+        const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT }).toString().trim();
+        const summary = Site.build({ out, main: head, previews: previews(head), ...options });
+        return { summary, warnings, list: fs.readFileSync(path.join(out, 'preview', 'index.html'), 'utf8'), folders: fs.readdirSync(path.join(out, 'preview')).sort() };
+    } finally {
+        console.warn = warn;
+        fs.rmSync(out, { recursive: true, force: true });
+    }
+};
+
+test('the summary says for every pull request whether its preview was built, and why not', () => {
+    const oldLayout = commitWithout(['app']);
+    const noJs = commitWithout(['app/js']);
+    const noLanding = commitWithout(['index.html']);
+    const { summary, warnings, list, folders } = withQuietBuild((head) => [
+        { number: 1, ref: oldLayout }, { number: 2, ref: noJs }, { number: 3, ref: noLanding },
+        { number: 4, ref: 'refs/previews/does-not-exist' }, { number: 5, ref: head }, { number: 6, ref: head, isCrossRepository: true }
+    ]);
+    const by = Object.fromEntries(summary.results.map((r) => [r.number, r]));
+    assert.deepEqual(summary.results.map((r) => [r.number, r.status]), [[1, 'skipped'], [2, 'skipped'], [3, 'skipped'], [4, 'skipped'], [5, 'built']], 'a fork is not in the summary');
+    assert.match(by[1].reason, /rebase on main, the app moved to app\//);
+    assert.match(by[2].reason, /missing from the head \(app\/js\/[^)]*and \d+ more\), rebase on main/, 'a head without js/ is not published with blank pages');
+    assert.match(by[3].reason, /no landing page/);
+    assert.match(by[4].reason, /could not be fetched/);
+    assert.equal(by[5].sha.length, 7);
+    assert.deepEqual(summary.skipped, [1, 2, 3, 4]);
+    assert.deepEqual(summary.previews.map((p) => p.name), ['pr-5']);
+    assert.ok(warnings.some((w) => w.includes('pr-2') && w.includes('app/js/')), 'the warning names the missing files');
+    assert.deepEqual(folders, ['index.html', 'pr-5'], 'only the preview that was built is published');
+    assert.ok(list.includes('pr-5/') && !list.includes('pr-2/'), 'no link to a preview that does not exist');
+});
+
+test('the cap counts built previews, so skipped pull requests do not use up a place', () => {
+    const oldLayout = commitWithout(['app']);
+    const { summary } = withQuietBuild((head) => [
+        { number: 10, ref: oldLayout }, { number: 11, ref: head }, { number: 12, ref: oldLayout }, { number: 13, ref: head }, { number: 14, ref: head }
+    ], { limit: 2 });
+    assert.deepEqual(summary.results.map((r) => [r.number, r.status]), [[10, 'skipped'], [11, 'built'], [12, 'skipped'], [13, 'built'], [14, 'over-cap']]);
+    assert.match(summary.results[4].reason, /only the newest 2 previews/);
+    assert.deepEqual(summary.previews.map((p) => p.name), ['pr-11', 'pr-13']);
+});
+
+test('text taken from a pull request cannot add markup to the comment', () => {
+    const { summary } = withQuietBuild(() => [{ number: 1, ref: commitWithout(['app/js']) }]);
+    assert.ok(!/[<>`\n*[\]]/.test(summary.results[0].reason));
+});
