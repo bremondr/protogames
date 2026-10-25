@@ -5,14 +5,26 @@
  * once the DOM is ready.
  */
 const Main = (() => {
-    const debouncedResize = Utils.debounce(() => {
-        Renderer.resizeCanvas();
+    /**
+     * The canvas follows its container. Only a canvas of a new size needs the board laid out again; the
+     * synthetic resize that playtest and focus mode dispatch (and a resize that changes nothing) just
+     * redraws, so zoom and pan stay. The regeneration is not a user edit, so an unsaved change stays unsaved.
+     */
+    function handleResize() {
+        const size = Renderer.resizeCanvas();
+        if (size && !size.changed) {
+            Renderer.renderBoard();
+            return;
+        }
+        const wasDirty = AppState.getState().isDirty;
         Interactions.generateBoard(AppState.getState().boardConfig, {
             preserveColors: true,
             preserveHistory: true,
             skipDirtyFlag: true
         });
-    }, 250);
+        if (wasDirty) AppState.markDirty();
+    }
+    const debouncedResize = Utils.debounce(handleResize, 250);
 
     function initializeApp() {
         UI.init();
@@ -77,6 +89,7 @@ const Main = (() => {
     document.addEventListener('DOMContentLoaded', initializeApp);
 
     return {
-        startBoard
+        startBoard,
+        handleResize
     };
 })();
