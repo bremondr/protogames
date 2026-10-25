@@ -29,7 +29,9 @@ function fresh({ storage = makeStorage() } = {}) {
     const document = {
         createElement: () => { const el = makeElement(); calls.modals.push(el); return el; },
         body: { appendChild() {} },
-        getElementById: () => null
+        getElementById: () => null,
+        addEventListener() {},
+        removeEventListener() {}
     };
     const app = loadApp(['app/js/config.js', 'app/js/utils.js', 'app/js/projectFormat.js', 'app/js/projectLibrary.js', 'app/js/viewMath.js', 'app/js/state.js', 'app/js/focusUtils.js', 'app/js/fileManager.js'], {
         document,
