@@ -316,4 +316,19 @@ test('taking back a fill on a pinch restores the redo branch', () => {
     env.Interactions.cancelStroke();
     assert.equal(env.state.history.length, 2);
     assert.ok(env.AppState.redo(), 'redo is available again');
+
+test('undo and redo are autosaved like any other change', () => {
+    const env = fresh();
+    press(env, 0);
+    release(env, 0);
+    env.state.isDirty = false;
+    const saves = env.calls.saves;
+    env.Interactions.undo();
+    assert.equal(env.calls.saves, saves + 1, 'undo saves');
+    assert.equal(env.state.isDirty, true, 'and marks the board changed');
+    env.Interactions.redo();
+    assert.equal(env.calls.saves, saves + 2, 'redo saves');
+    env.Interactions.undo();
+    env.Interactions.undo();
+    assert.equal(env.calls.saves, saves + 3, 'an undo with nothing left to undo does not save');
 });

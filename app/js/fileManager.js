@@ -13,6 +13,21 @@ const FileManager = (() => {
         ui = uiRefs;
         ui?.loadInput?.addEventListener('change', handleFileUpload);
         wireProjectPanel();
+        window.addEventListener?.('storage', handleStorageEvent);
+        recoverLegacyProjects();
+    }
+
+    /** Turns the autosaves of older versions into projects (once) and says so, or says that some could not be kept. */
+    function recoverLegacyProjects() {
+        let problems = 0;
+        const recovered = ProjectLibrary.importLegacy((count) => { problems = count; });
+        if (recovered > 0) {
+            UI?.showNotification(`${recovered} earlier autosave${recovered === 1 ? ' was' : 's were'} recovered. Find ${recovered === 1 ? 'it' : 'them'} under Load…`, 8000);
+        }
+        if (problems > 0) {
+            UI?.showNotification(`${problems} earlier autosave${problems === 1 ? '' : 's'} could not be copied because browser storage is full; ${problems === 1 ? 'it was' : 'they were'} left where ${problems === 1 ? 'it is' : 'they are'}.`, 8000);
+        }
+        return recovered;
     }
 
     function wireProjectPanel() {
@@ -54,10 +69,16 @@ const FileManager = (() => {
         try { history.replaceState(null, '', location.pathname + (id ? `?project=${encodeURIComponent(id)}` : '')); } catch (error) { /* sandboxed frame */ }
     }
 
-    /** Saves the open project and lets go of it, so the board can be replaced without touching its saved copy. */
+    /**
+     * Saves the open project (when it changed) and lets go of it, so the board can be replaced without touching its
+     * saved copy. Whether the board that comes next can be saved is found out by its own first save.
+     */
     function detachProject() {
-        autoSaveToLocalStorage(true);
+        autoSaveToLocalStorage();
         AppState.setProjectId(null);
+        tracked = { id: null, raw: null };
+        saveFailed = false;
+        paused = false;
     }
 
     /** Makes the board on screen a project of its own in the library, named `name`, and saves it. Returns its id. */
@@ -103,6 +124,9 @@ const FileManager = (() => {
             return false;
         }
         AppState.setProjectId(id);
+        tracked = { id, raw };
+        saveFailed = false;
+        paused = false;
         syncProjectPanel();
         return true;
     }
@@ -123,9 +147,26 @@ const FileManager = (() => {
     /** True when the board holds painted tiles, objects, start markers or players the user could lose. */
     function hasUserWork() {
         const state = AppState.getState();
-        return state.players.length > 0 || state.polygons.some(
-            (polygon) => polygon.object || polygon.start || (polygon.color && polygon.color !== Config.DEFAULT_TILE_COLOR)
-        );
+        return state.players.length > 0 || state.polygons.some(isPainted);
+    }
+
+    /** True when the board cannot be trusted to be in the browser's storage: the last save failed, or saving is off. */
+    function workAtRisk() {
+        return (saveFailed || !AppState.getState().autoSaveEnabled) && hasUserWork();
+    }
+
+    /**
+     * Runs `proceed` once it is safe to replace the open board: at once when its work is saved (or there is none),
+     * after a confirmation when the last save failed. `onCancel` runs when the person decides to keep the board.
+     */
+    function guardReplace(proceed, onCancel) {
+        if (!paused) autoSaveToLocalStorage(saveFailed);
+        if (!workAtRisk()) { proceed(); return; }
+        confirmReplace(proceed, {
+            message: 'This board could not be saved in this browser, so replacing it loses the work on it. Save it to a file first if you want to keep it.',
+            confirmLabel: 'Replace anyway',
+            onCancel
+        });
     }
 
     /**
@@ -134,6 +175,8 @@ const FileManager = (() => {
      * colors and objects carried over by tile id. Returns true when it opened.
      */
     async function openShowcase(id) {
+        // Asked before the download, so a person who keeps the board does not wait for nothing.
+        if (!await new Promise((resolve) => guardReplace(() => resolve(true), () => resolve(false)))) return false;
         const entry = Config.SHOWCASES.find((item) => item.id === id);
         if (!entry) {
             showMessage('Showcase not found', 'There is no showcase board with this name.');
@@ -195,35 +238,118 @@ const FileManager = (() => {
         };
     }
 
+    const FULL_MESSAGE = 'Auto-save failed: browser storage is full. Delete projects you no longer need on the home page, or save this one to a file so you do not lose work.';
+    const UNAVAILABLE_MESSAGE = 'Browser storage is not available, so your work is not being saved. Save it to a file so you do not lose it.';
+
+    let saveFailed = false;       // the last save of the open project did not happen
+    let failureReported = false;  // the notice for the current run of failures is out
+    let paused = false;           // another tab changed the project: nothing is written until the person chooses
+    let conflictOpen = false;
+    // The stored text of the open project as this tab last read or wrote it; a different text in storage came from elsewhere.
+    let tracked = { id: null, raw: null };
+
+    /** Every stroke and the 30 s timer retry the save, so the warning is shown once until a save works again. */
+    function noteSaveFailure(error) {
+        saveFailed = true;
+        console.error('Auto-save error:', error);
+        if (failureReported) return;
+        failureReported = true;
+        const full = error && (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED');
+        UI?.showNotification(full ? FULL_MESSAGE : UNAVAILABLE_MESSAGE, 8000);
+    }
+
+    /**
+     * Writes the open project into the library. Returns true when it was written, false when it was not (nothing
+     * to save, or it failed: a failure is reported once and remembered, see workAtRisk).
+     */
     function autoSaveToLocalStorage(force = false) {
         const state = AppState.getState();
-        if (!state.autoSaveEnabled) return;
-        if (!state.polygons.length) return;
+        if (!state.autoSaveEnabled) return false;
+        if (!state.polygons.length) return false;
         // Nothing is saved before the project has a name and an id (see startNewProject).
-        if (!state.currentProjectId) return;
-        if (!force && !state.isDirty) return;
+        if (!state.currentProjectId) return false;
+        if (!force && !state.isDirty) return false;
+        if (paused) { offerConflictChoice(); return false; }
 
+        const id = state.currentProjectId;
         try {
             // Inside the try: with storage blocked, even reading window.localStorage throws.
-            if (!window.localStorage) return;
+            if (!window.localStorage) throw new Error('No storage.');
+            const stored = ProjectLibrary.readStrict(id);
+            if (tracked.id === id && tracked.raw !== null) {
+                if (stored === null) { projectLost(); return false; }
+                if (stored !== tracked.raw) { paused = true; offerConflictChoice(); return false; }
+            }
             const payload = ProjectFormat.createAutosave({
                 projectName: state.currentProjectName || Config.DEFAULT_PROJECT_NAME,
                 appState: serializeAppState()
             });
-            ProjectLibrary.write(state.currentProjectId, payload);
+            tracked = { id, raw: ProjectLibrary.write(id, payload) };
             AppState.clearDirty();
-            quotaWarned = false;
+            saveFailed = false;
+            failureReported = false;
+            return true;
         } catch (error) {
-            // Every stroke and the 30 s timer retry the save, so the warning is shown once until a save works again.
-            if (error && error.name === 'QuotaExceededError' && !quotaWarned) {
-                quotaWarned = true;
-                UI?.showNotification('Auto-save failed: browser storage is full. Delete projects you no longer need on the home page, or save this one to a file so you do not lose work.', 8000);
-            }
-            console.error('Auto-save error:', error);
+            noteSaveFailure(error);
+            return false;
         }
     }
 
-    let quotaWarned = false;
+    /** Looks at the stored copy of the open project after another tab touched storage. */
+    function handleStorageEvent(event) {
+        const id = AppState.getState().currentProjectId;
+        if (!id || (event && event.key && event.key !== ProjectLibrary.KEY_PREFIX + id)) return;
+        if (tracked.id !== id || tracked.raw === null) return;
+        let stored;
+        try { stored = ProjectLibrary.readStrict(id); } catch (error) { return; }
+        if (stored === null) projectLost();
+        else if (stored !== tracked.raw) { paused = true; offerConflictChoice(); }
+    }
+
+    function offerConflictChoice() {
+        if (conflictOpen) return;
+        conflictOpen = true;
+        saveFailed = true;
+        presentChoice({
+            title: 'This project was changed in another tab',
+            message: 'It was saved from another tab or window since you opened it here. This tab does not save until you choose.',
+            primaryLabel: "Keep this tab's version",
+            secondaryLabel: 'Load the other version',
+            onPrimary: () => {
+                conflictOpen = false;
+                try { tracked = { id: tracked.id, raw: ProjectLibrary.readStrict(tracked.id) }; } catch (error) { /* the save below reports it */ }
+                paused = false;
+                autoSaveToLocalStorage(true);
+            },
+            onSecondary: () => {
+                conflictOpen = false;
+                const id = AppState.getState().currentProjectId;
+                // Detached first, so opening the other copy does not write this board over it.
+                AppState.setProjectId(null);
+                paused = false;
+                if (!openStoredProject(id)) { AppState.setProjectId(id); paused = true; }
+            },
+            onDismiss: () => { conflictOpen = false; }
+        });
+    }
+
+    /** The open project is gone from the library (deleted elsewhere): let go of it so the next save does not bring it back. */
+    function projectLost() {
+        const name = AppState.getState().currentProjectName;
+        AppState.setProjectId(null);
+        tracked = { id: null, raw: null };
+        saveFailed = true;
+        paused = false;
+        setAddress(null);
+        presentChoice({
+            title: 'This project was deleted',
+            message: 'It was deleted from this browser in another tab or window, so this board is no longer saved. Save it again as a new project, or keep working without saving and use "Save to file".',
+            primaryLabel: 'Save as a new project',
+            secondaryLabel: 'Keep it unsaved',
+            onPrimary: () => registerNewProject(name),
+            onSecondary: () => {}
+        });
+    }
 
     let modalCount = 0;
     /** Settles when the message on screen (if any) is dismissed, so a follow-up dialog does not stack on top of it. */
@@ -361,6 +487,38 @@ const FileManager = (() => {
         });
     }
 
+    /** A dialog with two answers that are both actions. Escape and a click outside only close it (`onDismiss`). */
+    function presentChoice({ title, message, primaryLabel, secondaryLabel, onPrimary, onSecondary, onDismiss }) {
+        const modal = document.createElement('div');
+        modal.className = 'modal-backdrop';
+        modal.innerHTML = `
+            <div class="modal">
+                <h3></h3>
+                <p></p>
+                <div class="modal-actions">
+                    <button type="button" class="secondary-button" data-action="secondary"></button>
+                    <button type="button" class="primary-button" data-action="primary"></button>
+                </div>
+            </div>
+        `;
+        modal.querySelector('h3').textContent = title;
+        modal.querySelector('p').textContent = message;
+        modal.querySelector('[data-action="primary"]').textContent = primaryLabel;
+        modal.querySelector('[data-action="secondary"]').textContent = secondaryLabel;
+        const close = presentModal(modal, { initialFocus: modal.querySelector('[data-action="primary"]'), onEscape: () => decide(null), role: 'alertdialog' });
+        function decide(action) {
+            close();
+            if (action === 'primary') onPrimary();
+            else if (action === 'secondary') onSecondary();
+            else if (onDismiss) onDismiss();
+        }
+        modal.addEventListener('click', (event) => {
+            const button = event.target.closest('button[data-action]');
+            if (!button && event.target !== modal) return;
+            decide(button ? button.dataset.action : null);
+        });
+    }
+
     function saveProjectFile() {
         const state = AppState.getState();
         if (!state.polygons.length) {
@@ -377,16 +535,14 @@ const FileManager = (() => {
 
     /** Goes to a blank board that asks for a name (the open project is saved first). */
     function startAnotherProject() {
-        autoSaveToLocalStorage(true);
-        location.assign(location.pathname);
+        guardReplace(() => location.assign(location.pathname));
     }
 
     /** Opens another project of the library in this tab; the open one is saved first. */
     function openProjectById(id) {
         if (!ProjectLibrary.isValidId(id)) return;
         if (id === AppState.getState().currentProjectId) return;
-        autoSaveToLocalStorage(true);
-        location.assign(`${location.pathname}?project=${encodeURIComponent(id)}`);
+        guardReplace(() => location.assign(`${location.pathname}?project=${encodeURIComponent(id)}`));
     }
 
     function downloadProject() {
@@ -421,16 +577,18 @@ const FileManager = (() => {
      * nothing is asked and nothing is lost. A failure is reported instead of vanishing into a click handler.
      */
     function openProject(payload) {
-        try {
-            showAsNewProject(() => restoreState(payload), payload.projectName || 'Opened project');
-        } catch (error) {
-            console.error('Load error:', error);
-            showMessage('Could not open this file', error.message || 'Unable to load project file.');
-        }
+        guardReplace(() => {
+            try {
+                showAsNewProject(() => restoreState(payload), payload.projectName || 'Opened project');
+            } catch (error) {
+                console.error('Load error:', error);
+                showMessage('Could not open this file', error.message || 'Unable to load project file.');
+            }
+        });
     }
 
     /** True when the tile has something a person did to it: a colour other than blank, an object or a start marker. */
-    const isPainted = (polygon) => Boolean(polygon.object || polygon.start || (polygon.color && polygon.color !== Config.DEFAULT_TILE_COLOR));
+    const isPainted = (polygon) => Boolean(polygon.object || polygon.start || (polygon.color && String(polygon.color).toLowerCase() !== Config.DEFAULT_TILE_COLOR.toLowerCase()));
 
     /**
      * Lays a restored board out for the canvas it is shown on. The saved tiles carry the pixel coordinates of the
@@ -481,10 +639,7 @@ const FileManager = (() => {
         AppState.setPlayers(Utils.clone(statePayload.players || []));
         AppState.setDice(Utils.clone(statePayload.dice || Config.STANDARD_DICE));
         window.dispatchEvent(new CustomEvent('pg:toolchange'));
-        if (typeof statePayload.autoSaveEnabled === 'boolean') {
-            AppState.setAutoSaveEnabled(statePayload.autoSaveEnabled);
-            setupAutoSave();
-        }
+        // The file's auto-save setting is not applied: a file that says "off" must not leave the next board unsaved.
         AppState.setPolygons(polygons);
         // A loaded board is shown whole, whatever pan and zoom the board before it had (an infinite board has no
         // outline to frame: what was drawn is shown instead of the origin).
@@ -523,6 +678,9 @@ const FileManager = (() => {
         restoreState,
         openProject,
         hasUserWork,
+        guardReplace,
+        handleStorageEvent,
+        recoverLegacyProjects,
         confirmReplace,
         saveProjectFile,
         startAnotherProject,

@@ -70,6 +70,7 @@ test('opening a file makes it a new project: nothing is asked and the open proje
     env.FileManager.restoreState(project(env));
     const first = env.FileManager.registerNewProject('First board');
     env.AppState.getState().polygons[0].color = '#123456';
+    env.AppState.markDirty();
     const modalsBefore = env.calls.modals.length;
     env.FileManager.openProject(env.ProjectFormat.parse(fixture('v0-legacy-project.protogames.json')));
     assert.equal(env.calls.modals.length, modalsBefore, 'no confirmation dialog, even over painted work');
@@ -209,6 +210,7 @@ test('blocked storage (reading window.localStorage throws) does not break saving
     env.AppState.setProjectId('abcdef-1234');
     assert.doesNotThrow(() => env.FileManager.autoSaveToLocalStorage(true));
     assert.equal(env.ui.notes.some((n) => /storage is full/.test(n)), false);
+    assert.equal(env.ui.notes.filter((n) => /not available/.test(n)).length, 1, 'but the person is told once that nothing is saved');
 });
 
 test('restoring a file replaces the board settings instead of merging them into the previous board', () => {
@@ -223,4 +225,194 @@ test('restoring a file replaces the board settings instead of merging them into 
     assert.equal(config.triangleOrientation, 'point-up');
     assert.equal('leftover' in config, false, 'unknown keys are dropped');
     assert.equal(config.gridType, 'hexagon');
+});
+
+/** Presses a button of the dialog `modal` (a stand-in element from fresh()). */
+const press = (modal, action) => modal.listeners.click({ target: { closest: () => ({ dataset: { action } }) } });
+const lastModal = (env) => env.calls.modals[env.calls.modals.length - 1];
+
+test('autosave says whether it wrote, and a failed save is reported once per run of failures', () => {
+    const env = fresh();
+    env.FileManager.restoreState(project(env));
+    env.FileManager.registerNewProject('Tell me');
+    assert.equal(env.FileManager.autoSaveToLocalStorage(true), true);
+    env.storage.failWritesWith = new Error('denied');
+    assert.equal(env.FileManager.autoSaveToLocalStorage(true), false);
+    env.FileManager.autoSaveToLocalStorage(true);
+    assert.equal(env.ui.notes.filter((n) => /not available/.test(n)).length, 1);
+    env.storage.failWritesWith = null;
+    assert.equal(env.FileManager.autoSaveToLocalStorage(true), true);
+    env.storage.failWritesWith = quotaError();
+    env.FileManager.autoSaveToLocalStorage(true);
+    assert.equal(env.ui.notes.filter((n) => /not available/.test(n)).length, 1, 'a full storage has its own text');
+    assert.equal(env.ui.notes.filter((n) => /storage is full/.test(n)).length, 1);
+});
+
+test('replacing a board whose last save failed asks first; a saved board is replaced without a question', () => {
+    const env = fresh();
+    env.FileManager.restoreState(project(env));
+    env.FileManager.registerNewProject('Precious');
+    env.AppState.getState().polygons[0].color = '#123456';
+    env.AppState.markDirty();
+    env.storage.failWritesWith = quotaError();
+    const modals = env.calls.modals.length;
+    const other = env.ProjectFormat.parse(fixture('v0-legacy-project.protogames.json'));
+    env.FileManager.openProject(other);
+    assert.equal(env.calls.modals.length, modals + 1, 'asked');
+    assert.equal(env.AppState.getState().currentProjectName, 'Precious', 'nothing replaced yet');
+    press(lastModal(env), 'cancel');
+    assert.equal(env.AppState.getState().currentProjectName, 'Precious');
+    env.FileManager.openProject(other);
+    press(lastModal(env), 'confirm');
+    assert.equal(env.AppState.getState().currentProjectName, 'legacy-board');
+    // Storage works again: the next replacement is not asked.
+    env.storage.failWritesWith = null;
+    env.FileManager.autoSaveToLocalStorage(true);
+    const asked = env.calls.modals.length;
+    env.FileManager.openProject(other);
+    assert.equal(env.calls.modals.length, asked);
+});
+
+test('project switches and a new project ask as well when the save failed, and navigate when confirmed', () => {
+    const env = fresh();
+    env.FileManager.restoreState(project(env));
+    env.FileManager.registerNewProject('Precious');
+    env.AppState.getState().polygons[0].color = '#123456';
+    env.AppState.markDirty();
+    env.storage.failWritesWith = quotaError();
+    env.FileManager.startAnotherProject();
+    env.FileManager.openProjectById('other-project-1');
+    assert.deepEqual(env.calls.navigations, []);
+    press(lastModal(env), 'confirm');
+    assert.equal(env.calls.navigations.length, 1);
+});
+
+test('a board that is blank is replaced without a question even when saving fails', () => {
+    const env = fresh();
+    env.FileManager.restoreState(project(env));
+    env.FileManager.registerNewProject('Empty');
+    env.AppState.getState().polygons.forEach((p) => { p.color = env.Config.DEFAULT_TILE_COLOR; delete p.object; delete p.start; });
+    env.storage.failWritesWith = quotaError();
+    env.FileManager.autoSaveToLocalStorage(true);
+    const modals = env.calls.modals.length;
+    env.FileManager.startAnotherProject();
+    assert.equal(env.calls.modals.length, modals);
+    assert.equal(env.calls.navigations.length, 1);
+});
+
+test('hasUserWork reads colours case-insensitively: a board of #FFFFFF is blank', () => {
+    const env = fresh();
+    env.FileManager.restoreState(project(env));
+    env.AppState.getState().polygons.forEach((p) => { p.color = env.Config.DEFAULT_TILE_COLOR.toUpperCase(); delete p.object; delete p.start; });
+    assert.equal(env.FileManager.hasUserWork(), false);
+});
+
+test('a file that says autoSaveEnabled:false does not turn saving off', () => {
+    const env = fresh();
+    const file = project(env);
+    file.appState.autoSaveEnabled = false;
+    env.FileManager.restoreState(file);
+    assert.equal(env.AppState.getState().autoSaveEnabled, true);
+});
+
+test('a project that did not change is not rewritten when it is left or looked at', () => {
+    const env = fresh();
+    env.FileManager.restoreState(project(env));
+    const id = env.FileManager.registerNewProject('Quiet');
+    const before = env.Library.read(id);
+    assert.equal(env.FileManager.autoSaveToLocalStorage(), false, 'not dirty, nothing written');
+    env.FileManager.openProjectById('other-project-1');
+    assert.equal(env.Library.read(id), before, 'the stored text and its time are untouched');
+    assert.equal(env.calls.navigations.length, 1);
+    env.AppState.markDirty();
+    assert.equal(env.FileManager.autoSaveToLocalStorage(), true, 'a changed board is saved');
+});
+
+test('the same project saved from another tab is not overwritten silently', () => {
+    const storage = makeStorage();
+    const a = fresh({ storage });
+    a.FileManager.restoreState(project(a));
+    const id = a.FileManager.registerNewProject('Shared');
+    const b = fresh({ storage });
+    b.FileManager.openStoredProject(id);
+    b.AppState.getState().polygons[0].color = '#bbbbbb';
+    b.AppState.markDirty();
+    assert.equal(b.FileManager.autoSaveToLocalStorage(true), true);
+    const theirs = a.Library.read(id);
+    a.AppState.getState().polygons[0].color = '#aaaaaa';
+    a.AppState.markDirty();
+    const modals = a.calls.modals.length;
+    assert.equal(a.FileManager.autoSaveToLocalStorage(true), false);
+    assert.equal(a.calls.modals.length, modals + 1, 'the person is asked');
+    assert.equal(a.Library.read(id), theirs, 'nothing written over the other tab');
+    a.FileManager.autoSaveToLocalStorage(true);
+    assert.equal(a.calls.modals.length, modals + 1, 'one dialog at a time');
+    press(lastModal(a), 'primary');
+    assert.equal(JSON.parse(a.Library.read(id)).appState.polygons[0].color, '#aaaaaa', 'keeping this tab writes it');
+    assert.equal(a.FileManager.autoSaveToLocalStorage(true), true, 'and saving goes on');
+});
+
+test('choosing the other version loads it and does not write over it', () => {
+    const storage = makeStorage();
+    const a = fresh({ storage });
+    a.FileManager.restoreState(project(a));
+    const id = a.FileManager.registerNewProject('Shared');
+    const b = fresh({ storage });
+    b.FileManager.openStoredProject(id);
+    b.AppState.getState().polygons[0].color = '#bbbbbb';
+    b.AppState.markDirty();
+    b.FileManager.autoSaveToLocalStorage(true);
+    const theirs = a.Library.read(id);
+    a.AppState.markDirty();
+    a.FileManager.autoSaveToLocalStorage(true);
+    press(lastModal(a), 'secondary');
+    assert.equal(a.Library.read(id), theirs);
+    assert.equal(a.AppState.getState().polygons[0].color, '#bbbbbb');
+    assert.equal(a.AppState.getState().currentProjectId, id);
+});
+
+test('a storage event about the open project pauses saving before the next save', () => {
+    const storage = makeStorage();
+    const a = fresh({ storage });
+    a.FileManager.restoreState(project(a));
+    const id = a.FileManager.registerNewProject('Shared');
+    const modals = a.calls.modals.length;
+    a.FileManager.handleStorageEvent({ key: 'protogames_project:somebody-else' });
+    assert.equal(a.calls.modals.length, modals, 'another project is not our business');
+    storage.setItem('protogames_project:' + id, JSON.stringify({ ...JSON.parse(a.Library.read(id)), timestamp: Date.now() + 5 }));
+    a.FileManager.handleStorageEvent({ key: 'protogames_project:' + id });
+    assert.equal(a.calls.modals.length, modals + 1);
+});
+
+test('a project deleted elsewhere is not recreated by the next save', () => {
+    const storage = makeStorage();
+    const a = fresh({ storage });
+    a.FileManager.restoreState(project(a));
+    const id = a.FileManager.registerNewProject('Doomed');
+    storage.removeItem('protogames_project:' + id);
+    a.AppState.markDirty();
+    const modals = a.calls.modals.length;
+    assert.equal(a.FileManager.autoSaveToLocalStorage(true), false);
+    assert.equal(a.calls.modals.length, modals + 1, 'the person is told');
+    assert.equal(a.AppState.getState().currentProjectId, null);
+    assert.deepEqual(storage.dump(), {}, 'nothing was written back');
+    assert.equal(a.calls.addresses[a.calls.addresses.length - 1], '/app/', 'the address no longer names it');
+    press(lastModal(a), 'primary');
+    const [entry] = a.Library.list();
+    assert.equal(entry.name, 'Doomed', 'saved again as a project of its own');
+    assert.notEqual(entry.id, id);
+});
+
+test('earlier autosaves that were recovered are announced once; the ones that could not be copied are reported', () => {
+    const raw = fixture('v2-space-arctic.protogames.json');
+    const env = fresh({ storage: makeStorage({ 'protogames_autosave:tab1': raw, 'protogames_autosave:tab2': raw }) });
+    assert.equal(env.FileManager.recoverLegacyProjects(), 2);
+    assert.equal(env.ui.notes.filter((n) => /2 earlier autosaves were recovered/.test(n)).length, 1);
+    assert.equal(env.FileManager.recoverLegacyProjects(), 0);
+    assert.equal(env.ui.notes.length, 1, 'nothing more to say the second time');
+    const full = fresh({ storage: makeStorage({ 'protogames_autosave:tab9': raw }) });
+    full.storage.failWritesWith = quotaError();
+    full.FileManager.recoverLegacyProjects();
+    assert.ok(full.ui.notes.some((n) => /could not be copied/.test(n)));
+    assert.ok('protogames_autosave:tab9' in full.storage.dump(), 'the original stays');
 });

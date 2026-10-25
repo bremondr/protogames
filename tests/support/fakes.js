@@ -9,10 +9,11 @@ function makeStorage(initial = {}) {
     const data = new Map(Object.entries(initial));
     return {
         failWith: null,
+        failWritesWith: null,
         get length() { return data.size; },
         key: (i) => [...data.keys()][i] ?? null,
         getItem(key) { if (this.failWith) throw this.failWith; return data.has(key) ? data.get(key) : null; },
-        setItem(key, value) { if (this.failWith) throw this.failWith; data.set(key, String(value)); },
+        setItem(key, value) { if (this.failWith) throw this.failWith; if (this.failWritesWith) throw this.failWritesWith; data.set(key, String(value)); },
         removeItem(key) { data.delete(key); },
         dump: () => Object.fromEntries(data)
     };

@@ -38,6 +38,11 @@ const ProjectLibrary = (() => {
         return Array.from(String(text == null ? '' : text).replace(/\s+/g, ' ').trim()).slice(0, MAX_NAME_LENGTH).join('');
     }
 
+    /** A saved time that can be believed: from the past up to a day ahead (clocks differ), else 0 for "never saved". */
+    function cleanTimestamp(value, now = Date.now()) {
+        return Number.isFinite(value) && value >= 0 && value <= now + 24 * 60 * 60 * 1000 ? value : 0;
+    }
+
     /**
      * What a stored payload says about itself, without validating it (the editor does that when it opens it).
      * Returns null when the text is not a project at all.
@@ -49,7 +54,7 @@ const ProjectLibrary = (() => {
         const config = parsed.appState.boardConfig && typeof parsed.appState.boardConfig === 'object' ? parsed.appState.boardConfig : {};
         return {
             name: cleanName(parsed.projectName) || 'Untitled project',
-            timestamp: Number.isFinite(parsed.timestamp) ? parsed.timestamp : 0,
+            timestamp: cleanTimestamp(parsed.timestamp),
             tiles: Array.isArray(parsed.appState.polygons) ? parsed.appState.polygons.length : 0,
             boardShape: typeof config.boardShape === 'string' ? config.boardShape : '',
             gridType: typeof config.gridType === 'string' ? config.gridType : ''
@@ -84,6 +89,7 @@ const ProjectLibrary = (() => {
 
     /** "Edited just now", "Edited 5 minutes ago", "Edited yesterday", "Edited 3 days ago"; an old one becomes its date. */
     function describeAge(timestamp, now) {
+        timestamp = cleanTimestamp(timestamp, now);
         if (!timestamp) return 'Never saved';
         const age = Math.max(0, now - timestamp);
         const plural = (n, unit) => `${n} ${unit}${n === 1 ? '' : 's'} ago`;
@@ -114,12 +120,25 @@ const ProjectLibrary = (() => {
         try { return store.getItem(keyFor(id)); } catch (error) { return null; }
     }
 
-    /** Stores a payload. Throws (a QuotaExceededError when the storage is full) so the caller can tell the person. */
+    /** Like read(), but a storage that cannot be read throws instead of looking like a project that is not there. */
+    function readStrict(id) {
+        const store = storage();
+        if (!store) throw new Error('This browser does not allow storing projects.');
+        if (!isValidId(id)) return null;
+        return store.getItem(keyFor(id));
+    }
+
+    /**
+     * Stores a payload and returns the text stored. Throws (a QuotaExceededError when the storage is full) so the
+     * caller can tell the person.
+     */
     function write(id, payload) {
         if (!isValidId(id)) throw new Error(`Not a project id: ${id}`);
         const store = storage();
         if (!store) throw new Error('This browser does not allow storing projects.');
-        store.setItem(keyFor(id), JSON.stringify(payload));
+        const text = JSON.stringify(payload);
+        store.setItem(keyFor(id), text);
+        return text;
     }
 
     function remove(id) {
@@ -130,13 +149,15 @@ const ProjectLibrary = (() => {
 
     /**
      * Turns the per-tab autosaves of older versions into projects and deletes them. The project id is made from
-     * the old key, so doing it again (another tab, a reload) finds the project and does nothing twice.
-     * Returns how many projects were created.
+     * the old key, so doing it again (another tab, a reload) finds the project and does nothing twice. An autosave
+     * newer than the project it was imported into replaces it; one that cannot be copied (storage full) stays where
+     * it is, and `onProblem` is told how many. Returns how many projects were created or brought up to date.
      */
-    function importLegacy() {
+    function importLegacy(onProblem) {
         const store = storage();
         if (!store) return 0;
-        let created = 0;
+        let recovered = 0;
+        let problems = 0;
         try {
             const keys = [];
             for (let i = 0; i < store.length; i++) {
@@ -144,24 +165,36 @@ const ProjectLibrary = (() => {
                 if (key && (key === LEGACY_KEY || key.startsWith(LEGACY_PREFIX))) keys.push(key);
             }
             for (const key of keys) {
-                const raw = store.getItem(key);
-                const summary = summarize(raw);
-                if (summary) {
-                    const slot = key === LEGACY_KEY ? 'legacy' : key.slice(LEGACY_PREFIX.length);
-                    const id = `recovered-${slot.replace(/[^A-Za-z0-9_-]/g, '')}`.slice(0, 64);
-                    if (isValidId(id) && store.getItem(keyFor(id)) === null) {
-                        store.setItem(keyFor(id), raw);
-                        created += 1;
+                try {
+                    const raw = store.getItem(key);
+                    const summary = summarize(raw);
+                    if (summary) {
+                        const slot = key === LEGACY_KEY ? 'legacy' : key.slice(LEGACY_PREFIX.length);
+                        const id = `recovered-${slot.replace(/[^A-Za-z0-9_-]/g, '')}`.slice(0, 64);
+                        if (isValidId(id)) {
+                            const existing = store.getItem(keyFor(id));
+                            const known = existing === null ? null : summarize(existing);
+                            // Copied when there is no project yet, or the autosave is newer than the unreadable or older one.
+                            if (existing === null || !known || summary.timestamp > known.timestamp) {
+                                store.setItem(keyFor(id), raw);
+                                recovered += 1;
+                            }
+                        }
                     }
+                    // An unreadable slot is dropped, as the old cleanup did; a readable one is now a project.
+                    store.removeItem(key);
+                } catch (error) {
+                    // The copy failed: the original is the only one left, so it stays.
+                    problems += 1;
+                    console.error('Could not import an autosave of an older version.', error);
                 }
-                // An unreadable slot is dropped, as the old cleanup did; a readable one is now a project.
-                store.removeItem(key);
             }
         } catch (error) {
             console.error('Could not import the autosaves of an older version.', error);
         }
-        return created;
+        if (problems && onProblem) onProblem(problems);
+        return recovered;
     }
 
-    return { KEY_PREFIX, MAX_NAME_LENGTH, isValidId, newId, cleanName, summarize, list, read, write, remove, importLegacy, describeAge, describeBoard };
+    return { KEY_PREFIX, MAX_NAME_LENGTH, isValidId, newId, cleanName, summarize, cleanTimestamp, list, read, readStrict, write, remove, importLegacy, describeAge, describeBoard };
 })();
