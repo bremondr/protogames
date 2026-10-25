@@ -44,95 +44,97 @@ Since the second audit the project grew a lot: several named projects in the bro
 
 ---
 
-## 3. Open findings (the current register)
+## 3. The register (open findings, with live status)
+
+The **Status** column is updated as fixes land: *Open* → *Fixed in #N (pending merge)* → *Fixed*. Last update: 2026-10-25, nothing fixed yet.
 
 ### 3.1 High
 
-| ID | Finding | Where | Evidence |
-|---|---|---|---|
-| **H1** | A tile id near 2^53 (share link or file) **and a file with coordinates around 1e18** hang the tab: `cellsIn` loops `x++` until the counter stops changing. Carried from BUG-H1; the second entry point is new (N2-1). | `infinite.js:92-117`, `:66`; `projectFormat.js:316-335` (accepts any finite coordinates) | script: `inf_s_9007199254740991_0` and a polygon at 1e18 both time out; 1e17 finishes |
+| ID | Finding | Where | Evidence | Status |
+|---|---|---|---|---|
+| **H1** | A tile id near 2^53 (share link or file) **and a file with coordinates around 1e18** hang the tab: `cellsIn` loops `x++` until the counter stops changing. Carried from BUG-H1; the second entry point is new (N2-1). | `infinite.js:92-117`, `:66`; `projectFormat.js:316-335` (accepts any finite coordinates) | script: `inf_s_9007199254740991_0` and a polygon at 1e18 both time out; 1e17 finishes | Open |
 
 *Fix:* bound ids in `fromId` (|a|, |b| ≤ 1e9), reject huge rectangles in `cellsIn`, tie polygon `bounds` to the vertices and cap coordinates in the validator (this also fixes L16 and N2-1). No format change is needed.
 
 ### 3.2 Medium
 
-| # | Finding | Source | Evidence |
-|---|---|---|---|
-| **M1** | Infinite board: Undo and the pinch rollback do not un-paint tiles that were loaded after the snapshot. The history index moves but the tile stays. | BUG-M4 | script and browser: still reproduces (`infinite.js:276-286`, `state.js:369-380`) |
-| **M2** | Undo and Redo are never autosaved: undo, reload or reopen the project, and the undone stroke is back. | BUG-M5 | script: board 1 → 0 tiles, stored project still 1, still 1 after the 30 s timer |
-| **M3** | **The canvas is a keyboard trap.** Tab and Shift+Tab always cycle swatches while the canvas has focus. In playtest nothing after the canvas is reachable by keyboard. A mouse click does not focus the canvas, so for mouse users Tab no longer cycles swatches either. | BUG-M6 (from PR #76's Tab fix) | browser: 189 Tab presses never leave the canvas; Tab from the canvas in playtest never reaches the trays, dice or Reset |
-| **M4** | Painting leaves focus in a previously used sidebar field, so Ctrl+Z, E, B and every shortcut do nothing until a non-field click. | BUG-M7 | browser: still reproduces |
-| **M5** | Space-to-pan swallows Space on checkboxes and other non-text inputs, so the Export dialog's checkboxes cannot be toggled with the keyboard. | BUG-M8 | browser: "Page labels" checkbox stays checked on Space |
-| **M6** | The Share dialog builds a link for triangle-tile hexagon/circle boards at 50 layers (width 101/102) that the recipient cannot open ("width out of range"). Hexagon and square tiles are fine now. | BUG-M9 (narrowed), N2-4 | script: 4 of 10 UI-maximum boards (14,701–18,048 tiles) |
-| **M7** | Circle of hexagon tiles loses tiles from radius 23 (tile centre) or 19 (point centre) and loses its symmetry. At the UI maximum, 496 of 8,887 tiles are missing. The onset moved from 16 (the scan window changed in #103) but the bug is not fixed. | BUG-M10 | script: R49 8,391 of 8,887; suggested `span = ceil((radius + 0.72) * 2 / √3) + 2`. **Changes ids and counts again, see M14** |
-| **M8** | A printed legend is drawn over a board that does not fit its sheet. | BUG-M12 | script and PDF: A3 sheet, 40 mm hex tiles, legend on |
-| **M9** | The printed legend names a terrain after the wrong palette (`#C62828` is "Trap" in dungeon and "Danger Zone" in spaceship). | BUG-M13 | script: still "Trap" on a spaceship board |
-| **M10** | The board canvas ignores `devicePixelRatio`: soft on HiDPI screens, PNG export at CSS-pixel size. | BUG-M14 | browser: DPR 2 → backing 1100×844 on a 2200×1688 surface |
-| **M11** | Old boards with legacy triangle ids: the next resize drops all their colours; opening them leaves the board unfitted. New in the same family: a file saved before #113 with a painted spike tile is also not refit on open. | BUG-M15, N2-9 | script: 23 painted → 0 after resize; spike-painted file keeps old pixel coordinates (maxX 850 on a 900 px canvas) |
-| **M12** | A slow remote theme image blocks start-up: with two hanging images the board has 0 tiles after 30 s. Worse now: with `?project=<id>` the project never opens either. | BUG-M16 | browser |
-| **M13** | The preview-link comment is lost whenever a run is cancelled. Less frequent now (27 of the last 30 PRs have it). | BUG-M17 | gh run history |
-| **M14** | **Old share links of circle boards fail with "Board size mismatch".** #113 and #103 changed tile counts for 77 of 100 radii (triangle circles R3 60 → 54, hexagon circles R16 971 → 979) without a link or format version bump. Saved files survive; links do not. The spec says a board saved earlier keeps its tiles, which is true for files only. | N1-1, N2-2 (new) | script: old generator vs new, links refused for R3, R4, R10, R16, R20, R30 |
-| **M15** | **Failed saves are silent and unprotected.** When storage is full, blocked, or autosave is off, nothing says so (only quota-full gets a notice), and opening a file, link, showcase or another project replaces the unsaved board without asking. | N1-2, N1-5 (new) | script: 80 tiles on screen, 20 in storage, `openProject` replaced the screen with no prompt; blocked storage gives only a console line |
-| **M16** | **The same project open in two tabs: last save wins, silently.** No `storage` listener, no revision check, no lock. | N1-3, N3-2 (new) | browser: tab A's stroke gone from storage, still on tab A's screen |
-| **M17** | Escape during a tray drag, then release, still sends the piece to a start marker (the captured tray button gets the click) and counts a move. | N3-1 (new) | browser |
-| **M18** | A Country board 120 tiles across takes 3–5 s to generate, and generates again on every resize, playtest toggle and project open. The default 24 across is fast (80 ms). | N2-3 (new) | script: Norway 120 hex 4.8 s |
+| # | Finding | Source | Evidence | Status |
+|---|---|---|---|---|
+| **M1** | Infinite board: Undo and the pinch rollback do not un-paint tiles that were loaded after the snapshot. The history index moves but the tile stays. | BUG-M4 | script and browser: still reproduces (`infinite.js:276-286`, `state.js:369-380`) | Open |
+| **M2** | Undo and Redo are never autosaved: undo, reload or reopen the project, and the undone stroke is back. | BUG-M5 | script: board 1 → 0 tiles, stored project still 1, still 1 after the 30 s timer | Open |
+| **M3** | **The canvas is a keyboard trap.** Tab and Shift+Tab always cycle swatches while the canvas has focus. In playtest nothing after the canvas is reachable by keyboard. A mouse click does not focus the canvas, so for mouse users Tab no longer cycles swatches either. | BUG-M6 (from PR #76's Tab fix) | browser: 189 Tab presses never leave the canvas; Tab from the canvas in playtest never reaches the trays, dice or Reset | Open |
+| **M4** | Painting leaves focus in a previously used sidebar field, so Ctrl+Z, E, B and every shortcut do nothing until a non-field click. | BUG-M7 | browser: still reproduces | Open |
+| **M5** | Space-to-pan swallows Space on checkboxes and other non-text inputs, so the Export dialog's checkboxes cannot be toggled with the keyboard. | BUG-M8 | browser: "Page labels" checkbox stays checked on Space | Open |
+| **M6** | The Share dialog builds a link for triangle-tile hexagon/circle boards at 50 layers (width 101/102) that the recipient cannot open ("width out of range"). Hexagon and square tiles are fine now. | BUG-M9 (narrowed), N2-4 | script: 4 of 10 UI-maximum boards (14,701–18,048 tiles) | Open |
+| **M7** | Circle of hexagon tiles loses tiles from radius 23 (tile centre) or 19 (point centre) and loses its symmetry. At the UI maximum, 496 of 8,887 tiles are missing. The onset moved from 16 (the scan window changed in #103) but the bug is not fixed. | BUG-M10 | script: R49 8,391 of 8,887; suggested `span = ceil((radius + 0.72) * 2 / √3) + 2`. **Changes ids and counts again, see M14** | Open |
+| **M8** | A printed legend is drawn over a board that does not fit its sheet. | BUG-M12 | script and PDF: A3 sheet, 40 mm hex tiles, legend on | Open |
+| **M9** | The printed legend names a terrain after the wrong palette (`#C62828` is "Trap" in dungeon and "Danger Zone" in spaceship). | BUG-M13 | script: still "Trap" on a spaceship board | Open |
+| **M10** | The board canvas ignores `devicePixelRatio`: soft on HiDPI screens, PNG export at CSS-pixel size. | BUG-M14 | browser: DPR 2 → backing 1100×844 on a 2200×1688 surface | Open |
+| **M11** | Old boards with legacy triangle ids: the next resize drops all their colours; opening them leaves the board unfitted. New in the same family: a file saved before #113 with a painted spike tile is also not refit on open. | BUG-M15, N2-9 | script: 23 painted → 0 after resize; spike-painted file keeps old pixel coordinates (maxX 850 on a 900 px canvas) | Open |
+| **M12** | A slow remote theme image blocks start-up: with two hanging images the board has 0 tiles after 30 s. Worse now: with `?project=<id>` the project never opens either. | BUG-M16 | browser | Open |
+| **M13** | The preview-link comment is lost whenever a run is cancelled. Less frequent now (27 of the last 30 PRs have it). | BUG-M17 | gh run history | Open |
+| **M14** | **Old share links of circle boards fail with "Board size mismatch".** #113 and #103 changed tile counts for 77 of 100 radii (triangle circles R3 60 → 54, hexagon circles R16 971 → 979) without a link or format version bump. Saved files survive; links do not. The spec says a board saved earlier keeps its tiles, which is true for files only. | N1-1, N2-2 (new) | script: old generator vs new, links refused for R3, R4, R10, R16, R20, R30 | Open |
+| **M15** | **Failed saves are silent and unprotected.** When storage is full, blocked, or autosave is off, nothing says so (only quota-full gets a notice), and opening a file, link, showcase or another project replaces the unsaved board without asking. | N1-2, N1-5 (new) | script: 80 tiles on screen, 20 in storage, `openProject` replaced the screen with no prompt; blocked storage gives only a console line | Open |
+| **M16** | **The same project open in two tabs: last save wins, silently.** No `storage` listener, no revision check, no lock. | N1-3, N3-2 (new) | browser: tab A's stroke gone from storage, still on tab A's screen | Open |
+| **M17** | Escape during a tray drag, then release, still sends the piece to a start marker (the captured tray button gets the click) and counts a move. | N3-1 (new) | browser | Open |
+| **M18** | A Country board 120 tiles across takes 3–5 s to generate, and generates again on every resize, playtest toggle and project open. The default 24 across is fast (80 ms). | N2-3 (new) | script: Norway 120 hex 4.8 s | Open |
 
 ### 3.3 Low (carried from the second audit)
 
-| # | Finding | Source |
-|---|---|---|
-| L1 | Empty infinite board: PNG/SVG/Print throw on a large window; the **Export… button now does nothing** (the dialog throws before it opens) | BUG-L1 |
-| L2 | A `#ffffff` tile in an imported or edited theme becomes `#000000` | BUG-L2 |
-| L3 | A file with `autoSaveEnabled: false` is never saved and nothing can turn saving back on; reload says "Project not found" | BUG-L3, N5-2 |
-| L4 | Autosave stores full tile geometry; the biggest boards exceed the quota (hexagon 100×100 is 5.1M characters) and all projects and themes now share it | BUG-L4 |
-| L5 | Cancelling a fill with a pinch loses the redo branch | BUG-L6 |
-| L6 | The last tiles of a fast brush stroke are dropped (16 ms throttle) | BUG-L7 |
-| L7 | A stroke is not tied to its pointer; a lost pointer-up keeps painting | BUG-L8 |
-| L8 | Any resize or playtest toggle resets zoom and pan | BUG-L9 |
-| L9 | No-op undo steps (Clear on a blank board; colour case mismatch) | BUG-L10 |
-| L10 | `[` and `]` unusable on AltGr layouts (Czech, German) | BUG-L11 |
-| L11 | Number fields: `1e2` read as 1; an empty field uses the default without showing it | BUG-L12 |
-| L12 | Dynamic dialogs (help, file-manager modals, "Name your project") lose Escape and the Tab trap once focus falls to `<body>` | BUG-L14 |
-| L13 | A share link opened while the help overlay is open leaves a stale `#shortcutHelp` that disables Escape | BUG-L15 |
-| L14 | `#rgb` colours: project files accept them, share links reject them | BUG-L17, N5-1 |
-| L15 | The theme editor discards all edits on Escape or a backdrop click | BUG-L18 |
-| L16 | Imported polygons with huge bounds crash the point locator on hover (out of memory) | BUG-L19 |
-| L17 | A fractional radius is rounded differently per tile type | BUG-L20 |
-| L18 | Print: float noise adds a whole extra page when the board is exactly one page wide | BUG-L21 |
-| L19 | Print: the 16 MP cap is exceeded by rounding for about 47% of area-capped sheet sizes | BUG-L22 |
-| L20 | Print: crop marks reach the page edge for small margins | BUG-L23 |
-| L21 | Hovering a tile hides the top of an object on the tile below | BUG-L24 |
-| L22 | Print: a "fit" sheet can exceed 14,400 pt with no warning | BUG-L25 |
-| L23 | Print: the 16 MP cap lowers A1/A0 sheets to ~147/~104 dpi in every browser | BUG-L26 |
-| L24 | The bot comments a preview link that is a 404 for a PR over the 20-preview cap, one skipped as unbuildable, or one still on the old layout (now more likely) | BUG-L27, N4-1 |
-| L25 | `preview:pr-N:` storage keys of closed PRs are never cleaned and share production's quota | BUG-L28 |
-| L26 | Remote theme image URLs are fetched on every start (IP and origin leak); CSP allows any https image | BUG-L29 |
-| L27 | A PR head that lacks `app/js` and images is published as a blank page (48 unresolved references in a test build) | BUG-L30 |
-| L28 | Documentation residuals: README Tab claim, project tree, `square` shape listed, `TILE_GENERATION_EXPLANATION.md` stale again after #113 (documents 6/24/60, measured 6/24/54), `SPECIFICATION.md` orientation values | BUG-L31, N5-4, N5-5 |
+| # | Finding | Source | Status |
+|---|---|---|---|
+| L1 | Empty infinite board: PNG/SVG/Print throw on a large window; the **Export… button now does nothing** (the dialog throws before it opens) | BUG-L1 | Open |
+| L2 | A `#ffffff` tile in an imported or edited theme becomes `#000000` | BUG-L2 | Open |
+| L3 | A file with `autoSaveEnabled: false` is never saved and nothing can turn saving back on; reload says "Project not found" | BUG-L3, N5-2 | Open |
+| L4 | Autosave stores full tile geometry; the biggest boards exceed the quota (hexagon 100×100 is 5.1M characters) and all projects and themes now share it | BUG-L4 | Open |
+| L5 | Cancelling a fill with a pinch loses the redo branch | BUG-L6 | Open |
+| L6 | The last tiles of a fast brush stroke are dropped (16 ms throttle) | BUG-L7 | Open |
+| L7 | A stroke is not tied to its pointer; a lost pointer-up keeps painting | BUG-L8 | Open |
+| L8 | Any resize or playtest toggle resets zoom and pan | BUG-L9 | Open |
+| L9 | No-op undo steps (Clear on a blank board; colour case mismatch) | BUG-L10 | Open |
+| L10 | `[` and `]` unusable on AltGr layouts (Czech, German) | BUG-L11 | Open |
+| L11 | Number fields: `1e2` read as 1; an empty field uses the default without showing it | BUG-L12 | Open |
+| L12 | Dynamic dialogs (help, file-manager modals, "Name your project") lose Escape and the Tab trap once focus falls to `<body>` | BUG-L14 | Open |
+| L13 | A share link opened while the help overlay is open leaves a stale `#shortcutHelp` that disables Escape | BUG-L15 | Open |
+| L14 | `#rgb` colours: project files accept them, share links reject them | BUG-L17, N5-1 | Open |
+| L15 | The theme editor discards all edits on Escape or a backdrop click | BUG-L18 | Open |
+| L16 | Imported polygons with huge bounds crash the point locator on hover (out of memory) | BUG-L19 | Open |
+| L17 | A fractional radius is rounded differently per tile type | BUG-L20 | Open |
+| L18 | Print: float noise adds a whole extra page when the board is exactly one page wide | BUG-L21 | Open |
+| L19 | Print: the 16 MP cap is exceeded by rounding for about 47% of area-capped sheet sizes | BUG-L22 | Open |
+| L20 | Print: crop marks reach the page edge for small margins | BUG-L23 | Open |
+| L21 | Hovering a tile hides the top of an object on the tile below | BUG-L24 | Open |
+| L22 | Print: a "fit" sheet can exceed 14,400 pt with no warning | BUG-L25 | Open |
+| L23 | Print: the 16 MP cap lowers A1/A0 sheets to ~147/~104 dpi in every browser | BUG-L26 | Open |
+| L24 | The bot comments a preview link that is a 404 for a PR over the 20-preview cap, one skipped as unbuildable, or one still on the old layout (now more likely) | BUG-L27, N4-1 | Open |
+| L25 | `preview:pr-N:` storage keys of closed PRs are never cleaned and share production's quota | BUG-L28 | Open |
+| L26 | Remote theme image URLs are fetched on every start (IP and origin leak); CSP allows any https image | BUG-L29 | Open |
+| L27 | A PR head that lacks `app/js` and images is published as a blank page (48 unresolved references in a test build) | BUG-L30 | Open |
+| L28 | Documentation residuals: README Tab claim, project tree, `square` shape listed, `TILE_GENERATION_EXPLANATION.md` stale again after #113 (documents 6/24/60, measured 6/24/54), `SPECIFICATION.md` orientation values | BUG-L31, N5-4, N5-5 | Open |
 
 ### 3.4 Low (new in this pass)
 
-| # | Finding | Source |
-|---|---|---|
-| L29 | A project deleted on the home page while open in the editor is recreated by the next save | N1-4 |
-| L30 | Opening the Load dialog or switching projects rewrites the open project and bumps "Edited just now"; the list reorders | N1-6 |
-| L31 | Old per-tab autosaves are imported silently; the editor then shows only a name prompt | N1-7 |
-| L32 | Share links carry the sender's `?project=<id>` (longer; the recipient may get "Project not found" or the sender's project) | N1-8 |
-| L33 | Legacy import copies before deleting, so it fails when storage is more than half full; and it deletes a newer autosave of a still-open old tab | N1-9, N4-3 |
-| L34 | A corrupt project timestamp breaks the Load dialog and the home list (`RangeError`), and that project cannot be deleted from either page | N3-3 |
-| L35 | The landing page ignores a share link pasted as a same-tab hash change | N3-4 |
-| L36 | The home page's two-step Delete is silent to screen readers and drops focus | N3-5 |
-| L37 | With NumLock off, numpad navigation keys pick swatches | N3-6 |
-| L38 | Saved export options with `png: null` or `svg: null` make the Export dialog fail to open on every visit | N2-5 |
-| L39 | The orientation control is shown for triangle circles built around a point but does nothing | N2-6 |
-| L40 | SVG draws country borders under objects and start markers; screen, PNG and print draw them on top | N2-7 |
-| L41 | Print always prints start markers, with no switch, and keeps them in "tokens only" mode (issue #87) | N2-8 |
-| L42 | On an infinite board the Export dialog recomputes the export scene (about 0.2 s) on every control change | N2-10 |
-| L43 | In previews the home page project list never refreshes (the `storage` key is prefixed) | N4-2 |
-| L44 | The move to protogames.eu strands projects saved on the old github.io origin, while DEPLOYMENT.md says saved data survives the move | N4-4 |
-| L45 | The Share dialog makes links for boards over 20,000 tiles that the opener refuses | N5-3 |
-| L46 | Ctrl+S in the new permanent "Project name" field opens the browser's Save Page dialog | BUG-C19, now more exposed |
-| L47 | Playtest follow-ups (tracked in issues #85 and #86): a lone tray is not centred on its edge; at 390 px wide with side or four seats the board is about 80 px wide and trays overlap the controls; overlapping two-finger taps fire no click for dice or "send"; a folded tray hides the dice; "column, row" labels on infinite boards count loaded tiles and change when panning; piece keys and Esc missing from the help overlay and README; an off-board drop is silent for screen readers; Reset has no confirmation | playtest check, N3-7…9 |
+| # | Finding | Source | Status |
+|---|---|---|---|
+| L29 | A project deleted on the home page while open in the editor is recreated by the next save | N1-4 | Open |
+| L30 | Opening the Load dialog or switching projects rewrites the open project and bumps "Edited just now"; the list reorders | N1-6 | Open |
+| L31 | Old per-tab autosaves are imported silently; the editor then shows only a name prompt | N1-7 | Open |
+| L32 | Share links carry the sender's `?project=<id>` (longer; the recipient may get "Project not found" or the sender's project) | N1-8 | Open |
+| L33 | Legacy import copies before deleting, so it fails when storage is more than half full; and it deletes a newer autosave of a still-open old tab | N1-9, N4-3 | Open |
+| L34 | A corrupt project timestamp breaks the Load dialog and the home list (`RangeError`), and that project cannot be deleted from either page | N3-3 | Open |
+| L35 | The landing page ignores a share link pasted as a same-tab hash change | N3-4 | Open |
+| L36 | The home page's two-step Delete is silent to screen readers and drops focus | N3-5 | Open |
+| L37 | With NumLock off, numpad navigation keys pick swatches | N3-6 | Open |
+| L38 | Saved export options with `png: null` or `svg: null` make the Export dialog fail to open on every visit | N2-5 | Open |
+| L39 | The orientation control is shown for triangle circles built around a point but does nothing | N2-6 | Open |
+| L40 | SVG draws country borders under objects and start markers; screen, PNG and print draw them on top | N2-7 | Open |
+| L41 | Print always prints start markers, with no switch, and keeps them in "tokens only" mode (issue #87) | N2-8 | Open |
+| L42 | On an infinite board the Export dialog recomputes the export scene (about 0.2 s) on every control change | N2-10 | Open |
+| L43 | In previews the home page project list never refreshes (the `storage` key is prefixed) | N4-2 | Open |
+| L44 | The move to protogames.eu strands projects saved on the old github.io origin, while DEPLOYMENT.md says saved data survives the move | N4-4 | Open |
+| L45 | The Share dialog makes links for boards over 20,000 tiles that the opener refuses | N5-3 | Open |
+| L46 | Ctrl+S in the new permanent "Project name" field opens the browser's Save Page dialog | BUG-C19, now more exposed | Open |
+| L47 | Playtest follow-ups (tracked in issues #85 and #86): a lone tray is not centred on its edge; at 390 px wide with side or four seats the board is about 80 px wide and trays overlap the controls; overlapping two-finger taps fire no click for dice or "send"; a folded tray hides the dice; "column, row" labels on infinite boards count loaded tiles and change when panning; piece keys and Esc missing from the help overlay and README; an off-board drop is silent for screen readers; Reset has no confirmation | playtest check, N3-7…9 | Open |
 
 ### 3.5 Info
 
@@ -183,40 +185,46 @@ No High or Medium finding. Tests run on every deploy and `main` cannot publish u
 
 ## 7. Plan for tonight
 
-**Principle:** the same way as last time — independent agents in separate worktrees, one branch per package, every package test-first, nothing pushed until I have reviewed the diff and run the full suite. You get draft PRs with previews and one combined integration PR to try in the morning. I do not merge anything.
+**Principle:** independent agents in separate worktrees, one branch per package, every package test-first, nothing pushed until I have reviewed the diff and run the full suite. You get draft PRs with previews and one combined integration PR to try in the morning. I do not merge anything. As packages are reviewed, pushed and merged, I update the Status column in Section 3 on the PR of this report.
 
-### 7.1 Decisions I need from you before I start
+### 7.1 Decisions taken
 
-1. **Tab key (M3).** Default if you don't say: remove Tab as the swatch key entirely and move "next/previous swatch" to `,` and `.`; Tab then always navigates, and the canvas is no longer a trap. Say so if you would rather keep Tab with a canvas-focus rule.
-2. **Geometry fixes (M7 and the generator change behind M14).** These change tile counts and ids of existing boards. Default: tonight I only make old share links fail with a clear message ("made with an older board generator") and add tests; the hexagon-circle span fix (M7) and a generation flag for old links wait for your decision (format bump, or accept that those links change).
-3. **Print legends (M9).** Default: prefer the palette active on the board; no change to saved data.
+1. **Tab (M3, M4, M5): the default.** The app never claims Tab. "Next/previous swatch" moves to `,` and `.`. The canvas stops being a trap; clicking the board no longer leaves focus in a sidebar field; Space belongs to inputs and dialogs. Help overlay and README are updated.
+2. **Geometry (M7, M14): old links may break, but the fix is done properly.** Nothing has been shared, so old circle-board links are not worth keeping alive. What we want is that **future generator changes cannot silently change existing boards again**. That means package I below:
+   - the board settings get a **generator version** (`boardConfig.generator`); the current generator is version 2 (spike-free triangle circles, the corrected hexagon-circle scan window);
+   - project format v8 with a migration that marks every older file as generator 1, a v7 fixture, validation (an unknown newer value is refused like a newer format), tests and a spec update, following the project's versioning rule;
+   - boards of generator 1 keep generating the old shapes (the differences are small parameter switches: scan window and spike removal), so old files still regenerate on resize with their colours instead of losing them;
+   - share links of circle boards carry the generator version (link v5, only for circle boards, as with country boards); a link without it is read as generator 1, which as a side effect opens most old links again, and a mismatch gets a clear message instead of "size mismatch";
+   - the spec states the rule "change the generator = new generator version".
+3. **Print legends (M9): the default.** Labels prefer the board's active palette, then fall back to the first match; no saved-data change.
 
-### 7.2 The work packages (8 agents, no two touch the same files)
+### 7.2 Work packages
 
-| Pkg | What | Findings | Main files | Needs a decision? |
+| Pkg | Wave | What | Findings | Files it owns |
 |---|---|---|---|---|
-| **A. Saved work** | `autoSaveToLocalStorage` reports success; any save failure shows a notice (including blocked storage); opening a file/link/showcase/project asks when the save failed and there is work; ignore `autoSaveEnabled:false` on load; autosave after undo/redo; save only when dirty (Load dialog no longer bumps "edited"); warn when another tab changed the same project (`storage` listener or revision check), drop the id when its key disappears; fix legacy import order | M2, M15, M16, L3, L29, L30, L33 | `fileManager.js`, `projectLibrary.js`, `interactions.js` | no |
-| **B. Keyboard and focus** | Tab never claimed (per decision 1), canvas gets focus on click or the shortcut layer stops depending on it, blur a focused field on canvas pointer-down, Space owned by inputs and dialogs, dialogs listen on `document` for Escape and the Tab trap, numpad keys, Ctrl+S in the name field, AltGr brackets, help overlay and README list all keys incl. Esc and piece keys | M3, M4, M5, L10, L12, L13, L37, L46, part of L47 | `shortcuts.js`, `viewControls.js`, `interactions.js`, `focusUtils.js`, README | decision 1 |
-| **C. Playtest** | Escape during a tray drag fully cancels (no click), tray centring, folded tray keeps dice reachable or shows the last roll, roll and send on `pointerup`, phone-width layout so trays never hide zoom controls and the board stays usable, announce off-board drops, stable labels on infinite boards | M17, rest of L47 | `playtestDrag.js`, `playtestTray.js`, `playtest.js`, `pieces.js`, `styles.css` | no |
-| **D. Hang and infinite** | Bound ids and coordinates (H1 incl. the file entry point), validator ties bounds to vertices and caps coordinates (L16), infinite undo blanks tiles missing from a snapshot (M1), empty-infinite export and Export dialog no longer throw (L1), export settings null (L38), corrupt timestamp (L34), recompute cache for the export scene (L42) | H1, M1, L1, L16, L34, L38, L42 | `infinite.js`, `state.js`, `projectFormat.js`, `neighbors.js`, `exporter.js`, `exportDialog.js`, `projectLibrary.js` | no (back-compatible validation, checked against all fixtures like last time) |
-| **E. Print and export** | Legend onto its own page when the board does not fit (M8), palette-aware labels (M9), float noise, rounding of the 16 MP cap, crop marks, 14,400 pt warning, optional start-outline switch (L41), SVG border order (L40), progress and cancel for long exports (info) | M8, M9, L18, L19, L20, L22, L40, L41 | `print.js`, `exportDialog.js`, `exporter.js` | decision 3 |
-| **F. Share links and start-up** | Link width cap for 50 layers (M6), `#rgb` normalisation (L14), Share dialog refuses boards over the tile cap (L45), clear message for old-generator links (part of M14), do not carry `?project` (L32), landing hash change (L35), start the board before applying themes and load theme images in parallel with a timeout (M12), numbers: `1e2`/empty field (L11), orientation control for triangle circles (L39) | M6, M12, L11, L14, L32, L35, L39, L45 | `shareLink.js`, `ui.js`, `main.js`, `themeManager.js`, `landing.js` | decision 2 (partly) |
-| **G. CI and previews** | Post the preview comment from a job that cannot be cancelled, only when the preview was really built; skip PRs without the app layout; check refs of exported pages; fix the landing `storage` key for previews; note on the domain move in the docs | M13, L24, L27, L43, L44 | `.github/workflows/`, `scripts/build-site.js`, `landing.js`, docs | no. **Only takes effect after you merge it** (the workflow runs from `main`) |
-| **H. Tests and docs (last)** | Tests for the 16 mutation survivors (`restoreState` resets, `fromId` guard, spike repetition, blocked storage, `uniqueHex`, `linePath` on islands), a test that every script tag is present and in a valid order, browser-driven keyboard checks for M3–M5 where feasible, tests for the eight untested UI modules where cheap; README, `TILE_GENERATION_EXPLANATION.md`, SPECIFICATION and help text brought in line; banners in the first two audits pointing here | L28, E4-type gaps | `tests/`, `docs/` | no |
+| **A. Saved work** | 1 | Saving reports success; any failure shows a notice (including blocked storage); opening a file, link, showcase or project asks when the save failed and there is work; `autoSaveEnabled:false` is ignored on load; Undo/Redo autosave; save only when dirty (the Load dialog stops bumping "edited"); warn when another tab saved the same project (`storage` listener or revision check); a deleted project is not recreated; legacy import order and quota; corrupt timestamp tolerated | M2, M15, M16, L3, L29, L30, L33, L34 | `fileManager.js`, `projectLibrary.js`, `loadDialog.js`, `handleUndo`/`handleRedo` in `interactions.js` |
+| **B. Keyboard and focus** | 1 | Tab never claimed, swatches on `,` `.`; blur a focused field on canvas pointer-down; Space ownership; dialogs listen on `document` for Escape and the Tab trap; numpad with NumLock off; Ctrl+S in the name field; AltGr brackets; help overlay and README list every key including Esc and the piece keys | M3, M4, M5, L10, L12, L13, L37, L46, part of L47 | `shortcuts.js`, `viewControls.js`, `focusUtils.js`, `handlePointerDown` in `interactions.js`, README keys table |
+| **C. Playtest** | 1 | Escape during a tray drag fully cancels; tray centring; a folded tray keeps the dice reachable; roll and send on `pointerup`; phone-width layout; announce off-board drops; stable labels on infinite boards | M17, rest of L47 | `playtestDrag.js`, `playtestTray.js`, `playtest.js`, `pieces.js`, `styles.css` |
+| **D. Hang and infinite** | 1 | Bound ids and coordinates; the validator ties bounds to vertices and caps coordinates; infinite undo blanks tiles missing from a snapshot; empty-infinite export no longer throws | H1, M1, L1, L16 | `infinite.js`, `state.js` (`restoreSnapshot`), `projectFormat.js`, `neighbors.js` |
+| **E. Print and export** | 1 | Legend on its own page when the board does not fit; palette-aware labels; float noise; 16 MP rounding; crop marks; 14,400 pt warning; start-outline switch; SVG border order; export settings `null`; cache of the infinite export scene; hover no longer hides object overhang | M8, M9, L18–L23, L38, L40, L41, L42 | `print.js`, `exportDialog.js`, `exporter.js`, `renderer.js`, label lookup in `textures.js` |
+| **F. Share links and start-up** | 1 | Link width cap for 50 layers; `#rgb` normalised; the Share dialog refuses boards over the tile cap; do not carry `?project`; landing hash change and the preview `storage` key; start the board before applying themes and load theme images in parallel with a timeout; `1e2` and empty number fields; orientation control for triangle circles; white theme tile; the theme editor asks before discarding | M6, M12, L2, L11, L14, L15, L32, L35, L39, L43, L45 | `shareLink.js`, `ui.js`, `main.js`, `themeManager.js`, `themeEditor.js`, `landing.js` |
+| **G. CI and previews** | 1 | Preview comment from a job that cannot be cancelled and only when the preview was built; skip PRs without the app layout; check references of exported pages; note on the domain move | M13, L24, L27, L44 | `.github/workflows/`, `scripts/build-site.js`, `docs/DEPLOYMENT.md`. **Only takes effect after you merge it** (the workflow runs from `main`) |
+| **J. Interaction details** | 1 | Last tiles of a fast stroke; a stroke tied to its pointer and ended on lost release; resize and playtest keep zoom and pan; no-op undo steps (Clear on a blank board, colour case); a pinch-cancelled fill keeps the redo branch | L5–L9 | `handlePointerMove`/`Up`/`Cancel`, `handleClearBoard`, `applyToolToPolygon` in `interactions.js`, the debounced resize in `main.js`, `setPolygons` and the view reset in `state.js` |
+| **I. Generator version** | 2 (after D and F, on the combined tree) | Everything in 7.1 point 2, including the hexagon-circle scan-window fix | M7, M14 | `geometry/hex.js`, `geometry/triangle.js`, `config.js`, `projectFormat.js`, `shareLink.js`, fixtures, `docs/SPECIFICATION.md`, `docs/TILE_GENERATION_EXPLANATION.md` |
+| **H. Tests and docs** | 3 (last) | Tests for the 16 mutation survivors (`restoreState` resets, `fromId` guard, spike repetition, blocked storage, `uniqueHex`, `linePath` on islands), a test that every script tag is present and in a valid order, browser-driven keyboard checks for M3-M5 where feasible; README, SPECIFICATION and TILE_GENERATION brought in line | L28, test gaps | `tests/`, `docs/` |
 
-Not tonight: M7 and M14's generation flag (decision 2), M10 `devicePixelRatio` (a rendering change that needs a careful look on a real HiDPI screen), M18 Country board caching (needs a design for the tile-id cache), M11 legacy id migration (needs real old files to test against), converting theme images to data URLs at import (L26), L4 compact autosave (a format-level change), the Info items.
+Not tonight: M10 `devicePixelRatio` (needs a look on a real HiDPI screen), M18 Country board caching, M11 legacy-id migration (needs real old files), converting theme images to data URLs at import (L26), compact autosave (L4), L17 fractional radius, the Info items.
 
-### 7.3 Order and parallelism
+### 7.3 Order
 
-1. **Wave 1, in parallel:** A, B, C, D, E, F, G (no shared files between them; B touches `interactions.js` for one handler and A for undo-autosave: I assign the undo/redo handler to A and tell B to leave that function alone).
-2. **Review:** I read every diff, rerun the full suite, check that each branch passes alone and that the combined merge is conflict-free.
-3. **Wave 2:** H, on top of the combined result, so the new tests describe the final behaviour.
-4. **Verification in a browser:** I drive the combined build with Chrome for the keyboard and playtest checks (Tab walk, shortcut after canvas click, two-tab overwrite warning, failed-save prompt, tray Escape), and for the touch layout at 390 px as far as the browser window allows.
-5. **Push:** one draft PR per package plus one combined integration PR (preview), no force-pushes, no merges. The morning summary lists the PRs, what to try in each preview, and anything I could not verify.
+1. **Wave 1, in parallel:** A, B, C, D, E, F, G, J. File ownership above keeps them apart; `interactions.js` is shared by A, B and J, split by function, and I resolve any textual conflict at integration.
+2. **Review:** I read every diff, rerun the full suite on each branch and on the combined result.
+3. **Wave 2:** I (generator version) on top of the combined result of wave 1.
+4. **Wave 3:** H (tests and docs) on top of that.
+5. **Browser verification:** I drive the combined build in Chrome (Tab walk in the editor and in playtest, shortcuts after a canvas click, two-tab overwrite warning, failed-save prompt, tray Escape, Export dialog on a large window, old and new circle boards).
+6. **Push:** one draft PR per package and one combined integration PR; the Status column of this report is updated at each step; no force-pushes, no merges.
 
-**Risks:** the keyboard changes touch every shortcut, so B is the package most likely to need your eye; A changes when the app prompts, so its wording needs a read; G only has an effect after you merge it. Agents will be told not to kill browser processes by name (the geometry reviewer's `taskkill /IM msedge.exe` closed every Edge window on this machine).
-
----
+**Rules for the agents:** work only in their own worktree; no `taskkill` by image name (only the PIDs they started); no change to saved data outside package I and D's back-compatible validation; do not edit this report.
 
 ## 8. Reports
 
