@@ -157,11 +157,15 @@ const UI = (() => {
     const MAX_BOARD_SIDE = 100;
     const MAX_BOARD_RADIUS = 50;
 
-    /** Whole number from a board input, clamped to 1..max; empty or invalid input gives the default. The field shows the value used. */
+    /**
+     * Whole number from a board input, clamped to 1..max; empty or invalid input gives the default. The field
+     * shows the value used. Number() rather than parseInt, so "1e2" is 100 (as the field itself reads it), not 1.
+     */
     function readBoardNumber(input, fallback, max) {
-        const parsed = parseInt(input?.value, 10);
+        const text = String(input?.value ?? '').trim();
+        const parsed = text === '' ? NaN : Math.trunc(Number(text));
         const value = Number.isFinite(parsed) ? Math.min(max, Math.max(1, parsed)) : fallback;
-        if (input && input.value !== '' && String(value) !== input.value.trim()) input.value = value;
+        if (input && String(value) !== input.value) input.value = value;
         return value;
     }
 
@@ -320,8 +324,9 @@ const UI = (() => {
         const gridType = elements.gridTypeSelect?.value || Config.DEFAULT_BOARD_CONFIG.gridType;
         const boardShape = elements.boardShapeSelect?.value || Config.DEFAULT_BOARD_CONFIG.boardShape;
         const center = elements.centerSelect?.value === 'point' ? 'point' : 'tile';
-        // Hexagon tiles are pointy or flat; triangles around a point are laid out as a pointy or a flat hexagon.
-        const showOrientation = gridType === 'hexagon' || (gridType === 'triangle' && isCentral(boardShape) && center === 'point');
+        // Hexagon tiles are pointy or flat; triangles around a point are laid out as a pointy or a flat hexagon
+        // (the circle of triangles is not rotated by it, so it gets no control).
+        const showOrientation = gridType === 'hexagon' || (gridType === 'triangle' && boardShape === 'hexagon' && center === 'point');
         elements.orientationField?.classList.toggle('hidden', !showOrientation);
     }
 
