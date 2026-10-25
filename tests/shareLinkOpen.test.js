@@ -167,3 +167,37 @@ test('a link pasted into a running tab opens once the guard lets it through', as
     await untilRestored(env);
     assert.equal(env.calls.restores.length, 1);
 });
+
+test('an old circle link (no generator) opens as the board it was: generator 1 and the same tiles', async () => {
+    const env = fresh();
+    const Geometry = env.app.context.Geometry;
+    const config = { ...env.Config.DEFAULT_BOARD_CONFIG, boardShape: 'circle', radius: 20, width: 42, height: 42, center: 'point' };
+    const board = Geometry.generateGrid({ ...config, generator: 1 }, { width: 1200, height: 800 }, null);
+    board[5].color = '#1976D2';
+    const payload = JSON.parse(JSON.stringify(env.ShareLink.pack({ projectName: 'old', boardConfig: config, paletteId: 'landscape', polygons: board, formatVersion: 7 })));
+    delete payload.g; // as links made before generator versions
+    payload.v = 1;
+    env.location.hash = `#b=${await env.ShareLink.encode(payload)}`;
+    assert.equal(await env.ShareLink.openFromHash(), true);
+    const project = env.calls.restores[0];
+    assert.equal(project.appState.boardConfig.generator, 1);
+    assert.equal(project.appState.polygons.length, board.length);
+    assert.equal(project.appState.polygons[5].color, '#1976d2');
+});
+
+test('a link made now carries generator 2 and opens with it; a link from a newer generator is refused', async () => {
+    const env = fresh();
+    const Geometry = env.app.context.Geometry;
+    const config = { ...env.Config.DEFAULT_BOARD_CONFIG, boardShape: 'circle', radius: 20, width: 42, height: 42, center: 'point' };
+    const board = Geometry.generateGrid(config, { width: 1200, height: 800 }, null);
+    const payload = JSON.parse(JSON.stringify(env.ShareLink.pack({ projectName: 'new', boardConfig: config, paletteId: 'landscape', polygons: board, formatVersion: 8 })));
+    assert.equal(payload.g, 2);
+    env.location.hash = `#b=${await env.ShareLink.encode(payload)}`;
+    assert.equal(await env.ShareLink.openFromHash(), true);
+    assert.equal(env.calls.restores[0].appState.boardConfig.generator, 2);
+    assert.equal(env.calls.restores[0].appState.polygons.length, board.length);
+
+    env.location.hash = `#b=${await env.ShareLink.encode({ ...payload, g: 3 })}`;
+    assert.equal(await env.ShareLink.openFromHash(), false);
+    assert.equal(env.calls.restores.length, 1, 'nothing was opened');
+});

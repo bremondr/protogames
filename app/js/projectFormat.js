@@ -17,7 +17,9 @@
  * read live app config inside them.
  */
 const ProjectFormat = (() => {
-    const CURRENT_VERSION = 7;
+    const CURRENT_VERSION = 8;
+    // The board generator this app builds new boards with (see Config.GENERATOR_VERSION and the specification).
+    const GENERATOR_VERSION = Config.GENERATOR_VERSION;
 
     const GRID_TYPES = ['hexagon', 'square', 'triangle'];
     const BOARD_CENTERS = ['tile', 'point'];
@@ -26,7 +28,7 @@ const ProjectFormat = (() => {
     const MAX_COUNTRY_NAME = 100;
     const ORIENTATIONS = ['pointy-top', 'flat-top', 'orthogonal', 'diagonal'];
     const TRIANGLE_ORIENTATIONS = ['point-up', 'point-down'];
-    const MAX_BOARD_DIMENSION = 100; // same cap as share links
+    const MAX_BOARD_DIMENSION = 100; // share links read the same cap from here
     const MAX_BOARD_SPAN = 2 * MAX_BOARD_DIMENSION + 1;
     const MAX_VERTICES = 64;
     const MAX_OBJECT_ID = 200;
@@ -236,6 +238,20 @@ const ProjectFormat = (() => {
         return next;
     }
 
+    /**
+     * v7 -> v8: the generator version. A board remembers which version of the tile generator made it
+     * (boardConfig.generator) so that improving the generator never changes a saved board. Every board saved
+     * before this was made by generator 1; the migration writes that down. Frozen history: it does not read
+     * the live generator version.
+     */
+    function migrateV7toV8(project) {
+        const next = clone(project);
+        next.version = 8;
+        const config = isObject(next.appState) && isObject(next.appState.boardConfig) ? next.appState.boardConfig : null;
+        if (config && config.generator === undefined) config.generator = 1;
+        return next;
+    }
+
     /** MIGRATIONS[n] upgrades a version-n project to version n + 1. */
     const MIGRATIONS = {
         0: migrateV0toV1,
@@ -244,7 +260,8 @@ const ProjectFormat = (() => {
         3: migrateV3toV4,
         4: migrateV4toV5,
         5: migrateV5toV6,
-        6: migrateV6toV7
+        6: migrateV6toV7,
+        7: migrateV7toV8
     };
 
     /**
@@ -306,6 +323,15 @@ const ProjectFormat = (() => {
         }
         if (config.triangleOrientation !== undefined && !TRIANGLE_ORIENTATIONS.includes(config.triangleOrientation)) {
             fail(`The board has an unknown triangle orientation (${JSON.stringify(config.triangleOrientation)}).`);
+        }
+        if (!Number.isInteger(config.generator) || config.generator < 1) {
+            fail(`The board has an invalid generator version (${JSON.stringify(config.generator)}).`);
+        }
+        if (config.generator > GENERATOR_VERSION) {
+            throw new ProjectFormatError(
+                `This project's board was made by a newer version of Protogames (board generator ${config.generator}; this app understands up to ${GENERATOR_VERSION}). Update Protogames to open it.`,
+                'newer-version'
+            );
         }
         if (config.boardShape === 'country') {
             if (typeof config.country !== 'string' || !config.country.trim() || config.country.length > MAX_COUNTRY_NAME) {
@@ -498,6 +524,8 @@ const ProjectFormat = (() => {
 
     return {
         CURRENT_VERSION,
+        MAX_BOARD_DIMENSION,
+        MAX_BOARD_SPAN,
         MIGRATIONS,
         ProjectFormatError,
         detectVersion,

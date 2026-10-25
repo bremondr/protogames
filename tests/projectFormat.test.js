@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { ROOT, loadApp, plain } = require('./support/load');
 
-const app = loadApp(['app/js/projectFormat.js']);
+const app = loadApp(['app/js/config.js', 'app/js/projectFormat.js']);
 const PF = app.run('ProjectFormat');
 const fixture = (name) => JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', name), 'utf8'));
 const legacyProject = () => fixture('v0-legacy-project.protogames.json');
@@ -55,7 +55,7 @@ test('a legacy v0 project (string version "1.0") still loads and keeps its data'
     assert.equal(loaded.projectName, 'legacy-board');
     assert.equal(loaded.created, legacy.created);
     assert.equal(loaded.appState.polygons.length, legacy.appState.polygons.length);
-    assert.deepEqual(loaded.appState.boardConfig, { ...legacy.appState.boardConfig, center: 'tile' }, 'the board is untouched, the centre written down');
+    assert.deepEqual(loaded.appState.boardConfig, { ...legacy.appState.boardConfig, center: 'tile', generator: 1 }, 'the board is untouched, the centre and generator written down');
     assert.equal(loaded.appState.polygons[0].color, '#2D5016');
     assert.equal(loaded.appState.polygons[2].object, 'castle');
 });
@@ -642,7 +642,7 @@ test('v5 to v6 keeps players and dice a file already has', () => {
 test('a v5 file loads through parse() as a current project with the standard dice', () => {
     const loaded = plain(PF.parse(JSON.stringify(v5Project())));
     assert.equal(loaded.version, PF.CURRENT_VERSION);
-    assert.equal(PF.CURRENT_VERSION, 7);
+    assert.equal(PF.CURRENT_VERSION, 8);
     assert.deepEqual(loaded.appState.players, []);
     assert.deepEqual(loaded.appState.dice, STANDARD_DICE);
 });
@@ -802,4 +802,72 @@ test('a legacy triangle hexagon board keeps its tiles: the file loads and its ti
     const loaded = plain(PF.parse(JSON.stringify(withBoard({ boardShape: 'hexagon', gridType: 'triangle' }))));
     assert.equal(loaded.appState.boardConfig.center, 'point');
     assert.equal(loaded.appState.polygons.length, v6Project().appState.polygons.length, 'the tiles are untouched');
+});
+
+// ---- v7 -> v8: the generator version -------------------------------------------------------------------------------------
+
+const v7Project = (name = 'v7-circle-hexagon.protogames.json') => fixture(name);
+const V7_FIXTURES = ['v7-circle-hexagon.protogames.json', 'v7-circle-triangle.protogames.json'];
+
+test('v7 to v8 writes down the generator every earlier board was made with: generator 1, for every board shape', () => {
+    for (const boardShape of ['hexagon', 'rectangle', 'triangle', 'circle', 'infinite', 'country']) {
+        const source = v7Project();
+        source.appState.boardConfig.boardShape = boardShape;
+        assert.equal(plain(PF.MIGRATIONS[7](source)).appState.boardConfig.generator, 1, boardShape);
+    }
+});
+
+test('v7 to v8 changes nothing else, keeps a generator a file already has, and does not mutate its input', () => {
+    const source = v7Project('v7-circle-triangle.protogames.json');
+    const migrated = plain(PF.MIGRATIONS[7](source));
+    assert.equal(migrated.version, 8);
+    const expected = JSON.parse(JSON.stringify(source));
+    expected.version = 8;
+    expected.appState.boardConfig.generator = 1;
+    assert.deepEqual(migrated, expected);
+    assert.equal(source.version, 7, 'the input is not mutated');
+    assert.equal(source.appState.boardConfig.generator, undefined);
+    source.appState.boardConfig.generator = 2;
+    assert.equal(plain(PF.MIGRATIONS[7](source)).appState.boardConfig.generator, 2);
+    assert.equal(plain(PF.MIGRATIONS[7]({ version: 7 })).version, 8, 'incomplete data does not throw');
+    assert.equal(plain(PF.MIGRATIONS[7]({ version: 7, appState: { boardConfig: null } })).version, 8);
+});
+
+test('every older fixture arrives with generator 1; what the app saves now carries the current one', () => {
+    for (const name of ['v0-legacy-project.protogames.json', 'v1-space-arctic.protogames.json', 'v2-space-arctic.protogames.json', 'v3-space-arctic.protogames.json', 'v4-space-arctic.protogames.json', 'v4-square-board.protogames.json', 'v5-space-arctic.protogames.json', 'v6-space-arctic.protogames.json', ...V7_FIXTURES]) {
+        const loaded = plain(PF.parse(JSON.stringify(fixture(name))));
+        assert.equal(loaded.version, 8, name);
+        assert.equal(loaded.appState.boardConfig.generator, 1, name);
+    }
+    assert.equal(app.run('Config.DEFAULT_BOARD_CONFIG.generator'), 2);
+});
+
+test('the generator survives saving and loading: a generator 1 board stays generator 1', () => {
+    const loaded = plain(PF.parse(JSON.stringify(v7Project())));
+    const saved = plain(PF.createProject({ projectName: 'again', appState: loaded.appState, now: 0 }));
+    assert.equal(saved.appState.boardConfig.generator, 1);
+    assert.equal(plain(PF.parse(JSON.stringify(saved))).appState.boardConfig.generator, 1);
+    const autosave = plain(PF.createAutosave({ projectName: 'again', appState: loaded.appState, now: 1 }));
+    assert.equal(plain(PF.parse(JSON.stringify(autosave))).appState.boardConfig.generator, 1);
+});
+
+test('the generator is checked: a whole number from 1 up to what this app knows', () => {
+    const project = plain(PF.parse(JSON.stringify(v7Project('v7-circle-triangle.protogames.json'))));
+    for (const generator of [1, 2]) {
+        project.appState.boardConfig.generator = generator;
+        assert.doesNotThrow(() => PF.validate(project), String(generator));
+    }
+    for (const bad of [0, -1, 2.5, 'x', '1', null, undefined, NaN]) {
+        project.appState.boardConfig.generator = bad;
+        throwsFormatError(() => PF.validate(project), 'invalid', /invalid generator version/);
+    }
+    project.appState.boardConfig.generator = 3;
+    throwsFormatError(() => PF.validate(project), 'newer-version', /made by a newer version.*generator 3.*up to 2/);
+    // the same through parse: the file says it is current, but its board comes from the future
+    throwsFormatError(() => PF.parse(JSON.stringify(project)), 'newer-version', /newer version/);
+});
+
+test('the board size caps are shared: share links read them from here', () => {
+    assert.equal(PF.MAX_BOARD_DIMENSION, 100);
+    assert.equal(PF.MAX_BOARD_SPAN, 201);
 });
