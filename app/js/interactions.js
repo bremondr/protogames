@@ -233,6 +233,8 @@ const Interactions = (() => {
         if (!snapshot) return;
         AppState.restoreSnapshot(snapshot);
         Renderer.renderBoard();
+        AppState.markDirty();
+        FileManager.autoSaveToLocalStorage(true);
     }
 
     function handleRedo() {
@@ -240,6 +242,8 @@ const Interactions = (() => {
         if (!snapshot) return;
         AppState.restoreSnapshot(snapshot);
         Renderer.renderBoard();
+        AppState.markDirty();
+        FileManager.autoSaveToLocalStorage(true);
     }
 
     function handleClearBoard() {

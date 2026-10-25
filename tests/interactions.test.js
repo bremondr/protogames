@@ -223,3 +223,19 @@ test('regenerating a board with the same tiles keeps the start markers', () => {
     env.Interactions.generateBoard(env.state.boardConfig, { skipDirtyFlag: true });
     assert.equal(env.state.polygons[4].start, undefined, 'a fresh board has none');
 });
+
+test('undo and redo are autosaved like any other change', () => {
+    const env = fresh();
+    press(env, 0);
+    release(env, 0);
+    env.state.isDirty = false;
+    const saves = env.calls.saves;
+    env.Interactions.undo();
+    assert.equal(env.calls.saves, saves + 1, 'undo saves');
+    assert.equal(env.state.isDirty, true, 'and marks the board changed');
+    env.Interactions.redo();
+    assert.equal(env.calls.saves, saves + 2, 'redo saves');
+    env.Interactions.undo();
+    env.Interactions.undo();
+    assert.equal(env.calls.saves, saves + 3, 'an undo with nothing left to undo does not save');
+});
