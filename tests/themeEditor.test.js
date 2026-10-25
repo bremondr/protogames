@@ -65,5 +65,42 @@ test('a failed save keeps the dialog open with the reason, and it can be closed 
     assert.equal(env.hidden(), false);
     assert.equal(env.elements.themeEditorSave.disabled, false);
     env.elements.themeEditorCancel.listeners.click();
+    env.elements.themeEditorCancel.listeners.click();
+    assert.equal(env.hidden(), true, 'closing still asks once, because the name typed was never saved');
+});
+
+test('an editor with no changes closes at once; with changes the first request asks and the second discards', () => {
+    const env = fresh(() => Promise.resolve({ saved: true }));
+    // Back to the state it opened in: nothing to lose.
+    env.elements.themeEditorName.value = '';
+    env.elements.themeEditorName.listeners.input();
+    env.elements.themeEditorCancel.listeners.click();
+    assert.equal(env.hidden(), true, 'nothing changed, so no question');
+
+    env.ThemeEditor.open('tiles', null);
+    env.elements.themeEditorName.value = 'Dunes';
+    env.elements.themeEditorName.listeners.input();
+    const root = env.elements.themeEditor;
+    root.listeners.pointerdown({ target: root });
+    assert.equal(env.hidden(), false, 'a backdrop click does not throw the edit away');
+    assert.match(env.elements.themeEditorError.textContent, /unsaved changes/);
+    assert.equal(env.elements.themeEditorCancel.textContent, 'Discard changes');
+    env.elements.themeEditorClose.listeners.click();
+    assert.equal(env.hidden(), true, 'asked again: discarded');
+    assert.equal(env.elements.themeEditorCancel.textContent, 'Cancel');
+});
+
+test('typing after the question takes it back, and saving needs no question', async () => {
+    const env = fresh(() => Promise.resolve({ saved: true }));
+    env.elements.themeEditorCancel.listeners.click();
+    assert.equal(env.elements.themeEditorCancel.textContent, 'Discard changes');
+    env.elements.themeEditorName.value = 'Swamp 2';
+    env.elements.themeEditorName.listeners.input();
+    assert.equal(env.elements.themeEditorCancel.textContent, 'Cancel');
+    assert.equal(env.elements.themeEditorError.textContent, '');
+    env.elements.themeEditorCancel.listeners.click();
+    assert.equal(env.hidden(), false, 'asks again after a further edit');
+    env.elements.themeEditorSave.listeners.click();
+    await tick();
     assert.equal(env.hidden(), true);
 });
