@@ -15,11 +15,13 @@ const Exporter = (() => {
     const BACKGROUNDS = ['transparent', 'white'];
     const MAX_SCALE = 4;
 
+    const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
     const flag = (value, fallback) => (typeof value === 'boolean' ? value : fallback);
     const background = (value, fallback) => (BACKGROUNDS.includes(value) ? value : fallback);
 
     /** PNG options with anything missing or odd replaced by its default. */
-    function normalizePng(options = {}) {
+    function normalizePng(saved) {
+        const options = isObject(saved) ? saved : {};
         const scale = Math.floor(Number(options.scale));
         return {
             scale: Number.isFinite(scale) ? Math.min(MAX_SCALE, Math.max(1, scale)) : PNG_DEFAULTS.scale,
@@ -31,7 +33,8 @@ const Exporter = (() => {
     }
 
     /** SVG options with anything missing or odd replaced by its default. */
-    function normalizeSvg(options = {}) {
+    function normalizeSvg(saved) {
+        const options = isObject(saved) ? saved : {};
         return {
             textures: flag(options.textures, SVG_DEFAULTS.textures),
             objects: flag(options.objects, SVG_DEFAULTS.objects),
@@ -208,7 +211,7 @@ const Exporter = (() => {
             borderLines = `<path d="${d}" fill="none" stroke="${Utils.escapeAttribute(borders.shadow)}" stroke-width="${borders.width + 2}" stroke-linecap="round"/>`
                 + `<path d="${d}" fill="none" stroke="${Utils.escapeAttribute(borders.color)}" stroke-width="${borders.width}" stroke-linecap="round"/>`;
         }
-        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${Utils.escapeAttribute(viewBox)}" width="${Utils.escapeAttribute(width)}" height="${Utils.escapeAttribute(height)}">${defs ? `<defs>${defs}</defs>` : ''}${backdrop}${paths}${features}${borderLines}${markers}${pictures}</svg>`;
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${Utils.escapeAttribute(viewBox)}" width="${Utils.escapeAttribute(width)}" height="${Utils.escapeAttribute(height)}">${defs ? `<defs>${defs}</defs>` : ''}${backdrop}${paths}${features}${markers}${pictures}${borderLines}</svg>`;
     }
 
     /** The SVG text of the current board for the chosen options, with its size; null when there is no board. */
@@ -221,7 +224,7 @@ const Exporter = (() => {
         let viewBox = `0 0 ${width} ${height}`;
         if (Infinite.isActive()) {
             // Frame what was drawn on an infinite board.
-            const scene = Infinite.exportScene(width, height);
+            const scene = Renderer.exportScene(width, height);
             polygons = scene.polygons;
             width = Math.ceil(scene.bounds.maxX - scene.bounds.minX);
             height = Math.ceil(scene.bounds.maxY - scene.bounds.minY);

@@ -189,3 +189,23 @@ test('the borders between countries are lines over the tiles, a dark one under a
     const hostile = Exporter.buildSvg([square(0, 0, '#7cb342')], { width: 10, height: 10, viewBox: '0 0 10 10', borders: { ...borders, color: 'red" onload="x' } });
     assert.ok(!/onload="x/.test(hostile), 'a border colour cannot break out of its attribute');
 });
+
+test('country borders are the last thing in the SVG, over objects and start markers, as on screen', () => {
+    const { Exporter } = fresh({});
+    const borders = { edges: [[{ x: 10, y: 0 }, { x: 10, y: 10 }]], color: '#fff', shadow: '#000', width: 2.5 };
+    const polygons = [square(0, 0, '#7cb342', { start: '#c62828' }), square(10, 0, '#7cb342')];
+    const svg = Exporter.buildSvg(polygons, { width: 20, height: 10, viewBox: '0 0 20 10', objects: true, borders });
+    assert.ok(svg.indexOf('stroke="#c62828"') < svg.indexOf('stroke-width="4.5"'), 'the start marker is under the border');
+    assert.ok(svg.lastIndexOf('<path') > svg.indexOf('stroke="#c62828"'));
+    assert.ok(svg.indexOf('stroke-width="2.5"') > svg.indexOf('stroke-width="3.5"'));
+});
+
+test('saved PNG and SVG options that are null or not objects become the defaults', () => {
+    const { Exporter } = fresh({});
+    const plain = (value) => JSON.parse(JSON.stringify(value));
+    for (const bad of [null, 'text', 7, [], true]) {
+        assert.deepEqual(plain(Exporter.normalizePng(bad)), plain(Exporter.PNG_DEFAULTS));
+        assert.deepEqual(plain(Exporter.normalizeSvg(bad)), plain(Exporter.SVG_DEFAULTS));
+    }
+    assert.deepEqual(plain(Exporter.normalizeSvg(undefined)), plain(Exporter.SVG_DEFAULTS));
+});
