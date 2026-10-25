@@ -420,6 +420,51 @@ test('a file without bounds gets them from the vertices instead of crashing the 
     assert.deepEqual(loaded.appState.polygons[0].bounds, expected);
 });
 
+test('disagreeing bounds are recomputed from the vertices (a huge box would exhaust the point locator)', () => {
+    const project = hostile();
+    const polygon = project.appState.polygons[0];
+    const expected = plain(polygon.bounds);
+    polygon.bounds = { minX: -3e6, maxX: 3e6, minY: -3e6, maxY: 3e6 };
+    const loaded = plain(PF.parse(JSON.stringify(project)));
+    assert.deepEqual(loaded.appState.polygons[0].bounds, expected);
+});
+
+test('coordinates beyond what a board can hold are refused, not looped over', () => {
+    const far = (project, value) => {
+        const polygon = project.appState.polygons[0];
+        polygon.vertices = polygon.vertices.map((v) => ({ x: v.x + value, y: v.y + value }));
+        polygon.center = { x: polygon.center.x + value, y: polygon.center.y + value };
+    };
+    const finite = hostile();
+    far(finite, 1e18);
+    throwsFormatError(() => PF.parse(JSON.stringify(finite)), 'invalid', /too far/);
+    const justOver = hostile();
+    far(justOver, 2e7);
+    throwsFormatError(() => PF.parse(JSON.stringify(justOver)), 'invalid', /too far/);
+
+    const infinite = hostile();
+    infinite.appState.boardConfig.boardShape = 'infinite';
+    far(infinite, 1e18);
+    throwsFormatError(() => PF.parse(JSON.stringify(infinite)), 'invalid', /too far/);
+    const farButFine = hostile();
+    farButFine.appState.boardConfig.boardShape = 'infinite';
+    far(farButFine, 5e9); // an infinite board panned very far stays valid
+    assert.doesNotThrow(() => PF.parse(JSON.stringify(farButFine)));
+});
+
+test('an infinite tile id near 2^53 is refused', () => {
+    for (const id of ['inf_s_9007199254740991_0', 'inf_t_0_-9007199254740991_up', 'inf_hp_1000000001_0']) {
+        const project = hostile();
+        project.appState.boardConfig.boardShape = 'infinite';
+        project.appState.polygons[0].id = id;
+        throwsFormatError(() => PF.parse(JSON.stringify(project)), 'invalid', /too large/);
+    }
+    const ok = hostile();
+    ok.appState.boardConfig.boardShape = 'infinite';
+    ok.appState.polygons[0].id = 'inf_s_1000000_-1000000';
+    assert.doesNotThrow(() => PF.parse(JSON.stringify(ok)));
+});
+
 test('values at the edge of the allowed range, and three-digit colours, are still accepted', () => {
     const project = hostile();
     Object.assign(project.appState.boardConfig, { radius: 100, size: 100, width: 201, height: 201, orientation: 'flat-top', triangleOrientation: 'point-down' });
