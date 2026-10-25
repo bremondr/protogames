@@ -16,28 +16,28 @@ For `gridType: 'triangle'`, `buildTriangleGrid` picks a builder by `config.board
 | Board shape | Builder | Tiles |
 |---|---|---|
 | `triangle` | `buildTessellatedTriangle` | `size * size` (row `r` has `2r + 1` triangles) |
-| `hexagon` | `buildHexagonTriangleGrid(config, canvas, colorMap, radius, orientation)` | `6 * radius^2` |
+| `hexagon` | `buildHexagonTriangleGrid(config, canvas, colorMap, radius, orientation)` | around a point (`center: 'point'`): `6 * radius^2`; around a triangle (`center: 'tile'`): `6 * radius * (radius - 1) + 1`, see "Around a triangle" |
 | `circle` | `buildCircleTriangleGrid(config, canvas, colorMap, radius)` | see below |
 | anything else | rectangular fallback, clipped by the board outline | - |
 
 The hexagon and circle builders both use the shared `buildLatticeTriangles`.
 
 ## The shared lattice builder
-`buildLatticeTriangles(canvas, colorMap, { span, accepts, rotate, idPrefix })` tiles a region with triangles of a lattice that has a **vertex at the board centre**, which gives the result the full 6-fold symmetry of the lattice.
+`buildLatticeTriangles(canvas, colorMap, { span, accepts, origin, rotate, idPrefix })` tiles a region with triangles of a lattice that has a **vertex at the board centre**, which gives the result the full 6-fold symmetry of the lattice.
 
 1. Layout is done at a fixed scale (`side = 100`) around the canvas centre. The final size is not chosen here: `fitPolygonsToCanvas` scales and centres whatever survived (see "Fitting" below).
 2. Lattice point `(i, j)` sits at `x = (i + j/2) * side`, `y = j * (sqrt(3)/2) * side`.
 3. Every lattice cell `(i, j)` for `i, j` in `-span..span` holds two triangles:
    - `down`: points `(i, j)`, `(i+1, j)`, `(i, j+1)`
    - `up`: points `(i+1, j)`, `(i+1, j+1)`, `(i, j+1)`
-4. A triangle is kept when `accepts(x, y)` is true for its **centroid**, given in triangle sides relative to the centre. The `accepts` predicate is the only thing that differs between board shapes.
+4. A triangle is kept when `accepts(x, y, triangle)` is true for its **centroid**, given in triangle sides relative to `origin` (the middle of the board in lattice units; the vertex at 0, 0 unless a board is built around a triangle), with `triangle` = `{ i, j, kind }`. The `accepts` predicate is the only thing that differs between board shapes.
 5. With `rotate`, the finished layout is turned by 90 degrees about the centre.
 6. Each kept triangle becomes a polygon with id `<idPrefix>_<j>_<i>_<kind>` and `type: 'triangle'`. The `pointingUp` flag is set only when the layout is not rotated; a rotated triangle points sideways, so it gets none.
 
 `span` only has to be large enough to cover the board (`2 * radius + 1` for hexagons, `2 * radius + 2` for circles); the predicate does the real selection.
 
 ## Hexagon board
-`radius` is the number of triangle sides from the centre to the edge (rings). The predicate describes a flat-top hexagon (corners left and right) whose edges follow lattice lines, so no centroid ever lies on the boundary:
+This section is about the board around a lattice vertex (`center: 'point'`, the only way triangle boards were built before generator versions and centres). `radius` is the number of triangle sides from the centre to the edge (rings). The predicate describes a flat-top hexagon (corners left and right) whose edges follow lattice lines, so no centroid ever lies on the boundary:
 
 ```javascript
 accepts: (x, y) => Math.abs(x) + Math.abs(y) / Math.sqrt(3) < rings
@@ -51,7 +51,10 @@ Rings of triangles around the centre vertex hold `6 * (2k - 1)` triangles for ri
 
 `6 + 18 + ... + 6(2N - 1) = 6 * N^2`
 
-triangles: 6 for `N = 1`, 24 for `N = 2`, 54 for `N = 3`, 96 for `N = 4`. Tests and `dev/geometry-checks.js` assert `6 * radius^2`.
+triangles: 6 for `N = 1`, 24 for `N = 2`, 54 for `N = 3`, 96 for `N = 4`. Tests and `dev/geometry-checks.js` assert `6 * radius^2` for this centre.
+
+### Around a triangle
+With `center: 'tile'` the board is built around one triangle (`triangleOrientation` says whether it points up or down) by `layersAroundTriangle` in `triangle.js`: layer 1 is that triangle and every next layer adds the triangles that share a corner with the previous one, the same rule that makes hexagons grow in rings. A board of `N` layers has `6 * N * (N - 1) + 1` triangles: 1, 13, 37, 73 for `N = 1` to 4 (layers add 12, 24, 36, ...). `6 * radius^2` does not apply to it.
 
 ## Circle board
 Around a lattice vertex (`center: 'point'`), every triangle whose centroid lies within `radius` triangle sides of the vertex:
