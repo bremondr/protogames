@@ -483,7 +483,10 @@ const Interactions = (() => {
     function handlePointerDown(event) {
         // Only the primary button paints; a right-click must reach the browser's context menu untouched.
         if (event.button > 0) return;
+        // preventDefault below stops the browser's own focus change, so move focus here: a sidebar field
+        // that still has it would swallow Ctrl+Z, E, B and the digits. The canvas is not a tab stop.
         event.preventDefault();
+        if (event.currentTarget && event.currentTarget.focus) event.currentTarget.focus({ preventScroll: true });
         const state = AppState.getState();
         if (state.playtest) return;
         const point = getWorldPoint(event);

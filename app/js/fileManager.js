@@ -245,14 +245,11 @@ const FileManager = (() => {
             dialog.setAttribute('aria-labelledby', heading.id);
         }
         document.body.appendChild(backdrop);
-        FocusUtils.trapTab(backdrop);
-        backdrop.addEventListener('keydown', (event) => {
-            if (event.key !== 'Escape' || !onEscape) return;
-            event.preventDefault(); // so playtest/popover Escape handlers leave their own state alone
-            onEscape();
-        });
+        // On `document`, so Escape and the Tab trap survive a click on dialog text (focus falls to <body>).
+        const stopKeys = FocusUtils.modalKeys(backdrop, onEscape ? { Escape: onEscape } : {});
         (initialFocus || FocusUtils.tabbables(backdrop)[0])?.focus();
         return () => {
+            stopKeys();
             backdrop.remove();
             if (opener && opener.isConnected && opener.focus) opener.focus();
         };

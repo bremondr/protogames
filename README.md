@@ -38,11 +38,16 @@ Press **?** (or use the keyboard button in the bottom-right corner) for the full
 | Eraser on/off | E |
 | Start markers on/off | M |
 | Smaller / larger brush or eraser (1-7) | [ / ] |
-| Pick swatch | 1 - 9, or Tab / Shift+Tab to cycle |
+| Pick swatch | 1 - 9 |
+| Next / previous swatch | . / , |
 | Zoom in / out / fit | + / - / 0 |
-| Pan | Space + drag |
-| Save project | Ctrl+S (only this key is taken over from the browser) |
+| Pan | Space + drag (Space keeps its normal job on buttons, checkboxes and in dialogs) |
+| Save project | Ctrl+S, also inside a text field (the only key taken over from the browser) |
 | Show shortcuts | ? |
+| Move between controls | Tab / Shift+Tab (the app never takes Tab, so the board is not a keyboard trap) |
+| Cancel a line or a drag, close the top dialog, leave playtest | Esc (one layer at a time, topmost first) |
+
+In playtest, keyboard play uses the same keys on real controls: **Tab** to a tray piece and press **Enter** or **Space** to send it to a free start; Tab to the piece list, then the **arrow keys** move the focused piece one tile and **Delete** or **Backspace** returns it to its tray; **Esc** cancels a drag, then leaves playtest. Undo and redo step through piece moves.
 
 `V` is reserved for the Select tool, which does not exist yet.
 

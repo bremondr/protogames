@@ -18,8 +18,8 @@ function ev(key, mods = [], extra = {}) {
         ...extra
     };
 }
-const idFor = (event, isMac = false, context = {}) => {
-    const binding = S.findBinding(event, isMac, context);
+const idFor = (event, isMac = false) => {
+    const binding = S.findBinding(event, isMac);
     return binding ? binding.id : null;
 };
 
@@ -63,8 +63,8 @@ test('every binding from the issue exists with the proposed keys', () => {
     assert.deepEqual(plain(keysOf('brush-smaller')), ['bracketleft']);
     assert.deepEqual(plain(keysOf('brush-larger')), ['bracketright']);
     for (let i = 1; i <= 9; i++) assert.deepEqual(plain(keysOf(`swatch-${i}`)), [String(i)]);
-    assert.deepEqual(plain(keysOf('swatch-next')), ['tab']);
-    assert.deepEqual(plain(keysOf('swatch-prev')), ['shift+tab']);
+    assert.deepEqual(plain(keysOf('swatch-next')), ['period']);
+    assert.deepEqual(plain(keysOf('swatch-prev')), ['comma']);
     assert.ok(keysOf('zoom-in').includes('plus') && keysOf('zoom-out').includes('minus'));
     assert.deepEqual(plain(keysOf('zoom-fit')), ['0']);
     assert.deepEqual(plain(keysOf('save')), ['mod+s']);
@@ -129,12 +129,42 @@ test('swatch number keys work on the number row, the numpad and AZERTY-style lay
     assert.equal(idFor(ev('0')), 'zoom-fit');
 });
 
-test('Tab cycles swatches only when focus is not on a control', () => {
-    assert.equal(idFor(ev('Tab'), false, { focusNeutral: false }), null);
-    assert.equal(idFor(ev('Tab'), false, { focusNeutral: true }), 'swatch-next');
-    assert.equal(idFor(ev('Tab', ['shift']), false, { focusNeutral: true }), 'swatch-prev');
-    assert.equal(idFor(ev('Tab', ['shift']), false, { focusNeutral: false }), null);
-    assert.equal(idFor(ev('Tab', ['ctrl']), false, { focusNeutral: true }), null, 'Ctrl+Tab switches browser tabs');
+test('the app never claims Tab; swatches cycle on . and ,', () => {
+    for (const mods of [[], ['shift'], ['ctrl']]) assert.equal(idFor(ev('Tab', mods)), null, `Tab ${mods}`);
+    for (const binding of S.BINDINGS) for (const key of binding.keys) assert.ok(!/tab/.test(key), `${binding.id} uses ${key}`);
+    assert.equal(idFor(ev('.', [], { code: 'Period' })), 'swatch-next');
+    assert.equal(idFor(ev(',', [], { code: 'Comma' })), 'swatch-prev');
+    assert.equal(S.BINDINGS.find((b) => b.id === 'swatch-next').repeat, true);
+    assert.equal(S.BINDINGS.find((b) => b.id === 'swatch-prev').repeat, true);
+    assert.equal(idFor(ev('.', ['ctrl'])), null);
+    assert.equal(S.hintFor(S.BINDINGS.find((b) => b.id === 'swatch-next'), false), '.');
+});
+
+test('AltGr (reported as Ctrl+Alt) still types [ and ] on Czech and German layouts', () => {
+    const altGr = (key, code) => ev(key, ['ctrl', 'alt'], { code, getModifierState: (name) => name === 'AltGraph' });
+    assert.equal(idFor(altGr('[', 'BracketLeft')), 'brush-smaller');
+    assert.equal(idFor(altGr(']', 'BracketRight')), 'brush-larger');
+    // Without AltGraph, Ctrl+Alt+[ is a real modifier chord and stays free for the browser.
+    assert.equal(idFor(ev('[', ['ctrl', 'alt'], { code: 'BracketLeft', getModifierState: () => false })), null);
+    // AltGr does not turn other keys into Ctrl+Z.
+    assert.equal(idFor(ev('z', ['ctrl', 'alt'], { getModifierState: (name) => name === 'AltGraph' })), null);
+});
+
+test('numpad digits pick swatches only with NumLock on (the key reports the digit)', () => {
+    assert.equal(idFor(ev('End', [], { code: 'Numpad1' })), null);
+    assert.equal(idFor(ev('ArrowDown', [], { code: 'Numpad2' })), null);
+    assert.equal(idFor(ev('Clear', [], { code: 'Numpad5' })), null);
+    assert.equal(idFor(ev('0', [], { code: 'Numpad0' })), 'zoom-fit');
+    assert.equal(idFor(ev('Insert', [], { code: 'Numpad0' })), null);
+    assert.equal(idFor(ev('3', [], { code: 'Numpad3' })), 'swatch-3');
+});
+
+test('every way to operate the app is listed: Esc, Tab and the playtest keys', () => {
+    const docs = S.BINDINGS.filter((b) => b.documentation).map((b) => `${b.group}:${b.display}`);
+    for (const wanted of ['Edit:Esc', 'Playtest:Esc', 'Playtest:Tab / Shift+Tab', 'Playtest:Enter / Space', 'Playtest:Arrow keys', 'Playtest:Delete / Backspace', 'Help:Esc', 'Help:Tab / Shift+Tab', 'View:Space + drag']) {
+        assert.ok(docs.includes(wanted), wanted);
+    }
+    assert.ok(S.GROUPS.includes('Playtest'));
 });
 
 test('zoom keys: + (with or without Shift), =, the numpad, - and _', () => {
@@ -220,8 +250,8 @@ test('symbol and special keys have readable labels', () => {
     assert.equal(S.formatCombo('bracketright', false), ']');
     assert.equal(S.formatCombo('minus', false), '−');
     assert.equal(S.formatCombo('plus', false), '+');
-    assert.equal(S.formatCombo('tab', false), 'Tab');
-    assert.equal(S.formatCombo('shift+tab', false), 'Shift+Tab');
+    assert.equal(S.formatCombo('period', false), '.');
+    assert.equal(S.formatCombo('comma', false), ',');
     assert.equal(S.formatCombo('question', false), '?');
     assert.equal(S.formatCombo('e', false), 'E');
 });
@@ -242,17 +272,87 @@ test('in playtest mode only navigation, help and undo/redo (of piece moves) stay
     }
 });
 
-// ---- Tab and focus (audit H6, M12) ----------------------------------------------------------------
+// ---- Focus rules (audit M3-M5, L12, L13) ---------------------------------------------------------
 
-test('Tab cycles swatches only while the canvas has focus', () => {
-    const canvas = { tagName: 'CANVAS' };
-    assert.equal(S.isFocusNeutral(canvas, canvas), true);
-    assert.equal(S.isFocusNeutral({ tagName: 'BODY' }, canvas), false);
-    assert.equal(S.isFocusNeutral(null, canvas), false);
-    assert.equal(S.isFocusNeutral({ tagName: 'BUTTON' }, canvas), false);
-    assert.equal(S.isFocusNeutral(canvas, null), false);
-    assert.equal(idFor(ev('Tab'), false, { focusNeutral: S.isFocusNeutral(canvas, canvas) }), 'swatch-next');
-    assert.equal(idFor(ev('Tab', ['shift']), false, { focusNeutral: S.isFocusNeutral({ tagName: 'BODY' }, canvas) }), null);
+/** A tiny element: tag, optional attributes, and the selectors it answers to. */
+function el(tag, attrs = {}) {
+    const node = { tagName: tag, ...attrs };
+    node.matches = (selector) => selector.split(',').some((part) => {
+        part = part.trim();
+        if (part === tag.toLowerCase()) return true;
+        const role = /^\[role="(\w+)"\]$/.exec(part);
+        if (role) return attrs.role === role[1];
+        return part === 'a[href]' && tag === 'A' && Boolean(attrs.href);
+    });
+    node.closest = (selector) => (attrs.inDialog && /dialog/.test(selector) ? {} : null);
+    return node;
+}
+
+test('Space belongs to inputs, buttons, links and widgets; only the page and the canvas pan', () => {
+    const F = app.run('FocusUtils');
+    for (const target of [el('INPUT', { type: 'checkbox' }), el('INPUT', { type: 'color' }), el('INPUT', { type: 'file' }), el('INPUT', { type: 'range' }),
+        el('INPUT', { type: 'text' }), el('SELECT'), el('BUTTON'), el('A', { href: '#' }), el('SUMMARY'), el('DIV', { role: 'switch' }), el('SPAN', { role: 'tab' }),
+        el('DIV', { role: 'button' }), el('DIV', { role: 'checkbox' }), el('P', { inDialog: true })]) {
+        assert.equal(F.keepsSpace(target), true, `${target.tagName} ${target.type || target.role || ''}`);
+    }
+    for (const target of [el('BODY'), el('CANVAS'), el('DIV'), null]) assert.equal(F.keepsSpace(target), false);
+});
+
+test('a hidden help overlay is not an open layer, so Escape keeps working', () => {
+    const queries = [];
+    const withDocument = (found) => loadApp(['app/js/focusUtils.js'], { document: { querySelector: (selector) => { queries.push(selector); return found; } } }).run('FocusUtils');
+    assert.equal(withDocument({}).layerOpen(), true);
+    assert.equal(withDocument(null).layerOpen(), false);
+    assert.match(queries[0], /#shortcutHelp:not\(\.hidden\)/, 'only a visible help overlay counts');
+});
+
+test('modalKeys: Escape and the Tab trap work from <body>, only the topmost layer answers, and it stops cleanly', () => {
+    const listeners = new Set();
+    const body = { tagName: 'BODY' };
+    const control = (id) => ({ id, focus() { doc.activeElement = this; }, tabIndex: 0, getClientRects: () => [1], closest: () => null });
+    const first = control('a');
+    const last = control('b');
+    const mkRoot = () => ({ isConnected: true, hidden: false, classList: { contains(name) { return name === 'hidden' && this.hiddenNow; } }, querySelectorAll: () => [first, last] });
+    const doc = {
+        activeElement: body,
+        addEventListener: (type, fn) => listeners.add(fn),
+        removeEventListener: (type, fn) => listeners.delete(fn)
+    };
+    const F = loadApp(['app/js/focusUtils.js'], { document: doc }).run('FocusUtils');
+    const press = (key, extra = {}) => {
+        const event = { key, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, ...extra };
+        for (const fn of [...listeners]) fn(event);
+        return event;
+    };
+    const closed = [];
+    const rootA = mkRoot();
+    const stopA = F.modalKeys(rootA, { Escape: () => closed.push('A') });
+    assert.equal(press('Escape').defaultPrevented, true);
+    assert.deepEqual(closed, ['A'], 'focus on <body> still closes the dialog');
+    assert.equal(press('Tab').defaultPrevented, true, 'focus outside the dialog is pulled back in');
+    assert.equal(doc.activeElement, first);
+    press('Tab', { shiftKey: true });
+    assert.equal(doc.activeElement, last);
+    assert.equal(press('Tab').defaultPrevented, true, 'wraps from the last control');
+    assert.equal(doc.activeElement, first);
+    assert.equal(press('Tab', { ctrlKey: true }).defaultPrevented, false, "Ctrl+Tab is the browser's");
+    // A second dialog on top owns the keys; a key already handled elsewhere is left alone.
+    const rootB = mkRoot();
+    const stopB = F.modalKeys(rootB, { Escape: () => closed.push('B') });
+    press('Escape');
+    assert.deepEqual(closed, ['A', 'B']);
+    rootB.classList.hiddenNow = true; // hidden: the layer below answers again
+    press('Escape');
+    assert.deepEqual(closed, ['A', 'B', 'A']);
+    press('Escape', { defaultPrevented: true });
+    assert.deepEqual(closed, ['A', 'B', 'A'], 'a key someone else handled is left alone');
+    // Removed from the page without closing (a share link clears dialogs): it unregisters itself.
+    rootA.isConnected = false;
+    press('Escape');
+    assert.equal(listeners.size, 1);
+    stopB();
+    assert.equal(listeners.size, 0);
+    stopA();
 });
 
 test('shortcuts and pan-with-Space share one typing-target rule', () => {
