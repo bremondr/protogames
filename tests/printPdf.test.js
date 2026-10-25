@@ -12,8 +12,8 @@ const JPEG = Uint8Array.from([0xff, 0xd8, 9, 8, 7, 0xff, 0xd9]);
 
 function fresh({ encode = true } = {}) {
     const surfaces = [];
-    const context = () => new Proxy({ calls: 0 }, {
-        get: (target, key) => (key in target ? target[key] : key === 'measureText' ? (str) => ({ width: String(str).length * 2 }) : () => { target.calls++; }),
+    const context = () => new Proxy({ log: [] }, {
+        get: (target, key) => (key in target ? target[key] : key === 'measureText' ? (str) => ({ width: String(str).length * 2 }) : () => { target.log.push(key); }),
         set: (target, key, value) => { target[key] = value; return true; }
     });
     const document = {
@@ -54,9 +54,16 @@ test('toPdf makes one JPEG page per planned page, reports each one, and releases
     assert.ok(surfaces.filter((canvas) => canvas.width === 0 && canvas.height === 0).length >= expected, 'finished pages are shrunk so their memory is freed');
 });
 
-test('toPdf of a single sheet is one page', async () => {
-    const { Print } = fresh();
-    assert.equal(await pagesOf(await Print.toPdf({ mode: 'sheet', paper: 'A4', legend: false })), 1);
+test('toPdf of a single sheet is one page, drawn as a sheet: crop marks, and none of the page labels of a tiled print', async () => {
+    const { Print, surfaces } = fresh();
+    const blob = await Print.toPdf({ mode: 'sheet', sheet: 'fit', marginMm: 10, cropMarks: true, labels: true, legend: false });
+    assert.equal(await pagesOf(blob), 1);
+    const calls = surfaces.flatMap((canvas) => canvas.getContext().log);
+    assert.ok(calls.includes('stroke'), 'the crop marks are drawn');
+    assert.ok(!calls.includes('fillText'), 'a sheet has no "Page 1 of n" caption');
+    const tiled = fresh();
+    await tiled.Print.toPdf({ mode: 'tiled', marginMm: 10, labels: true, legend: false });
+    assert.ok(tiled.surfaces.flatMap((canvas) => canvas.getContext().log).includes('fillText'), 'while a tiled page is captioned');
 });
 
 test('toPdf refuses a print the plan blocks, with the reason', async () => {

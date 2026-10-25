@@ -207,6 +207,7 @@ test('blocked storage (reading window.localStorage throws) does not break saving
     const blocked = new Error('denied');
     blocked.name = 'SecurityError';
     Object.defineProperty(env.app.context, 'localStorage', { get() { throw blocked; } });
+    Object.defineProperty(env.app.context.window, 'localStorage', { get() { throw blocked; } }); // the app reads both spellings
     assert.doesNotThrow(() => env.FileManager.restoreState(project(env)), 'a file that loads fine is not reported as failed');
     env.AppState.setProjectId('abcdef-1234');
     assert.doesNotThrow(() => env.FileManager.autoSaveToLocalStorage(true));
@@ -426,6 +427,17 @@ test('restoring a project shows it whole: the pan and zoom of the board before i
     env.AppState.setView({ scale: 2.5, x: 120, y: -80 });
     env.FileManager.restoreState(project(env));
     assert.deepEqual(JSON.parse(JSON.stringify(env.AppState.getState().view)), { scale: 1, x: 0, y: 0 });
+});
+
+test('the view is reset after the new tiles are in: an infinite board frames what was drawn, which needs them', () => {
+    const env = fresh();
+    const order = [];
+    for (const name of ['setPolygons', 'resetView']) {
+        const original = env.AppState[name];
+        env.AppState[name] = (...args) => { order.push(name); return original(...args); };
+    }
+    env.FileManager.restoreState(project(env));
+    assert.deepEqual(order, ['setPolygons', 'resetView']);
 });
 
 test('restoring a project starts its undo history over, so undo cannot step back into the project before it', () => {
