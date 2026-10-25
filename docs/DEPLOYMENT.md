@@ -10,11 +10,11 @@ Protogames is a static site (no build step), so any version of the repository ca
 
 ## Custom domain
 
-The site is served from `protogames.eu` (set under Settings → Pages → Custom domain; the site is deployed by a workflow, so no `CNAME` file is needed). DNS is at WEDOS: `A` records `185.199.108.153`, `.109.153`, `.110.153`, `.111.153` and `AAAA` records `2606:50c0:8000::153` to `8003::153` on the apex, and a `www` `CNAME` to `bremondr.github.io`. The old `bremondr.github.io/protogames/` address redirects to the new one. Browser storage (autosave, custom themes) is tied to the address, so work saved only in the browser under the old address is not visible on the new one; export projects first.
+The site is served from `protogames.eu` (set under Settings → Pages → Custom domain; the site is deployed by a workflow, so no `CNAME` file is needed). DNS is at WEDOS: `A` records `185.199.108.153`, `.109.153`, `.110.153`, `.111.153` and `AAAA` records `2606:50c0:8000::153` to `8003::153` on the apex, and a `www` `CNAME` to `bremondr.github.io`. The old `bremondr.github.io/protogames/` address redirects to the new one (share links keep working, the path and hash are kept). Browser storage (saved projects, custom themes, settings) is tied to the address (the origin), so it does **not** move with the redirect: work saved only in the browser under `bremondr.github.io` is not visible on `protogames.eu`, and the old address can no longer be opened to export it. Anyone who used the old address should have exported their projects (Export, Project file) before the move; projects exported earlier can be loaded on `protogames.eu` with Load.
 
 ## How to try something out
 
-Open a pull request (a **draft** is fine for an experiment). The workflow publishes it and comments the link on the pull request; pushing more commits updates the preview, and closing or merging the pull request removes it. Several experiments side by side are simply several open pull requests.
+Open a pull request (a **draft** is fine for an experiment). The workflow publishes it and comments the link on the pull request (or, if the pull request cannot have a preview, says why); pushing more commits updates the preview, and closing or merging the pull request removes it. Several experiments side by side are simply several open pull requests.
 
 A preview shows a small **Preview: PR #n (commit)** badge with links to production and to the list of previews. You can hide it with the x.
 
@@ -23,11 +23,15 @@ A preview shows a small **Preview: PR #n (commit)** badge with links to producti
 `.github/workflows/pages.yml` runs on every push to `main` and on every pull request event, and each run rebuilds the **whole** site (so nothing stale is left behind) using `scripts/build-site.js`:
 
 1. checks out `main` and runs the unit tests on every run, whatever started it (a failing `main` is never published, not even by a pull request event);
-2. lists the open pull requests of this repository and fetches their heads;
+2. lists the open pull requests of this repository (forks are filtered out before any limit; the newest 40 are looked at) and fetches their heads;
 3. writes production at the root and each pull request under `preview/pr-<number>/`, reading every version straight from git (only `index.html`, `landing.js` and `app/` are published; `app/` holds the editor with its `js/`, `images/`, `showcases/` and `data/`);
-4. deploys the folder with the official Pages actions and comments the preview link.
+4. deploys the folder with the official Pages actions, then comments on **every** open pull request (see below).
 
-Runs are serialised and the latest one wins (the concurrency group is on the deploy job, so a skipped fork pull request cannot cancel a deploy in flight). A pull request that cannot be built into a preview (for example it has no `app/index.html`) is skipped with a warning and never blocks production. Actions are referenced by version tag, not pinned to a commit. At most 20 previews are published. The workflow and the build script that run are always the ones on `main` (see Security), so a change to what is published, such as adding a folder to the list in `scripts/build-site.js`, only shows up in previews once it has been merged.
+Runs are serialised and the latest one wins (the concurrency group is on the deploy job, so a skipped fork pull request cannot cancel a deploy in flight). Actions are referenced by version tag, not pinned to a commit.
+
+**Skipped pull requests.** A pull request is skipped, with a warning in the log, and never blocks production, when its head cannot be fetched, has no `app/index.html` (it is older than the landing page/app split: rebase on main), has no landing page, or when its `app/index.html` or landing page uses a local script, stylesheet, icon or image that is not in the published files (for example a head without `js/`). At most 20 previews are published; the limit is applied after skipping, so a skipped pull request does not use up a place, and the pull requests beyond it are reported as over the limit.
+
+**The build summary and the comments.** `build-site.js` can write a JSON summary (`--summary build-summary.json`, not published) with one entry per pull request: `built` (with the short commit), `skipped` (with the reason) or `over-cap`. The last step of the workflow runs after a successful deploy, in whichever run completed it, and for every pull request in the summary creates or updates the single comment that starts with `<!-- protogames-preview -->` (only a comment by `github-actions[bot]`; nothing is posted twice, an unchanged comment is not touched): a link for a built preview, `No preview: <reason>` for a skipped one, and a note for one over the limit. A run that a newer one cancelled therefore does not leave a pull request without its comment, because the next run that finishes posts it. Comments on closed pull requests are not touched. The workflow and the build script that run are always the ones on `main` (see Security), so a change to what is published, such as adding a folder to the list in `scripts/build-site.js`, only shows up in previews once it has been merged.
 
 You can build the same folder locally from any git refs:
 
@@ -67,4 +71,4 @@ To go back, set the source to "Deploy from a branch" and choose `main`; the site
 
 ## The landing page
 
-`index.html` at the root is a static landing page (no build step, inline styles, its own Content-Security-Policy that allows only scripts from the site itself) and the editor lives in `app/`. Before the editor moved, share links pointed at the site root (`.../#b=...`); `landing.js` forwards any root address whose hash starts with `#b=` to `app/` with the hash intact, so those links keep working. Saved data (autosave, themes, settings) is stored per browser origin, not per path, so it is still there after the move.
+`index.html` at the root is a static landing page (no build step, inline styles, its own Content-Security-Policy that allows only scripts from the site itself) and the editor lives in `app/`. Before the editor moved, share links pointed at the site root (`.../#b=...`); `landing.js` forwards any root address whose hash starts with `#b=` to `app/` with the hash intact, so those links keep working. Saved data (autosave, themes, settings) is stored per browser origin, not per path, so it is still there after this move from `/` to `/app/` (the move to `protogames.eu` is different: see Custom domain).

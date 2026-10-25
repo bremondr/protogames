@@ -5,9 +5,11 @@
  * number of preview builds under /preview/<name>/. Nothing is copied from a working tree; every
  * version is read straight from a git ref, so this works the same in CI and on a laptop.
  *
- *   node scripts/build-site.js --out _site --main main [--previews previews.json] [--repo owner/name]
+ *   node scripts/build-site.js --out _site --main main [--previews previews.json] [--repo owner/name] [--summary build-summary.json]
  *
  * previews.json: [{ "number": 66, "title": "...", "ref": "refs/previews/pr-66", "isDraft": false }, ...]
+ * build-summary.json (not published): for every pull request that was asked for, whether its preview was built, skipped
+ * (and why) or left out because of the cap. The workflow turns it into one comment per pull request.
  *
  * Production is the site exactly as committed (landing page at the root, app in app/). Previews have the same
  * layout and get one change: a generated preview-runtime.js (own browser storage + a badge) is the first
@@ -114,12 +116,46 @@ function addRuntimeToLanding(dir, template, { name, label, sha }) {
     }
 }
 
-/** Previews to publish: same-repository pull requests only, newest first, capped. */
-function selectPreviews(pulls, limit = MAX_PREVIEWS) {
-    return pulls
-        .filter((p) => p && Number.isInteger(p.number) && p.ref && !p.isCrossRepository)
-        .slice(0, limit);
+/** Pull requests that may become previews: same-repository only, in the order given (newest first). Not capped; see build(). */
+function eligiblePreviews(pulls) {
+    return pulls.filter((p) => p && Number.isInteger(p.number) && p.ref && !p.isCrossRepository);
 }
+
+/** Previews to publish if every one of them could be built: eligible pull requests, capped. */
+function selectPreviews(pulls, limit = MAX_PREVIEWS) {
+    return eligiblePreviews(pulls).slice(0, limit);
+}
+
+/** The attribute of each tag that names a file the page loads. */
+const FILE_ATTRIBUTES = [['script', 'src'], ['link', 'href'], ['img', 'src']];
+
+/** Local files a page needs: every relative `<script src>`, `<link href>` and `<img src>`, as site paths (no query or hash). */
+function localReferences(html, pagePath) {
+    const found = new Set();
+    const bare = html.replace(/<!--[\s\S]*?-->/g, '');
+    for (const [tag, attribute] of FILE_ATTRIBUTES) {
+        const elements = bare.match(new RegExp(`<${tag}\\b[^>]*>`, 'gi')) || [];
+        for (const element of elements) {
+            const match = element.match(new RegExp(`\\s${attribute}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i'));
+            const value = match && (match[1] ?? match[2] ?? match[3]);
+            // Absolute addresses, data: URLs and in-page anchors are not files of this site.
+            if (!value || /^(?:[a-z][a-z0-9+.-]*:|\/|#)/i.test(value)) continue;
+            let target = value.split(/[?#]/)[0];
+            try { target = decodeURIComponent(target); } catch { /* keep it as written */ }
+            if (target) found.add(path.posix.normalize(path.posix.join(path.posix.dirname(pagePath), target)));
+        }
+    }
+    return [...found];
+}
+
+/** The referenced files of `html` that are not in `files` (the exported file list). */
+function missingReferences(html, pagePath, files) {
+    const have = files instanceof Set ? files : new Set(files);
+    return localReferences(html, pagePath).filter((file) => !have.has(file));
+}
+
+/** Text for a GitHub comment built from file names of a pull request: one short line, no markup. */
+const plainText = (text) => String(text).replace(/[^\w./ @+,()-]/g, '?').slice(0, 200);
 
 // ---- Reading a version out of git -----------------------------------------------------------------------
 
@@ -129,10 +165,18 @@ function git(args) {
 
 const sha = (ref) => git(['rev-parse', '--verify', `${ref}^{commit}`]).toString().trim();
 
+/** A pull request that cannot be a preview; `reason` is what the comment on the pull request says. */
+class SkipError extends Error {
+    constructor(message, reason) {
+        super(message);
+        this.reason = reason;
+    }
+}
+
 /** Writes the app as it is at `ref` into `dir` and returns what was written. */
 function exportApp(ref, dir) {
     const listed = git(['ls-tree', '-r', '--name-only', '-z', ref, '--', ...APP_PATHS]).toString().split('\0').filter(Boolean);
-    if (!listed.includes(APP_PAGE)) throw new Error(`${ref} does not contain ${APP_PAGE}`);
+    if (!listed.includes(APP_PAGE)) throw new SkipError(`${ref} does not contain ${APP_PAGE}`, `rebase on main, the app moved to ${path.posix.dirname(APP_PAGE)}/`);
     for (const file of listed) {
         const target = path.join(dir, file);
         fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -143,47 +187,71 @@ function exportApp(ref, dir) {
 
 // ---- Build -----------------------------------------------------------------------------------------------
 
-function build({ out, main, previews = [], repo = '' }) {
+/** Throws a SkipError when the exported app or landing page would not work: a missing page, or files they need that are not there. */
+function checkExport(dir, listed) {
+    if (!listed.includes(LANDING_PAGE)) throw new SkipError(`no ${LANDING_PAGE}`, `the head has no landing page (${LANDING_PAGE}), rebase on main`);
+    const files = new Set(listed);
+    const missing = [];
+    for (const page of [APP_PAGE, LANDING_PAGE]) {
+        for (const file of missingReferences(fs.readFileSync(path.join(dir, page), 'utf8'), page, files)) if (!missing.includes(file)) missing.push(file);
+    }
+    if (missing.length) {
+        const shown = missing.slice(0, 3).map(plainText).join(', ');
+        throw new SkipError(`${missing.length} file(s) used by the pages are missing: ${missing.join(', ')}`, `files used by the pages are missing from the head (${shown}${missing.length > 3 ? `, and ${missing.length - 3} more` : ''}), rebase on main`);
+    }
+}
+
+function build({ out, main, previews = [], repo = '', limit = MAX_PREVIEWS }) {
     fs.rmSync(out, { recursive: true, force: true });
     fs.mkdirSync(out, { recursive: true });
-    const summary = { production: sha(main), previews: [] };
+    const summary = { production: sha(main), previews: [], skipped: [], results: [] };
 
     exportApp(main, out);
     fs.writeFileSync(path.join(out, '.nojekyll'), '');
 
     const template = fs.readFileSync(path.join(__dirname, 'preview-runtime.js'), 'utf8');
-    const chosen = selectPreviews(previews);
-    const skipped = [];
-    for (const preview of chosen) {
+    const built = [];
+    // The cap counts previews that were really built, so a skipped pull request does not use up a place.
+    for (const preview of eligiblePreviews(previews)) {
         const name = previewName(preview.number);
         const dir = path.join(out, 'preview', name);
+        const skip = (reason) => {
+            summary.skipped.push(preview.number);
+            summary.results.push({ number: preview.number, name, status: 'skipped', reason });
+        };
+        if (built.length >= limit) {
+            summary.results.push({ number: preview.number, name, status: 'over-cap', reason: `only the newest ${limit} previews are published` });
+            continue;
+        }
         let commit;
         try {
             commit = sha(preview.ref);
         } catch (error) {
             // A pull request that could not be fetched must not take the whole site down.
             console.warn(`Skipping ${name}: ${preview.ref} is not available.`);
-            skipped.push(preview.number);
+            skip('its head could not be fetched');
             continue;
         }
         try {
-            exportApp(preview.ref, dir);
+            const listed = exportApp(preview.ref, dir);
+            checkExport(dir, listed);
             const info = buildInfo({ name, label: `PR #${preview.number}`, sha: commit });
             fs.writeFileSync(path.join(dir, 'app', 'preview-runtime.js'), runtimeSource(template, info));
             const indexFile = path.join(dir, APP_PAGE);
             fs.writeFileSync(indexFile, previewIndexHtml(fs.readFileSync(indexFile, 'utf8')));
             addRuntimeToLanding(dir, template, { name, label: `PR #${preview.number}`, sha: commit });
+            built.push(preview);
             summary.previews.push({ name, sha: info.sha });
+            summary.results.push({ number: preview.number, name, status: 'built', sha: info.sha });
         } catch (error) {
-            // A pull request without app/index.html or <head> must not stop production from being published.
+            // A pull request without app/index.html, <head> or files its pages need must not stop production from being published.
             console.warn(`Skipping ${name}: ${error.message}`);
             fs.rmSync(dir, { recursive: true, force: true });
-            skipped.push(preview.number);
+            skip(error.reason || `its pages could not be prepared (${plainText(error.message)})`);
         }
     }
     fs.mkdirSync(path.join(out, 'preview'), { recursive: true });
-    fs.writeFileSync(path.join(out, 'preview', 'index.html'), previewsIndexHtml(chosen.filter((p) => !skipped.includes(p.number)), repo));
-    summary.skipped = skipped;
+    fs.writeFileSync(path.join(out, 'preview', 'index.html'), previewsIndexHtml(built, repo));
     return summary;
 }
 
@@ -198,12 +266,13 @@ function parseArgs(argv) {
 
 function main() {
     const args = parseArgs(process.argv.slice(2));
-    if (!args.out || !args.main) throw new Error('Usage: node scripts/build-site.js --out <dir> --main <ref> [--previews <file.json>] [--repo owner/name]');
+    if (!args.out || !args.main) throw new Error('Usage: node scripts/build-site.js --out <dir> --main <ref> [--previews <file.json>] [--repo owner/name] [--summary <file.json>]');
     const previews = args.previews ? JSON.parse(fs.readFileSync(args.previews, 'utf8')) : [];
     const summary = build({ out: path.resolve(args.out), main: args.main, previews, repo: args.repo || '' });
+    if (args.summary) fs.writeFileSync(path.resolve(args.summary), `${JSON.stringify(summary, null, 2)}\n`);
     console.log(`production ${summary.production.slice(0, 7)}; ${summary.previews.length} preview(s): ${summary.previews.map((p) => `${p.name}@${p.sha}`).join(', ') || 'none'}`);
 }
 
 if (require.main === module) main();
 
-module.exports = { APP_PATHS, APP_PAGE, LANDING_PAGE, MAX_PREVIEWS, escapeHtml, previewName, buildInfo, previewIndexHtml, runtimeSource, previewsIndexHtml, selectPreviews, build };
+module.exports = { APP_PATHS, APP_PAGE, LANDING_PAGE, MAX_PREVIEWS, escapeHtml, previewName, buildInfo, previewIndexHtml, runtimeSource, previewsIndexHtml, eligiblePreviews, selectPreviews, localReferences, missingReferences, SkipError, build };
