@@ -1,5 +1,7 @@
 # Protogames — Bug Audit
 
+> **Status (2026-10-25):** this is the second audit, kept as written. Issues #4, #19 and #20 are fixed since; 6 of its 49 findings are fixed and 37 are still open. See [CURRENT_AUDIT.md](CURRENT_AUDIT.md) for the merged, current register and the plan.
+
 **Date:** 2026-10-11 · **Revision audited:** `39ead4a` (main, after the code-audit fixes of PR #76 and the favicon) · **Scope:** the open bug issues on GitHub, plus a hunt for unknown bugs across the whole app
 
 This is the second audit. The first one ([AUDIT.md](AUDIT.md)) was a code review and led to PR #76. This one looks for bugs that only show up when the code *runs*: it drives the real modules with fuzzing and property checks, runs the app in real browsers, validates generated PDFs and SVGs with external tools, and reviews PR #76 for regressions. The full per-area reports, with repro commands and the lists of what was checked and found fine, are in [bug-audit/](bug-audit/).
