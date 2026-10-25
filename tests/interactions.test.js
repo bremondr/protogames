@@ -316,6 +316,7 @@ test('taking back a fill on a pinch restores the redo branch', () => {
     env.Interactions.cancelStroke();
     assert.equal(env.state.history.length, 2);
     assert.ok(env.AppState.redo(), 'redo is available again');
+});
 
 test('undo and redo are autosaved like any other change', () => {
     const env = fresh();
