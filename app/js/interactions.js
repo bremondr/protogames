@@ -12,6 +12,10 @@ const Interactions = (() => {
     let lastMoveTimestamp = 0;
     // Where the brush last probed, so a fast drag can fill in the tiles between two events.
     let strokePoint = null;
+    // Positions of moves the throttle skipped; the next probe walks through them so no tile is cut off.
+    let skippedPoints = [];
+    // The pointer that started the stroke or line; the others (a stray touch, a second pen) are ignored until it ends.
+    let activePointerId = null;
     // The eraser remembers its own size; brushSize in AppState belongs to the colour brush.
     const ERASER_SIZE_KEY = 'protogames_eraser_size';
     let eraserSize = Config.BRUSH_SIZE_MIN;
@@ -28,7 +32,16 @@ const Interactions = (() => {
     function bindPointerEvents() {
         const canvas = ui?.canvas;
         if (!canvas) return;
-        canvas.addEventListener('pointerdown', handlePointerDown);
+        canvas.addEventListener('pointerdown', (event) => {
+            // A second pointer cannot take over a stroke that is already running.
+            if (isOtherPointer(event)) return;
+            if (event.button <= 0) {
+                activePointerId = event.pointerId;
+                lastMoveTimestamp = 0;
+                skippedPoints = [];
+            }
+            handlePointerDown(event);
+        });
         canvas.addEventListener('pointermove', handlePointerMove);
         canvas.addEventListener('pointerup', handlePointerUp);
         canvas.addEventListener('pointerleave', (event) => {
@@ -36,6 +49,8 @@ const Interactions = (() => {
             if (!AppState.getState().lineStartId) handlePointerCancel(event);
         });
         canvas.addEventListener('pointercancel', handlePointerCancel);
+        // The window lost focus mid-stroke (alt-tab, a dialog): the release will never arrive here.
+        if (typeof window.addEventListener === 'function') window.addEventListener('blur', handleWindowBlur);
         document.addEventListener('keydown', (event) => {
             if (event.key === 'Escape') cancelLine();
         });
@@ -181,8 +196,7 @@ const Interactions = (() => {
         const state = AppState.getState();
         if (state.isStartToolActive) {
             // The same colour again takes the marker away; another colour replaces it.
-            const wanted = String(state.currentStartColor).toLowerCase();
-            if (String(polygon.start || '').toLowerCase() === wanted) {
+            if (ToolOps.norm(polygon.start) === ToolOps.norm(state.currentStartColor)) {
                 if (!isStrokeStart) return false;
                 delete polygon.start;
             } else {
@@ -202,11 +216,11 @@ const Interactions = (() => {
         if (state.isEraserActive) {
             if (polygon.object) { delete polygon.object; return true; }
             if (polygon.start) { delete polygon.start; return true; }
-            if (polygon.color === Config.DEFAULT_TILE_COLOR) return false;
+            if (ToolOps.norm(polygon.color) === ToolOps.norm(Config.DEFAULT_TILE_COLOR)) return false;
             polygon.color = Config.DEFAULT_TILE_COLOR;
             return true;
         }
-        if (polygon.color === state.currentColor) return false;
+        if (ToolOps.norm(polygon.color) === ToolOps.norm(state.currentColor)) return false;
         polygon.color = state.currentColor;
         return true;
     }
@@ -245,6 +259,10 @@ const Interactions = (() => {
     function handleClearBoard() {
         const state = AppState.getState();
         if (!state.polygons.length) return;
+        // A board that is already blank is not a change: no undo step, no unsaved-changes mark.
+        const blank = state.polygons.every((polygon) =>
+            ToolOps.norm(polygon.color) === ToolOps.norm(Config.DEFAULT_TILE_COLOR) && !polygon.object && !polygon.start);
+        if (blank) return;
         state.polygons.forEach((polygon) => {
             polygon.color = Config.DEFAULT_TILE_COLOR;
             delete polygon.object;
@@ -521,6 +539,13 @@ const Interactions = (() => {
     function handlePointerMove(event) {
         const state = AppState.getState();
         if (state.playtest) return;
+        if (isOtherPointer(event)) return;
+        // The button went up somewhere we did not hear about (outside the window): end the stroke here.
+        if (state.isDrawing && event.pointerType === 'mouse' && event.buttons === 0) {
+            endStroke();
+            Renderer.renderBoard();
+            return;
+        }
         const point = getWorldPoint(event);
 
         if (state.lineStartId) {
@@ -538,24 +563,11 @@ const Interactions = (() => {
             if (state.isObjectToolActive || state.isStartToolActive) return;
             const now = performance.now();
             if (now - lastMoveTimestamp < MOVE_THROTTLE_MS) {
+                skippedPoints.push(...strokeTargets(event));
                 return;
             }
             lastMoveTimestamp = now;
-            // The throttle and the browser's own event batching drop positions; the coalesced events and
-            // the path since the last probe say which tiles the pointer really crossed.
-            const batch = typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents() : [];
-            const targets = (batch.length ? batch : [event]).map(getWorldPoint);
-            const step = ViewMath.typicalTileSize(state.polygons) / 2;
-            let painted = false;
-            for (const probe of ToolOps.strokePoints(strokePoint, targets, step)) {
-                const polygon = tileAt(probe);
-                if (!polygon || polygon.id === state.lastColoredPolygonId) continue;
-                if (paintAt(polygon, false)) strokeChanged = true;
-                AppState.setLastColoredPolygonId(polygon.id);
-                painted = true;
-            }
-            strokePoint = targets[targets.length - 1];
-            if (painted) Renderer.renderBoard();
+            if (probeStroke(event)) Renderer.renderBoard();
             return;
         }
 
@@ -568,18 +580,66 @@ const Interactions = (() => {
     }
 
     /**
+     * Paints the tiles the pointer crossed since the last probe. The throttle and the browser's own event
+     * batching drop positions; the coalesced events and the path since the last probe say which tiles
+     * the pointer really crossed. Returns true when a tile was visited.
+     */
+    function probeStroke(event) {
+        const state = AppState.getState();
+        const targets = [...skippedPoints, ...strokeTargets(event)];
+        skippedPoints = [];
+        const step = ViewMath.typicalTileSize(state.polygons) / 2;
+        let painted = false;
+        for (const probe of ToolOps.strokePoints(strokePoint, targets, step)) {
+            const polygon = tileAt(probe);
+            if (!polygon || polygon.id === state.lastColoredPolygonId) continue;
+            if (paintAt(polygon, false)) strokeChanged = true;
+            AppState.setLastColoredPolygonId(polygon.id);
+            painted = true;
+        }
+        strokePoint = targets[targets.length - 1];
+        return painted;
+    }
+
+    /** The positions an event stands for: its coalesced events when the browser batched them, else itself. */
+    function strokeTargets(event) {
+        const batch = typeof event.getCoalescedEvents === 'function' ? event.getCoalescedEvents() : [];
+        return (batch.length ? batch : [event]).map(getWorldPoint);
+    }
+
+    /** True for an event of a pointer other than the one that owns the stroke or line in progress. */
+    function isOtherPointer(event) {
+        const state = AppState.getState();
+        if (!state.isDrawing && !state.lineStartId) return false;
+        return activePointerId !== null && event.pointerId !== undefined && event.pointerId !== activePointerId;
+    }
+
+    /** Commits a brush stroke or drops a line when the window loses focus, so neither is left half-done. */
+    function handleWindowBlur() {
+        const state = AppState.getState();
+        fillPending = false;
+        if (state.lineStartId) { cancelLine(); return; }
+        if (!state.isDrawing) return;
+        endStroke();
+        Renderer.renderBoard();
+    }
+
+    /**
      * Finishes a line, or finalizes a brush stroke by recording history.
      *
      * @param {PointerEvent} event - Pointer up event.
      */
     function handlePointerUp(event) {
         const state = AppState.getState();
+        if (isOtherPointer(event)) return;
         fillPending = false;
         if (state.lineStartId) {
             finishLine(tileAt(getWorldPoint(event)));
             return;
         }
         if (!state.isDrawing) return;
+        // The last throttled move can be older than the release: paint where the pointer ended up.
+        if (!state.isObjectToolActive && !state.isStartToolActive) probeStroke(event);
         endStroke();
         Renderer.renderBoard();
     }
@@ -598,8 +658,9 @@ const Interactions = (() => {
     /**
      * Cancels drawing when the pointer leaves the canvas or touch is interrupted.
      */
-    function handlePointerCancel() {
+    function handlePointerCancel(event) {
         const state = AppState.getState();
+        if (event && isOtherPointer(event)) return;
         fillPending = false;
         if (state.lineStartId) {
             cancelLine();

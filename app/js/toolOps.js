@@ -139,5 +139,5 @@ const ToolOps = (() => {
         return out;
     }
 
-    return { planFill, planLine, applyToTiles, brushTiles, sourceFromState, activeTool, effectiveMode, effectiveSize, wouldChange, strokePoints };
+    return { planFill, planLine, applyToTiles, brushTiles, sourceFromState, activeTool, effectiveMode, effectiveSize, wouldChange, strokePoints, norm };
 })();
