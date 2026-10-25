@@ -43,9 +43,10 @@ const Main = (() => {
         LoadDialog.init(uiRefs);
         Shortcuts.init();
         ThemeEditor.init();
-        ThemeManager.init()
-            .catch((error) => console.error('Theme restore failed:', error))
-            .finally(() => startBoard().catch((error) => console.error('Start-up failed:', error)));
+        // The saved themes' palettes are in place when init returns; their pictures load in the background and must
+        // never hold the board back (a texture host that does not answer would otherwise leave the page empty).
+        ThemeManager.init().catch((error) => console.error('Theme restore failed:', error));
+        startBoard().catch((error) => console.error('Start-up failed:', error));
     }
 
     async function startBoard() {

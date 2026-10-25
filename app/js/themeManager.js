@@ -13,6 +13,9 @@
  */
 const ThemeManager = (() => {
     const KEY = 'protogames_custom_themes';
+    // A remote texture that has not arrived after this long is given up on (the tile keeps its flat colour).
+    const IMAGE_TIMEOUT_MS = 5000;
+    let imageTimeoutMs = IMAGE_TIMEOUT_MS;
     let store = { tiles: [], items: [] };
 
     const slug = (s) => String(s || 'theme').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'theme';
@@ -28,7 +31,16 @@ const ThemeManager = (() => {
         });
     }
     function loadImage(src) {
-        return new Promise((res, rej) => { const i = new Image(); i.crossOrigin = 'anonymous'; i.onload = () => res(i); i.onerror = () => rej(new Error('Could not load image')); i.src = src; });
+        return new Promise((res, rej) => {
+            const i = new Image();
+            i.crossOrigin = 'anonymous';
+            // Only addresses on the network can hang; a file the person just chose is local.
+            const remote = !/^(data|blob):/i.test(String(src));
+            const timer = remote ? setTimeout(() => { i.onload = i.onerror = null; i.src = ''; rej(new Error('The image took too long to load')); }, imageTimeoutMs) : null;
+            i.onload = () => { clearTimeout(timer); res(i); };
+            i.onerror = () => { clearTimeout(timer); rej(new Error('Could not load image')); };
+            i.src = src;
+        });
     }
     function averageHex(img) {
         const c = document.createElement('canvas'); c.width = 16; c.height = 16;
@@ -70,17 +82,29 @@ const ThemeManager = (() => {
         return s;
     }
 
-    async function applyTileTheme(theme) {
-        for (const t of theme.tiles) {
-            if (t.image) { try { Textures.registerImage(t.hex, await loadImage(t.image)); } catch (e) { /* keep flat color */ } }
-        }
+    function registerPalette(theme) {
         Config.COLOR_PALETTES.push({ id: theme.id, name: theme.name, description: 'Imported theme', custom: true, colors: theme.tiles.map(({ label, hex }) => ({ label, hex })) });
         Textures.resetLabels();
     }
+    /** Loads a theme's textures side by side; one that fails or times out keeps its flat colour. */
+    function loadTextures(theme, onEach) {
+        return Promise.all(theme.tiles.filter((t) => t.image).map(async (t) => {
+            try { Textures.registerImage(t.hex, await loadImage(t.image)); } catch (e) { return; /* keep flat color */ }
+            if (onEach) onEach();
+        }));
+    }
+    async function loadItems(set) {
+        const loaded = await Promise.all(set.items.map(async (it) => {
+            try { return { id: it.id, label: it.label, img: await loadImage(it.image) }; } catch (e) { return null; /* skip */ }
+        }));
+        Objects.registerSet({ id: set.id, name: set.name, items: loaded.filter(Boolean) });
+    }
+    async function applyTileTheme(theme) {
+        await loadTextures(theme);
+        registerPalette(theme);
+    }
     async function applyItemSet(set) {
-        const items = [];
-        for (const it of set.items) { try { items.push({ id: it.id, label: it.label, img: await loadImage(it.image) }); } catch (e) { /* skip */ } }
-        Objects.registerSet({ id: set.id, name: set.name, items });
+        await loadItems(set);
     }
 
     function persist() {
@@ -92,21 +116,39 @@ const ThemeManager = (() => {
     }
     function emit() { window.dispatchEvent(new CustomEvent('pg:themeschange')); }
 
-    async function init() {
+    /** What shows the themes' pictures: the swatches (textures) and the board (textures and items). */
+    function refreshView() {
+        const s = AppState.getState();
+        UI.renderColorPalette(s.currentPaletteId, s.currentColor);
+        Renderer.renderBoard();
+        emit();
+    }
+
+    /**
+     * Restores the saved themes. Their palettes are in place when the call returns (so a project that uses a theme's
+     * colours opens correctly at once); the pictures come from addresses that may be slow or gone, so they load in
+     * the background, side by side, each given up after a few seconds, and the view is redrawn as they arrive.
+     * The returned promise settles when all of them have.
+     */
+    async function init({ imageTimeoutMs: timeout } = {}) {
+        imageTimeoutMs = timeout || IMAGE_TIMEOUT_MS;
         try { store = JSON.parse(localStorage.getItem(KEY)) || store; } catch (e) { /* ignore */ }
         store.tiles = Array.isArray(store.tiles) ? store.tiles : []; store.items = Array.isArray(store.items) ? store.items : [];
         // Themes saved before colours were checked: anything that is not a hex colour falls back to grey.
         store.tiles.forEach((t) => { if (t && Array.isArray(t.tiles)) t.tiles.forEach((tile) => { tile.hex = cleanHex(tile.hex) || '#cccccc'; }); });
         store.tiles = store.tiles.filter((t) => t && Array.isArray(t.tiles));
-        for (const t of store.tiles) await applyTileTheme(t);
-        for (const s of store.items) await applyItemSet(s);
+        store.tiles.forEach(registerPalette);
         refreshPaletteSelect();
         if (store.tiles.length) {
             const s = AppState.getState();
             UI.renderColorPalette(s.currentPaletteId, s.currentColor);
-            Renderer.renderBoard();
         }
         emit();
+        const jobs = [
+            ...store.tiles.map((t) => loadTextures(t, refreshView)),
+            ...store.items.map((set) => loadItems(set).then(refreshView))
+        ];
+        await Promise.all(jobs);
     }
 
     /** Builds a theme/set from the chosen files: one JSON file, or any number of images. */
