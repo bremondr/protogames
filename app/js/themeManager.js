@@ -52,9 +52,14 @@ const ThemeManager = (() => {
     function uniqueHex(hex, used) {
         let h = cleanHex(hex);
         if (!h) throw new Error('A tile colour is not a hex colour like #4b5d3a.');
+        // Taken: try the next colour up, and from the top of the range (white) on, the ones below the original (not black).
+        const start = parseInt(h.slice(1), 16);
+        let n = start;
+        let step = 1;
         while (used.has(h)) {
-            const n = parseInt(h.slice(1), 16);
-            h = '#' + ((n + 1) & 0xffffff).toString(16).padStart(6, '0');
+            n += step;
+            if (n > 0xffffff) { step = -1; n = start - 1; }
+            h = '#' + n.toString(16).padStart(6, '0');
         }
         used.add(h);
         return h;

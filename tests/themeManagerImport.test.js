@@ -49,3 +49,16 @@ test('themes stored by an older version with bad colours are cleaned when restor
     await env.ThemeManager.init();
     assert.deepEqual(plain(swatches(env).map((c) => c.hex)), ['#cccccc', '#abcdef']);
 });
+
+test('a white or near-white tile is bumped down from the top of the range, never wrapped round to black', async () => {
+    const env = fresh();
+    // #ffffff is the board's own fill, so it is taken; the second and third tiles collide with it and each other.
+    await env.ThemeManager.importFiles('tiles', [themeFile([
+        { label: 'Snow', hex: '#ffffff' }, { label: 'Snow 2', hex: '#fff' }, { label: 'Almost', hex: '#fffffe' }, { label: 'Ink', hex: '#000000' }
+    ])]);
+    const hexes = plain(swatches(env).map((c) => c.hex));
+    assert.equal(new Set(hexes).size, 4, 'all four stay distinct');
+    assert.ok(!hexes.slice(0, 3).includes('#000000'), `none of the whites became black: ${hexes}`);
+    hexes.slice(0, 3).forEach((hex) => assert.ok(parseInt(hex.slice(1), 16) > 0xfffff0, `${hex} is still near white`));
+    assert.ok(hexes.includes('#000000'), 'black itself is kept');
+});
