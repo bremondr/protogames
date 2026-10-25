@@ -75,13 +75,13 @@ function fakeDocument() {
     return { byId, createElement: make, getElementById: (id) => byId[id] };
 }
 
-function visitWithProjects(entries) {
+function visitWithProjects(entries, { build, describeBoard } = {}) {
     const document = fakeDocument();
     const removed = [];
     const real = require('./support/load').loadApp(['app/js/projectLibrary.js']).run('ProjectLibrary');
-    const ProjectLibrary = { KEY_PREFIX: 'protogames_project:', importLegacy() {}, list: () => entries.filter((e) => !removed.includes(e.id)), remove: (id) => removed.push(id), describeAge: real.describeAge, describeBoard: real.describeBoard };
+    const ProjectLibrary = { KEY_PREFIX: 'protogames_project:', importLegacy() {}, list: () => entries.filter((e) => !removed.includes(e.id)), remove: (id) => removed.push(id), describeAge: real.describeAge, describeBoard: describeBoard || real.describeBoard };
     const events = {};
-    vm.runInNewContext(script, { location: { hash: '', search: '', replace() {} }, document, ProjectLibrary, window: { addEventListener: (type, fn) => { events[type] = fn; } }, setTimeout, clearTimeout, Date });
+    vm.runInNewContext(script, { location: { hash: '', search: '', replace() {} }, document, ProjectLibrary, PG_BUILD: build, console: { error() {} }, window: { addEventListener: (type, fn) => { events[type] = fn; } }, setTimeout, clearTimeout, Date });
     return { document, removed, events };
 }
 
@@ -124,4 +124,43 @@ test('a change made in another tab refreshes the list', () => {
     assert.equal(document.byId.projectList.children.length, 1);
     events.storage({ key: 'something_else' });
     assert.equal(document.byId.projectList.children.length, 1, 'other keys are ignored');
+});
+
+test('a share link pasted into the open landing page (a hash change) is forwarded to the app too', () => {
+    const forwarded = [];
+    const events = {};
+    const location = { hash: '', search: '', replace: (url) => forwarded.push(url) };
+    vm.runInNewContext(script, { location, window: { addEventListener: (type, fn) => { events[type] = fn; } } });
+    assert.equal(typeof events.hashchange, 'function');
+    location.hash = '#features';
+    events.hashchange();
+    assert.deepEqual(forwarded, [], 'anchors stay');
+    location.hash = '#b=abc_DEF';
+    location.search = '?x=1';
+    events.hashchange();
+    assert.deepEqual(forwarded, ['app/?x=1#b=abc_DEF']);
+});
+
+test('in a preview the list refreshes on its own prefixed storage keys, and not on another preview\'s', () => {
+    const build = { storagePrefix: 'preview:pr-7:' };
+    const { document, events } = visitWithProjects([ENTRY], { build });
+    const count = () => document.byId.projectList.children.length;
+    document.byId.projectList.children.length = 0;
+    events.storage({ key: 'preview:pr-8:protogames_project:aaaaaa-1111' });
+    events.storage({ key: 'protogames_project:aaaaaa-1111' });
+    events.storage({ key: 'preview:pr-7:other_key' });
+    assert.equal(count(), 0, 'keys of production, another preview or something else are ignored');
+    events.storage({ key: 'preview:pr-7:protogames_project:aaaaaa-1111' });
+    assert.equal(count(), 1);
+    document.byId.projectList.children.length = 0;
+    events.storage({ key: null });
+    assert.equal(count(), 1, 'a cleared storage refreshes too');
+});
+
+test('one project that cannot be drawn does not hide the others', () => {
+
+    const describeBoard = (entry) => { if (entry.name === 'Broken') throw new Error('bad entry'); return 'ok'; };
+    const { document } = visitWithProjects([ENTRY, { ...ENTRY, id: 'bbbbbb-2222', name: 'Broken' }, { ...ENTRY, id: 'cccccc-3333', name: 'Third' }], { describeBoard });
+    assert.deepEqual(document.byId.projectList.children.map((li) => li.children[0].children[0].textContent), ['Dragon isle', 'Third']);
+    assert.equal(document.byId.projects.hidden, false);
 });

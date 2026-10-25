@@ -122,8 +122,10 @@ test('hashPayload finds the board in an address hash', () => {
     assert.equal(ShareLink.hashPayload(undefined), null);
 });
 
-test('urlFor replaces an existing hash and describeLength is readable', () => {
-    assert.equal(ShareLink.urlFor('http://x/app?y=1#old', 'AB'), 'http://x/app?y=1#b=AB');
+test('urlFor replaces an existing hash, drops the query, and describeLength is readable', () => {
+    assert.equal(ShareLink.urlFor('http://x/app?y=1#old', 'AB'), 'http://x/app#b=AB');
+    assert.equal(ShareLink.urlFor('https://x.io/app/?project=abc-1&showcase=chess', 'AB'), 'https://x.io/app/#b=AB');
+    assert.equal(ShareLink.urlFor('https://x.io/app/', 'AB'), 'https://x.io/app/#b=AB');
     assert.equal(ShareLink.describeLength(279), '279 characters link');
     assert.equal(ShareLink.describeLength(2048), '2.0 KB link');
 });
@@ -184,8 +186,10 @@ test('a country board may be wider and taller than other boards, within its own 
     assert.doesNotThrow(() => ShareLink.unpack(link(country), polygons));
     assert.throws(() => ShareLink.unpack(link({ ...country, width: 121 }), polygons), /width in the link is out of range/);
     assert.throws(() => ShareLink.unpack(link({ ...country, height: 202 }), polygons), /height in the link is out of range/);
-    // Every other shape keeps the old limit.
-    assert.throws(() => ShareLink.unpack(link({ ...CONFIG, width: 101 }), polygons), /width in the link is out of range/);
+    // Every other shape is capped like a project file: 2 * 100 + 1 across, and 100 for a radius or a size.
+    assert.doesNotThrow(() => ShareLink.unpack(link({ ...CONFIG, width: 201, height: 201 }), polygons));
+    assert.throws(() => ShareLink.unpack(link({ ...CONFIG, width: 202 }), polygons), /width in the link is out of range/);
+    assert.throws(() => ShareLink.unpack(link({ ...CONFIG, radius: 101 }), polygons), /radius in the link is out of range/);
 });
 
 // ---- Square boards (united with rectangle boards in project format 5) -------------------------------------
@@ -307,4 +311,77 @@ test('links with unusable players or start markers are refused', () => {
     const tooMany = good();
     tooMany.pl = [[RED, 'bottom', [['pawn', 501]]]];
     assert.throws(() => ProjectFormat.parse(ShareLink.unpack(tooMany, blankBoard())), /invalid number of pawn/);
+});
+
+// ---- Limits and colours ---------------------------------------------------------------------------------
+
+test('every board the controls can make (up to 50 layers, 100 a side) packs into a link that unpacks', () => {
+    const configs = [];
+    for (const gridType of ['hexagon', 'square', 'triangle']) {
+        for (const boardShape of ['hexagon', 'circle', 'rectangle', 'triangle']) {
+            if (gridType === 'square' && boardShape === 'hexagon') continue;
+            for (const center of ['tile', 'point']) {
+                // What UI.getBoardConfig produces at its maximum: layers are radius + 1, except for triangle tiles.
+                const radius = gridType === 'triangle' ? 50 : 49;
+                const central = boardShape === 'hexagon' || boardShape === 'circle';
+                const span = central ? radius * 2 + (center === 'point' ? 2 : 1) : boardShape === 'triangle' ? 100 : 100;
+                configs.push({ ...Config.DEFAULT_BOARD_CONFIG, gridType, boardShape, center, radius, size: 100, width: span, height: span });
+            }
+        }
+    }
+    assert.equal(configs.length, 22);
+    for (const config of configs) {
+        const data = plain(ShareLink.pack({ projectName: '', boardConfig: config, paletteId: 'landscape', polygons: [], formatVersion: ProjectFormat.CURRENT_VERSION }));
+        assert.doesNotThrow(() => ShareLink.unpack(data, []), `${config.gridType} ${config.boardShape} ${config.center}`);
+    }
+});
+
+test('short #rgb colours become #rrggbb in a link, and links that carry them still open', () => {
+    const polygons = blankBoard();
+    polygons[0].color = '#F0A';
+    polygons[1].color = '#ff00aa';
+    polygons[2].color = '#abc';
+    polygons[0].start = '#0F8';
+    const players = [{ color: '#00F', seat: 'bottom', pieces: [{ kind: 'pawn', count: 2 }] }];
+    const data = plain(ShareLink.pack({ projectName: 'Short', boardConfig: CONFIG, paletteId: 'landscape', polygons, formatVersion: ProjectFormat.CURRENT_VERSION, players }));
+    assert.deepEqual(data.k.slice(0, 2), ['#ff00aa', '#aabbcc'], '#F0A and #ff00aa are one colour');
+    assert.deepEqual(data.sc, ['#00ff88']);
+    assert.equal(data.pl[0][0], '#0000ff');
+    // A link written by an older app can still hold the short form; it is accepted and expanded.
+    const old = { ...data, k: ['#F0A', '#abc'], t: data.t.split('.').map((t) => (t === '0' ? '0' : '1')).join('.'), sc: ['#0F8'], pl: [['#00F', 'bottom', [['pawn', 2]]]] };
+    const project = plain(ShareLink.unpack(old, blankBoard()));
+    assert.equal(project.appState.polygons[0].color, '#ff00aa');
+    assert.equal(project.appState.polygons[0].start, '#00ff88');
+    assert.equal(project.appState.players[0].color, '#0000ff');
+});
+
+test('a project with short colours survives parse -> pack -> unpack -> parse', () => {
+    const polygons = blankBoard();
+    polygons[0].color = '#F0A';
+    polygons[1].start = '#0F8';
+    const project = ProjectFormat.parse({
+        version: ProjectFormat.CURRENT_VERSION,
+        projectName: 'Round trip',
+        appState: {
+            boardConfig: CONFIG, currentColor: '#F0A', paletteId: 'landscape', isEraserActive: false, autoSaveEnabled: true, polygons,
+            players: [{ color: '#00F', seat: 'bottom', pieces: [{ kind: 'pawn', count: 1 }] }],
+            dice: [{ sides: 6 }]
+        }
+    });
+    const data = plain(ShareLink.pack({
+        projectName: project.projectName, boardConfig: project.appState.boardConfig, paletteId: project.appState.paletteId,
+        polygons: project.appState.polygons, formatVersion: project.version, players: project.appState.players
+    }));
+    const again = ProjectFormat.parse(ShareLink.unpack(data, blankBoard()));
+    assert.equal(again.appState.polygons[0].color.toLowerCase(), '#ff00aa');
+    assert.equal(again.appState.polygons[1].start.toLowerCase(), '#00ff88');
+    assert.equal(again.appState.players[0].color.toLowerCase(), '#0000ff');
+});
+
+test('shareProblem refuses a board the opener would refuse, and passes the biggest the controls allow', () => {
+    assert.equal(ShareLink.shareProblem(CONFIG, 91), '');
+    assert.match(ShareLink.shareProblem(CONFIG, 20001), /too many tiles for a link.*project file/);
+    assert.match(ShareLink.shareProblem({ ...CONFIG, gridType: 'triangle', boardShape: 'hexagon', radius: 100, width: 201, height: 201 }, 100), /too many tiles/, 'by the settings alone');
+    assert.equal(ShareLink.shareProblem({ ...CONFIG, boardShape: 'infinite' }, 20000), '');
+    assert.equal(ShareLink.shareProblem({ ...CONFIG, gridType: 'triangle', boardShape: 'hexagon', radius: 50, width: 102, height: 102 }, 18048), '');
 });

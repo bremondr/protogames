@@ -34,12 +34,22 @@ const ShareLink = (() => {
     // A link for the biggest board (20000 tiles) inflates to well under 1 MB; this leaves room and stops bombs.
     const MAX_INFLATED_BYTES = 2 * 1024 * 1024;
     const HASH_PATTERN = /[#&]b=([A-Za-z0-9_-]+)/;
-    const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+    // Project files accept #rgb too; links carry only the long form, so either is accepted on the way in.
+    const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+    // The same cap as the project file validator (ProjectFormat): a side of a board may be as wide as a radius-100 hexagon board.
+    const MAX_SPAN = 2 * MAX_DIMENSION + 1;
     // Rules of thumb for the apps a link gets pasted into (chat, email); browsers themselves take far more.
     const LONG_LINK = 2000;
     const VERY_LONG_LINK = 8000;
 
     // ---- Pure: payload -------------------------------------------------------------------------
+
+    /** "#RGB" or "#RRGGBB" in any case as lower-case "#rrggbb"; anything else is only lower-cased (and refused later). */
+    function normalizeHex(value) {
+        const text = String(value || '').toLowerCase();
+        const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/.exec(text);
+        return short ? `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}` : text;
+    }
 
     /**
      * Compact payload for a board: { v, f, n, c, p, k, t, ob, o }
@@ -53,7 +63,7 @@ const ShareLink = (() => {
         const colors = [];
         const colorIndex = new Map();
         const tiles = polygons.map((polygon) => {
-            const color = String(polygon.color || '').toLowerCase();
+            const color = normalizeHex(polygon.color);
             if (!colorIndex.has(color)) {
                 colorIndex.set(color, colors.length);
                 colors.push(color);
@@ -76,7 +86,7 @@ const ShareLink = (() => {
         const starts = [];
         polygons.forEach((polygon, index) => {
             if (!polygon.start) return;
-            const color = String(polygon.start).toLowerCase();
+            const color = normalizeHex(polygon.start);
             if (!startIndex.has(color)) {
                 startIndex.set(color, startColors.length);
                 startColors.push(color);
@@ -96,7 +106,7 @@ const ShareLink = (() => {
             ob: objects,
             o: placed.join('.'),
             ...(playerList.length
-                ? { pl: playerList.map((p) => [String(p.color).toLowerCase(), p.seat, (p.pieces || []).map((e) => [e.kind, e.count])]) }
+                ? { pl: playerList.map((p) => [normalizeHex(p.color), p.seat, (p.pieces || []).map((e) => [e.kind, e.count])]) }
                 : {}),
             ...(starts.length ? { sc: startColors, s: starts.join('.') } : {}),
             ...(boardConfig && boardConfig.boardShape === 'infinite' ? { i: polygons.map((p) => p.id).join('.') } : {})
@@ -110,7 +120,12 @@ const ShareLink = (() => {
     function boardConfigFrom(raw) {
         if (!raw || typeof raw !== 'object') fail('The link has no board settings.');
         const config = { ...raw };
-        const limit = (key) => (config.boardShape === 'country' ? (key === 'width' ? COUNTRY_MAX_ACROSS : key === 'height' ? COUNTRY_MAX_SPAN : MAX_DIMENSION) : MAX_DIMENSION);
+        const limit = (key) => {
+            if (key === 'radius' || key === 'size') return MAX_DIMENSION;
+            if (config.boardShape === 'country') return key === 'width' ? COUNTRY_MAX_ACROSS : COUNTRY_MAX_SPAN;
+            // Hexagon and circle boards are 2 * radius + 1 or 2 wide, so a width or height reaches past 100.
+            return MAX_SPAN;
+        };
         for (const key of ['width', 'height', 'radius', 'size']) {
             if (config[key] === undefined) continue;
             if (!Number.isInteger(config[key]) || config[key] < 1 || config[key] > limit(key)) fail(`The board ${key} in the link is out of range.`);
@@ -154,7 +169,7 @@ const ShareLink = (() => {
         const result = polygons.map((polygon, i) => {
             const color = data.k[parseInt(tiles[i], 36)];
             if (color === undefined) fail('The link refers to a colour it does not contain.');
-            return { ...polygon, color };
+            return { ...polygon, color: normalizeHex(color) };
         });
         const objects = Array.isArray(data.ob) ? data.ob : [];
         if (!objects.every((id) => typeof id === 'string' && id.length > 0 && id.length <= 200)) fail('The link has invalid items.');
@@ -174,7 +189,7 @@ const ShareLink = (() => {
             projectName: typeof data.n === 'string' && data.n ? data.n : defaultProjectName,
             appState: {
                 boardConfig: boardConfigFrom(data.c),
-                currentColor: data.k[0] || '#ffffff',
+                currentColor: data.k[0] ? normalizeHex(data.k[0]) : '#ffffff',
                 paletteId,
                 isEraserActive: false,
                 autoSaveEnabled: true,
@@ -200,7 +215,7 @@ const ShareLink = (() => {
             const target = tiles[parseInt(tile, 36)];
             const hex = data.sc[parseInt(color, 36)];
             if (!target || !hex) fail('The link places a start marker on a tile that does not exist.');
-            target.start = hex;
+            target.start = normalizeHex(hex);
         }
         return entries.length;
     }
@@ -216,7 +231,7 @@ const ShareLink = (() => {
                 fail('The link has invalid players.');
             }
             return {
-                color,
+                color: normalizeHex(color),
                 seat,
                 pieces: pieces.map((piece) => {
                     if (!Array.isArray(piece) || piece.length !== 2 || !PIECE_KINDS.includes(piece[0]) || !Number.isInteger(piece[1])) fail('The link has invalid pieces.');
@@ -249,7 +264,8 @@ const ShareLink = (() => {
     }
 
     function urlFor(baseUrl, encoded) {
-        return `${baseUrl.split('#')[0]}#b=${encoded}`;
+        // Only the page itself: the sender's query (?project=<id>, ?showcase=...) means nothing to the recipient.
+        return `${baseUrl.split('#')[0].split('?')[0]}#b=${encoded}`;
     }
 
     /** How risky a link of this many characters is to paste around: 'ok', 'long' or 'veryLong'. */
@@ -324,6 +340,15 @@ const ShareLink = (() => {
         });
     }
 
+    /**
+     * Why a board cannot be shared as a link, or '' when it can: the same limits openFromHash applies, so the
+     * dialog never shows a link that the recipient (or this tab) would refuse.
+     */
+    function shareProblem(config, tileCount) {
+        const tooBig = tileCount > MAX_TILES || (config.boardShape !== 'infinite' && estimateTiles(config) > MAX_TILES * 8);
+        return tooBig ? `This board has too many tiles for a link (at most ${MAX_TILES}). Save the project file to share it.` : '';
+    }
+
     function usesCustomContent(state) {
         const builtIn = Config.COLOR_PALETTES.some((p) => p.id === state.currentPaletteId);
         const customObject = state.polygons.some((p) => p.object && String(p.object).includes(':'));
@@ -340,8 +365,14 @@ const ShareLink = (() => {
             UI.showNotification('Generate a board before sharing.');
             return;
         }
+        const painted = Infinite.isActive() ? Infinite.paintedTiles(state.polygons) : state.polygons;
+        const problem = shareProblem(state.boardConfig, painted.length);
+        if (problem) {
+            UI.showNotification(problem, 6000);
+            return;
+        }
         try {
-            currentUrl = urlFor(location.href, await encode(currentPayload()));
+            currentUrl = urlFor(location.origin && location.origin !== 'null' ? location.origin + location.pathname : location.href, await encode(currentPayload()));
         } catch (error) {
             UI.showNotification(`Could not create link: ${error.message}`);
             return;
@@ -464,6 +495,7 @@ const ShareLink = (() => {
         LINK_VERSION,
         pack,
         unpack,
+        shareProblem,
         toBase64Url,
         fromBase64Url,
         hashPayload,
