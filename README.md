@@ -83,12 +83,15 @@ protogames/
 │  │  ├─ viewMath.js        (pure zoom/pan maths)
 │  │  ├─ viewControls.js    (zoom, pan, fit, minimap, texture toggle)
 │  │  ├─ renderer.js
-│  │  ├─ textureUtils.js    (colour helpers and blob-URL cache shared by textures and objects)
+│  │  ├─ textureUtils.js    (colour helpers and blob-URL cache shared by textures and objects; loads before both)
 │  │  ├─ textures.js        (procedural tile textures)
 │  │  ├─ objects.js         (placeable map objects)
 │  │  ├─ interactions.js
 │  │  ├─ toolOps.js         (fill and line tool logic)
 │  │  ├─ toolbar.js         (the tool column and its settings popovers)
+│  │  ├─ panels.js          (folding of the sidebar panels, remembered per browser)
+│  │  ├─ boardPicker.js     (the board-shape list with a picture of every layout)
+│  │  ├─ focusUtils.js      (keyboard-focus rules: typing targets, Tab trap, open layers; loads before the modules that use it)
 │  │  ├─ shortcuts.js       (keyboard bindings)
 │  │  ├─ projectFormat.js   (project file format: versions, migrations, validation)
 │  │  ├─ projectLibrary.js  (the projects kept in the browser; the home page uses it too)
@@ -115,28 +118,37 @@ protogames/
 │  │  ├─ utils.js
 │  │  └─ main.js
 │  ├─ showcases/         (example .protogames.json projects)
-│  ├─ images/            (logo and tile-shape illustrations)
+│  ├─ images/            (the logo and the favicon)
 │  └─ data/              (countries-50m.json: outlines for the Country shape)
-├─ tests/                (node:test suites, fixtures/ of old file formats, support/load.js)
-├─ dev/                  (geometry-gallery.html, geometry-checks.js)
-├─ scripts/              (build-site.js: assembles production + previews for Pages)
-├─ .github/workflows/    (test.yml, pages.yml)
+├─ tests/                (node:test suites, roughly one per module, plus generatorVersion, scriptOrder and
+│                         others that guard the whole app; fixtures/ of old file formats; support/ with load.js and fakes.js)
+├─ dev/                  (geometry-gallery.html, geometry-checks.js, build-showcases.js: writes the board-game showcases)
+├─ scripts/              (build-site.js: assembles production + previews for Pages; preview-runtime.js: storage prefix and badge of a preview)
+├─ .github/              (workflows/ test.yml and pages.yml, issue templates, FUNDING.yml)
 └─ docs/
    ├─ SPECIFICATION.md   (file, autosave and share-link formats, generator versions)
-   ├─ DEPLOYMENT.md
+   ├─ DEPLOYMENT.md      (production, previews, how the site is built)
    ├─ TILE_GENERATION_EXPLANATION.md
+   ├─ PLAYTEST.md        (how playtest works; PLAYTEST_DEVICES.md is a proposal, PLAYTEST_IDEAS.md a backlog)
+   ├─ BOARD_TOPOLOGIES.md (survey of the maps of published games; its schematics are in board-topologies/)
+   ├─ AUDIT.md           (code audit of 2026-10-05, a snapshot; many of its findings are fixed since)
+   ├─ notes.md           (links to reading on hex maps)
    └─ Protogames - Development Specification Document.md  (original PRD, historical)
 ```
 
 ## Notable Recent Changes
-- Geometry split into submodules (hex/triangle/square helpers + aggregator)
-- Concentric triangle-based hex generation refinements
-- Themed palette system with selector; palettes defined in `config.js`
-- Dedicated eraser tool (separate button) that clears tiles to the default color
-- Autosave/load preserves palette and eraser state
+Almost all of this happened in October 2026; before that the project was the board generator, the palettes and the eraser (November 2025).
+- **Projects**: every board is a named project in the browser, autosaved, listed on the home page; the Project panel, the tabbed Export dialog and the Load dialog replace the old menu. Opening a file, a share link or a showcase makes a new project instead of replacing the open one.
+- **Boards**: the tile shape is chosen first; hexagon and circle boards are built in layers around a tile or a point (every tile shape); the board shape is picked from a list of pictures. New shapes: **Infinite canvas** (prototype) and **Country** (real outlines, regions with borders). The old square board is now a rectangle with equal sides.
+- **Generator versions**: a board remembers which version of the tile generator made it (project format 8, share link 5), so improving the generator never changes a saved board. Circles of triangles lost their one-tile spikes; very large circles of hexagons no longer lose tiles at the rim.
+- **Playtest**: players with seats and piece sets, start markers, trays, movable pieces, dice; see [docs/PLAYTEST.md](docs/PLAYTEST.md).
+- **Print and export**: a PDF at real tile size (home-printer pages or one sheet, legend, tokens, crop marks); SVG export with textures, start markers and country borders.
+- **Safer files and links**: stricter project validation, bounded decoding of share links, a Content-Security-Policy, and blocked or full browser storage is reported instead of ignored.
+- **Showcases** (five example projects), per-pull-request **previews** of the site, and a test suite of over 700 tests.
+- Earlier: geometry split into submodules, themed palettes, a dedicated eraser, autosave of palette and eraser state.
 
 ## Usage
-1. Open `app/index.html` in a modern browser (or serve the repository, for example `python -m http.server`, and open `/` for the landing page or `/app/` for the editor).
+1. Open `app/index.html` in a modern browser (or serve the repository, for example `python -m http.server 8000 --bind 127.0.0.1`, and open `/` for the landing page or `/app/` for the editor).
 2. Choose board shape, grid type, and parameters in the sidebar; click **Generate Board**.
 3. Pick a palette theme, select a color (or click **Eraser**), then click or drag on tiles. Switch the tool to **Fill** to repaint a whole connected region of one colour, or **Line** to drag out a straight path of tiles (Esc cancels a line in progress).
 4. Projects are saved in the browser as you work; **Export…** downloads a `.protogames.json` file, a PNG/SVG, or a PDF at real-world scale.
@@ -155,7 +167,7 @@ npm test
 ```
 Runs the Node test runner over `tests/**/*.test.js`. The app's browser scripts are plain IIFE files, so `tests/support/load.js` evaluates them in an isolated `vm` context instead of needing a bundler or a DOM.
 
-The geometry tests (`tests/geometry.test.js`, `tests/neighbors.test.js`) cover every fixed board shape (hexagon, square, rectangle, triangle, circle; the infinite canvas is tested in `tests/infinite.test.js`) x tile shape x orientation combination: expected tile counts, no duplicate or overlapping tiles, correct bounds, centring inside the drawable area, hit-testing and tile adjacency (symmetric, correct neighbour counts). Every fixed shape bug has a regression test. When you fix a geometry bug, add a case there.
+The geometry tests (`tests/geometry.test.js`, `tests/neighbors.test.js`) cover every fixed board shape (hexagon, rectangle, triangle, circle; the infinite canvas is tested in `tests/infinite.test.js`, the country board in `tests/countryBoard.test.js`) x tile shape x orientation combination: expected tile counts, no duplicate or overlapping tiles, correct bounds, centring inside the drawable area, hit-testing and tile adjacency (symmetric, correct neighbour counts). Every fixed shape bug has a regression test. When you fix a geometry bug, add a case there.
 
 ### Geometry gallery
 `dev/geometry-gallery.html` renders every combination as a thumbnail, runs the same checks as the tests, and marks failing combinations in red and unsupported ones as dashed "invalid" cards with the reason. Serve the repository root with any static server and open the page:
@@ -167,6 +179,9 @@ Optional query parameters change the sizes, e.g. `?radius=5&size=8&width=10&heig
 
 ### Adding a keyboard shortcut
 All shortcuts live in `BINDINGS` in `js/shortcuts.js` (id, label, group, keys). Add the binding there, add its action to `ACTIONS` further down the same file, and mark any button that triggers it with `data-shortcut="<id>"` so its tooltip shows the key. `tests/shortcuts.test.js` fails if two bindings use the same key.
+
+### Adding a script
+There is no bundler: `app/index.html` lists every script with `defer` and the browser runs them in that order, so a module must come after the ones it uses while loading (for example `textureUtils.js` before `textures.js` and `objects.js`, `focusUtils.js` before the modules that use it, `projectFormat.js` before `shareLink.js` and `fileManager.js`). `tests/scriptOrder.test.js` fails when a file under `app/js/` is missing from the page or listed twice, when one of those orders is broken, and when the list does not load in a bare context.
 
 ### Continuous integration
 `.github/workflows/test.yml` runs `npm test` on every push to `main` and on every pull request, so a failing geometry test fails the check.
