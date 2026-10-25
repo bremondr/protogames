@@ -54,14 +54,37 @@ Rings of triangles around the centre vertex hold `6 * (2k - 1)` triangles for ri
 triangles: 6 for `N = 1`, 24 for `N = 2`, 54 for `N = 3`, 96 for `N = 4`. Tests and `dev/geometry-checks.js` assert `6 * radius^2`.
 
 ## Circle board
-Every triangle whose centroid lies within `radius` triangle sides of the centre vertex:
+Around a lattice vertex (`center: 'point'`), every triangle whose centroid lies within `radius` triangle sides of the vertex:
 
 ```javascript
 const limitSquared = (Math.floor(3 * radius * radius) + 0.5) / 3;
 accepts: (x, y) => x * x + y * y <= limitSquared
 ```
 
-Squared centroid distances are multiples of 1/3, so the threshold sits halfway between two achievable values and no triangle can lie exactly on the boundary. Not rotated; ids use the prefix `triangle_disc`. The counts are 6, 24 and 60 for radius 1, 2 and 3 (there is no `6 * radius^2` rule here).
+Squared centroid distances are multiples of 1/3, so the threshold sits halfway between two achievable values and no triangle can lie exactly on the boundary. Around a single triangle (`center: 'tile'`, `triangleOrientation` says whether it points up or down) the same is done from that triangle's centroid with a limit of `radius - 0.5` sides, halfway between two achievable distances (`limitBetween`), so radius 1 is that triangle alone. Not rotated; ids use the prefix `triangle_disc`.
+
+**Spikes.** The cut-out rim can leave a triangle that touches only one other triangle (or none). `withoutSpikes` removes those and repeats until every triangle touches at least two others, because removing one can leave its neighbour hanging by a single edge. A board of one triangle is left alone. The rule looks at a triangle and its neighbours only, so the symmetry of the disc is kept.
+
+Counts after the spikes are removed (there is no `6 * radius^2` rule here):
+
+| radius | 1 | 2 | 3 | 4 | 5 | 10 | 20 |
+|---|---|---|---|---|---|---|---|
+| around a vertex | 6 | 24 | 54 | 96 | 180 | 690 | 2874 |
+| around a triangle | 1 | 13 | 37 | 82 | 136 | 625 | 2737 |
+
+Circles of triangles are identical in generator 1 and generator 2 (see "Generator versions" below); the counts above were measured from the code and are asserted for generator 1 in `tests/generatorVersion.test.js`.
+
+## Generator versions
+`Geometry.generateGrid` reads `config.generator` (an integer from 1; `Config.GENERATOR_VERSION` is the current one, 2; missing means current). A board stores the version it was made with so that regenerating it (resize, opening a file) never changes its tiles; see "Generator versions" in `docs/SPECIFICATION.md` for the rule (*a change to the tiles generated for existing settings is a new generator version; an old version is never edited*) and the format.
+
+The two versions differ only in the **circle of hexagon tiles** (`buildCircleHexGrid` in `js/geometry/hex.js`), which scans a window of axial coordinates `(q, r)` around the middle and keeps the tiles within the disc:
+
+| | scan window (`span`) | tiles of a disc of radius 30 around a tile | complete up to |
+|---|---|---|---|
+| generator 1 | `radius + 3` | 3283 | radius 22 (tile), 18 (point) |
+| generator 2 | `ceil((radius + 0.72) * 2 / sqrt(3)) + 2` | 3367 | every radius |
+
+The disc of radius `radius + 0.72` tile widths reaches `2 / sqrt(3)` times as many axial steps as its radius, so a window that grows one step per radius runs out of tiles to scan. Generator 2 contains every tile of generator 1 with the same id. Circles of triangles are not affected: their window (`2 * radius + 2`) was always large enough.
 
 ## Fitting to the canvas
 `fitPolygonsToCanvas(polygons, canvas)` measures the bounding box of the tiles that remain, scales it to fit the drawable area (canvas minus `CANVAS_PADDING` on every side and `TOOLBAR_CLEARANCE` at the bottom) and centres it, updating each polygon's `vertices`, `center` and `bounds`. Builders may therefore lay tiles out at any scale, and nothing can overflow or sit off-centre.

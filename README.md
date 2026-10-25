@@ -122,7 +122,7 @@ protogames/
 ├─ scripts/              (build-site.js: assembles production + previews for Pages)
 ├─ .github/workflows/    (test.yml, pages.yml)
 └─ docs/
-   ├─ SPECIFICATION.md   (file, autosave and share-link formats)
+   ├─ SPECIFICATION.md   (file, autosave and share-link formats, generator versions)
    ├─ DEPLOYMENT.md
    ├─ TILE_GENERATION_EXPLANATION.md
    └─ Protogames - Development Specification Document.md  (original PRD, historical)
