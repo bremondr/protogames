@@ -247,3 +247,41 @@ test('players, dice and the running game can be replaced, and bad values fall ba
     AppState.setPlay(undefined);
     assert.equal(AppState.getState().play, null);
 });
+
+test('discarding the last step puts back the redo branch it threw away', () => {
+    const env = fresh();
+    const { AppState } = env;
+    AppState.setPolygons(tiles(env));
+    const state = AppState.getState();
+    for (const color of ['#111111', '#222222', '#333333']) { state.polygons[0].color = color; AppState.recordHistory(); }
+    AppState.undo();
+    AppState.undo();
+    state.polygons[0].color = '#444444';
+    AppState.recordHistory();
+    const back = AppState.discardLastStep();
+    assert.equal(back[0].color, '#111111');
+    assert.equal(state.history.length, 3);
+    assert.equal(AppState.redo()[0].color, '#222222', 'the redo branch is back');
+    assert.equal(AppState.redo()[0].color, '#333333');
+    assert.equal(AppState.discardLastStep()[0].color, '#222222', 'a second discard has nothing extra to restore');
+});
+
+test('discarding the last step at the history limit brings back the oldest step', () => {
+    const env = fresh();
+    const { AppState, Config } = env;
+    AppState.setPolygons(tiles(env));
+    const state = AppState.getState();
+    for (let i = 0; i < Config.HISTORY_LIMIT; i++) {
+        state.polygons[0].color = `#${String(i).padStart(6, '0')}`;
+        AppState.recordHistory();
+    }
+    assert.equal(state.history[0][0].color, '#000000');
+    state.polygons[0].color = '#ffffff';
+    AppState.recordHistory();
+    assert.equal(state.history[0][0].color, '#000001', 'the oldest was pushed out');
+    const back = AppState.discardLastStep();
+    assert.equal(back[0].color, `#${String(Config.HISTORY_LIMIT - 1).padStart(6, '0')}`);
+    assert.equal(state.history.length, Config.HISTORY_LIMIT);
+    assert.equal(state.history[0][0].color, '#000000', 'and is back');
+    assert.equal(state.historyIndex, Config.HISTORY_LIMIT - 1);
+});
