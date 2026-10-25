@@ -30,6 +30,8 @@ Since the second audit the project grew a lot: several named projects in the bro
 4. **The canvas swallows Tab** (M3, M4, M5). In the editor a keyboard user who reaches the canvas cannot leave it. In playtest the canvas is among the first tab stops, so trays, dice, the piece list and Reset cannot be reached by keyboard at all, although the docs promise keyboard play. Clicking the board also leaves focus in a sidebar field so shortcuts go dead, and Space can't toggle checkboxes.
 5. **The generator changes broke old share links** (M14). The spike removal (#113) and the new generator (#103) changed tile counts for 77 of 100 circle radii without a format or link version bump, so links made before for those boards fail with "Board size mismatch".
 
+**Progress (2026-10-26):** the High finding, 15 of the 18 Medium findings and 41 of the 47 Low ones have fixes ready in draft PRs #118-#126 (none merged yet); see the Status column in Section 3 and the table in Section 7.4. Left open on purpose: the high-DPI canvas (M10), legacy-id migration (M11), Country board caching (M18), compact autosave (L4), fractional radius (L17), the 16 MP print cap in every browser (L23), preview storage cleanup (L25), remote theme image tracking (L26) and the home-page delete announcement (L36).
+
 **Housekeeping:** the test suite is healthy (545 green on three runs and five environment variants, no flakes). A mutation check found 16 real gaps, mostly in `restoreState`. The deploy workflow is sound (tests run on every deploy, no open redirect, no CSP violations).
 
 ---
@@ -46,7 +48,7 @@ Since the second audit the project grew a lot: several named projects in the bro
 
 ## 3. The register (open findings, with live status)
 
-The **Status** column is updated as fixes land: *Open* → *Fixed in #N (pending merge)* → *Fixed*. Last update: 2026-10-26: the eight wave-1 packages are in draft PRs #118-#125 (listed per row); the generator version (M7, M14) and the test and docs package (L28) are still running; the rest is not planned for this round.
+The **Status** column is updated as fixes land: *Open* → *Fixed in #N (pending merge)* → *Fixed*. Last update: 2026-10-26: the eight wave-1 packages are in draft PRs #118-#125 (listed per row); the generator version (M7, M14) and the tests-and-docs package (L28) are in the combined draft PR #126, which contains everything. The findings still marked Open are not planned for this round.
 
 ### 3.1 High
 
@@ -66,14 +68,14 @@ The **Status** column is updated as fixes land: *Open* → *Fixed in #N (pending
 | **M4** | Painting leaves focus in a previously used sidebar field, so Ctrl+Z, E, B and every shortcut do nothing until a non-field click. | BUG-M7 | browser: still reproduces | Fixed in #119 (pending merge) |
 | **M5** | Space-to-pan swallows Space on checkboxes and other non-text inputs, so the Export dialog's checkboxes cannot be toggled with the keyboard. | BUG-M8 | browser: "Page labels" checkbox stays checked on Space | Fixed in #119 (pending merge) |
 | **M6** | The Share dialog builds a link for triangle-tile hexagon/circle boards at 50 layers (width 101/102) that the recipient cannot open ("width out of range"). Hexagon and square tiles are fine now. | BUG-M9 (narrowed), N2-4 | script: 4 of 10 UI-maximum boards (14,701–18,048 tiles) | Fixed in #123 (pending merge) |
-| **M7** | Circle of hexagon tiles loses tiles from radius 23 (tile centre) or 19 (point centre) and loses its symmetry. At the UI maximum, 496 of 8,887 tiles are missing. The onset moved from 16 (the scan window changed in #103) but the bug is not fixed. | BUG-M10 | script: R49 8,391 of 8,887; suggested `span = ceil((radius + 0.72) * 2 / √3) + 2`. **Changes ids and counts again, see M14** | Open |
+| **M7** | Circle of hexagon tiles loses tiles from radius 23 (tile centre) or 19 (point centre) and loses its symmetry. At the UI maximum, 496 of 8,887 tiles are missing. The onset moved from 16 (the scan window changed in #103) but the bug is not fixed. | BUG-M10 | script: R49 8,391 of 8,887; suggested `span = ceil((radius + 0.72) * 2 / √3) + 2`. **Changes ids and counts again, see M14** | Fixed in #126 (pending merge) |
 | **M8** | A printed legend is drawn over a board that does not fit its sheet. | BUG-M12 | script and PDF: A3 sheet, 40 mm hex tiles, legend on | Fixed in #122 (pending merge) |
 | **M9** | The printed legend names a terrain after the wrong palette (`#C62828` is "Trap" in dungeon and "Danger Zone" in spaceship). | BUG-M13 | script: still "Trap" on a spaceship board | Fixed in #122 (pending merge) |
 | **M10** | The board canvas ignores `devicePixelRatio`: soft on HiDPI screens, PNG export at CSS-pixel size. | BUG-M14 | browser: DPR 2 → backing 1100×844 on a 2200×1688 surface | Open |
 | **M11** | Old boards with legacy triangle ids: the next resize drops all their colours; opening them leaves the board unfitted. New in the same family: a file saved before #113 with a painted spike tile is also not refit on open. | BUG-M15, N2-9 | script: 23 painted → 0 after resize; spike-painted file keeps old pixel coordinates (maxX 850 on a 900 px canvas) | Open |
 | **M12** | A slow remote theme image blocks start-up: with two hanging images the board has 0 tiles after 30 s. Worse now: with `?project=<id>` the project never opens either. | BUG-M16 | browser | Fixed in #123 (pending merge) |
 | **M13** | The preview-link comment is lost whenever a run is cancelled. Less frequent now (27 of the last 30 PRs have it). | BUG-M17 | gh run history | Fixed in #124 (pending merge) |
-| **M14** | **Old share links of circle boards fail with "Board size mismatch".** #113 and #103 changed tile counts for 77 of 100 radii (triangle circles R3 60 → 54, hexagon circles R16 971 → 979) without a link or format version bump. Saved files survive; links do not. The spec says a board saved earlier keeps its tiles, which is true for files only. | N1-1, N2-2 (new) | script: old generator vs new, links refused for R3, R4, R10, R16, R20, R30 | Open |
+| **M14** | **Old share links of circle boards fail with "Board size mismatch".** #113 and #103 changed tile counts for 77 of 100 radii (triangle circles R3 60 → 54, hexagon circles R16 971 → 979) without a link or format version bump. Saved files survive; links do not. The spec says a board saved earlier keeps its tiles, which is true for files only. | N1-1, N2-2 (new) | script: old generator vs new, links refused for R3, R4, R10, R16, R20, R30 | Fixed in #126 (pending merge) |
 | **M15** | **Failed saves are silent and unprotected.** When storage is full, blocked, or autosave is off, nothing says so (only quota-full gets a notice), and opening a file, link, showcase or another project replaces the unsaved board without asking. | N1-2, N1-5 (new) | script: 80 tiles on screen, 20 in storage, `openProject` replaced the screen with no prompt; blocked storage gives only a console line | Fixed in #118 (pending merge) |
 | **M16** | **The same project open in two tabs: last save wins, silently.** No `storage` listener, no revision check, no lock. | N1-3, N3-2 (new) | browser: tab A's stroke gone from storage, still on tab A's screen | Fixed in #118 (pending merge) |
 | **M17** | Escape during a tray drag, then release, still sends the piece to a start marker (the captured tray button gets the click) and counts a move. | N3-1 (new) | browser | Fixed in #120 (pending merge) |
@@ -110,7 +112,7 @@ The **Status** column is updated as fixes land: *Open* → *Fixed in #N (pending
 | L25 | `preview:pr-N:` storage keys of closed PRs are never cleaned and share production's quota | BUG-L28 | Open |
 | L26 | Remote theme image URLs are fetched on every start (IP and origin leak); CSP allows any https image | BUG-L29 | Open |
 | L27 | A PR head that lacks `app/js` and images is published as a blank page (48 unresolved references in a test build) | BUG-L30 | Fixed in #124 (pending merge) |
-| L28 | Documentation residuals: README Tab claim, project tree, `square` shape listed, `TILE_GENERATION_EXPLANATION.md` stale again after #113 (documents 6/24/60, measured 6/24/54), `SPECIFICATION.md` orientation values | BUG-L31, N5-4, N5-5 | Open |
+| L28 | Documentation residuals: README Tab claim, project tree, `square` shape listed, `TILE_GENERATION_EXPLANATION.md` stale again after #113 (documents 6/24/60, measured 6/24/54), `SPECIFICATION.md` orientation values | BUG-L31, N5-4, N5-5 | Fixed in #126 (pending merge) |
 
 ### 3.4 Low (new in this pass)
 
@@ -238,9 +240,9 @@ Not tonight: M10 `devicePixelRatio` (needs a look on a real HiDPI screen), M18 C
 | F. Share links and start-up | #123 | M6, M12, L2, L11, L14, L15, L32, L35, L39, L43, L45 | done, 560 tests |
 | G. CI and previews | #124 | M13, L24, L27, L44 | done, 549 tests; takes effect only after merge |
 | J. Interaction details | #125 | L5-L9 | done, 556 tests |
-| Integration | branch `night/integration` | all of the above | merged, 640 tests; checked in Chrome: undo autosave, swatch keys, Space in Export, two-tab warning, infinite undo |
-| I. Generator version | next | M7, M14 | running |
-| H. Tests and docs | after I | L28, test gaps | waiting |
+| Integration | #126 (`night/integration`) | all of the above | merged, 709 tests; checked in Chrome: undo autosave, swatch keys, Space in Export, two-tab warning, infinite undo |
+| I. Generator version | in #126 | M7, M14 | done, 675 tests; checked in Chrome (v7 fixture migrates to generator 1 and survives a resize; new circle boards are generator 2; share link v5 round trip) |
+| H. Tests and docs | in #126 | L28, test gaps | done, 709 tests; 16 mutation survivors now have tests, each proven by reverting the fix; script-order test; README, SPECIFICATION, TILE_GENERATION and notes updated |
 
 ## 8. Reports
 
