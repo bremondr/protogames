@@ -53,6 +53,12 @@ const Infinite = (() => {
         return H.createPolygon({ id: `inf_t_${i}_${j}_${kind}`, type: 'triangle', center, vertices: corners, metadata: { pointingUp: kind === 'up' } });
     }
 
+    // Lattice indices of a tile id stay within what the double lattice (and the file validator) accepts.
+    // Beyond about 2^53 neighbouring indices are no longer distinct numbers and loops over them never end.
+    const MAX_LATTICE = 1e9;
+    const MAX_WORLD = MAX_LATTICE * HEX; // world extent of any rectangle cellsIn is willing to scan
+    const MAX_CELLS = 1e6; // a rectangle needing more tiles than this is refused outright
+
     const CANONICAL_INT = /^(0|-?[1-9]\d*)$/;
 
     /** Rebuilds a tile from its id, or null for ids that are not infinite-board tiles. */
@@ -63,7 +69,7 @@ const Infinite = (() => {
         if (!CANONICAL_INT.test(p[2] ?? '') || !CANONICAL_INT.test(p[3] ?? '')) return null;
         const a = Number(p[2]);
         const b = Number(p[3]);
-        if (!Number.isSafeInteger(a) || !Number.isSafeInteger(b)) return null;
+        if (!Number.isSafeInteger(a) || !Number.isSafeInteger(b) || Math.abs(a) > MAX_LATTICE || Math.abs(b) > MAX_LATTICE) return null;
         switch (p[1]) {
             case 'hp': return hex(a, b, false);
             case 'hf': return hex(a, b, true);
@@ -82,6 +88,7 @@ const Infinite = (() => {
 
     /** Rough number of tiles cellsIn would build for a rectangle, without building any. */
     function estimateCells(family, rect) {
+        if (![rect.minX, rect.minY, rect.maxX, rect.maxY].every(Number.isFinite)) return Infinity;
         const cellArea = family === 'inf_s' ? SQ * SQ : family === 'inf_t' ? (TRI * TRI_H) / 2 : 1.5 * R3 * HEX * HEX;
         const w = rect.maxX - rect.minX + 4 * HEX;
         const h = rect.maxY - rect.minY + 4 * HEX;
@@ -92,6 +99,8 @@ const Infinite = (() => {
     function cellsIn(family, rect) {
         const out = [];
         const { minX, minY, maxX, maxY } = rect;
+        // Non-finite, absurdly far or huge rectangles (a loop counter near 2^53 never advances) build nothing.
+        if (![minX, minY, maxX, maxY].every((v) => Math.abs(v) <= MAX_WORLD) || estimateCells(family, rect) > MAX_CELLS) return out;
         if (family === 'inf_hp') {
             const dy = 1.5 * HEX, dx = R3 * HEX;
             for (let r = Math.floor(minY / dy) - 1; r <= Math.ceil(maxY / dy) + 1; r++) {
@@ -134,6 +143,7 @@ const Infinite = (() => {
     function loadRect() {
         const s = st();
         const v = ViewMath.visibleWorldRect(s.view, s.canvas.width, s.canvas.height);
+        if (![v.minX, v.minY, v.maxX, v.maxY].every((n) => Math.abs(n) <= MAX_WORLD)) return null;
         return {
             minX: (Math.floor(v.minX / CHUNK) - 1) * CHUNK,
             minY: (Math.floor(v.minY / CHUNK) - 1) * CHUNK,
@@ -154,6 +164,7 @@ const Infinite = (() => {
         if (!s.canvas || !isActive()) return false;
         const family = familyOf(s.polygons[0].id);
         const rect = loadRect();
+        if (!rect) return false; // a view that is not a real place (NaN, 1e300): keep what is loaded
         const key = `${family}:${rect.minX},${rect.minY},${rect.maxX},${rect.maxY}`;
         if (!force && key === loadedKey) return false;
         loadedKey = key;
@@ -175,6 +186,7 @@ const Infinite = (() => {
         const painted = s.polygons.filter(isPainted);
         if (!painted.length) return ViewMath.identity();
         const b = ViewMath.boundsOf(painted);
+        if (![b.minX, b.minY, b.maxX, b.maxY].every(Number.isFinite)) return ViewMath.identity();
         const pad = 48;
         const w = s.canvas.width - pad * 2;
         const h = s.canvas.height - pad * 2 - Config.TOOLBAR_CLEARANCE;
@@ -205,15 +217,17 @@ const Infinite = (() => {
     function exportScene(width, height) {
         const s = st();
         const painted = s.polygons.filter(isPainted);
-        const base = ViewMath.boundsOf(painted.length ? painted : s.polygons);
+        const base = ViewMath.boundsOf(painted.length ? painted : s.polygons) || { minX: 0, minY: 0, maxX: 0, maxY: 0 };
         const rect = { minX: base.minX - EXPORT_MARGIN, minY: base.minY - EXPORT_MARGIN, maxX: base.maxX + EXPORT_MARGIN, maxY: base.maxY + EXPORT_MARGIN };
         const byId = new Map(s.polygons.map((p) => [p.id, p]));
         const family = familyOf(s.polygons[0].id);
         // Drawings spread over a huge area: export the drawn tiles only rather than millions of blanks.
         // Estimated first so those blanks are never allocated.
-        const polygons = estimateCells(family, rect) > EXPORT_MAX_TILES
-            ? painted
+        // With nothing drawn, the tiles loaded around the view stand in for them.
+        let polygons = estimateCells(family, rect) > EXPORT_MAX_TILES
+            ? (painted.length ? painted : s.polygons)
             : cellsIn(family, rect).map((cell) => byId.get(cell.id) || cell);
+        if (!polygons.length) polygons = cellsIn(family, { minX: -EXPORT_MARGIN, minY: -EXPORT_MARGIN, maxX: EXPORT_MARGIN, maxY: EXPORT_MARGIN });
         const bounds = ViewMath.boundsOf(polygons);
         const pad = 24;
         const scale = Math.min(2, (width - pad * 2) / Math.max(1, bounds.maxX - bounds.minX), (height - pad * 2) / Math.max(1, bounds.maxY - bounds.minY));
@@ -282,6 +296,15 @@ const Infinite = (() => {
                 .map((e) => fromId(e.id))
                 .filter(Boolean);
             if (missing.length) s.polygons = s.polygons.concat(missing);
+            // Tiles loaded after the snapshot were blank when it was taken; without an entry the base
+            // restore would leave their paint (and objects, start markers) in place.
+            const known = new Set(snapshot.map((e) => e.id));
+            for (const p of s.polygons) {
+                if (known.has(p.id) || !isPainted(p)) continue;
+                p.color = Config.DEFAULT_FILL;
+                delete p.object;
+                delete p.start;
+            }
         }
         originalRestore(snapshot);
     };
