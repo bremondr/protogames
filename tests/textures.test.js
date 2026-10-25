@@ -122,3 +122,16 @@ test('textures tile seamlessly: every shape is drawn identically at all 9 wrappe
         }
     }
 });
+
+test('a colour shared by two palettes is named by the active palette, and switching palette renames it', () => {
+    const { app: browser } = fakeBrowser();
+    browser.run(`var AppState = { getState: () => globalThis.__state }; void 0;`);
+    const T = browser.run('Textures');
+    const at = (id) => { browser.context.__state = { currentPaletteId: id }; };
+    at('dungeon');
+    assert.equal(T.getLabel('#C62828'), 'trap');
+    at('spaceship');
+    assert.equal(T.getLabel('#C62828'), 'danger zone', 'the cached name follows the active palette');
+    at('nonexistent');
+    assert.equal(T.getLabel('#C62828'), 'trap', 'with no match the first palette that has the colour wins, as before');
+});
