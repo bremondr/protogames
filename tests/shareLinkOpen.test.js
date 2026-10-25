@@ -16,8 +16,8 @@ function makeModal(id) {
     return modal;
 }
 
-function fresh({ hasWork = false, hash = '#b=AAAA', modals = [] } = {}) {
-    const calls = { confirms: [], restores: [], replaced: [], newProjects: 0 };
+function fresh({ hasWork = false, atRisk = false, hash = '#b=AAAA', modals = [] } = {}) {
+    const calls = { confirms: [], restores: [], replaced: [], newProjects: 0, guards: [] };
     const location = { hash, pathname: '/app/', search: '' };
     const document = { querySelectorAll: () => modals.filter((m) => !m.hidden && !m.removed) };
     const app = loadApp([...GEOMETRY_SCRIPTS, 'app/js/projectFormat.js', 'app/js/shareLink.js'], {
@@ -27,6 +27,10 @@ function fresh({ hasWork = false, hash = '#b=AAAA', modals = [] } = {}) {
         history: { replaceState: (...args) => { calls.replaced.push(args); location.hash = ''; } },
         FileManager: {
             hasUserWork: () => hasWork,
+            guardReplace: (proceed, onCancel) => {
+                calls.guards.push({ proceed, onCancel });
+                if (!atRisk) proceed();
+            },
             showAsNewProject: (show) => { calls.newProjects += 1; show(); },
             confirmReplace: (onConfirm, options) => calls.confirms.push({ onConfirm, options }),
             restoreState: (project) => calls.restores.push(project)
@@ -142,4 +146,24 @@ test('a hash change without a link is ignored', () => {
     env.ShareLink.onHashChange();
     assert.equal(env.calls.confirms.length, 0);
     assert.equal(env.calls.restores.length, 0);
+});
+
+test('a link pasted into a running tab asks first when the open board could not be saved, and keeps the board on cancel', async () => {
+    const env = fresh({ hasWork: true, atRisk: true });
+    env.location.hash = `#b=${await linkFor(env)}`;
+    env.ShareLink.onHashChange();
+    assert.equal(env.calls.guards.length, 1, 'the guard was consulted');
+    assert.equal(env.calls.restores.length, 0, 'nothing opened yet');
+    env.calls.guards[0].onCancel();
+    assert.equal(env.calls.restores.length, 0, 'cancelling keeps the board');
+    assert.equal(env.location.hash, '', 'and forgets the link');
+});
+
+test('a link pasted into a running tab opens once the guard lets it through', async () => {
+    const env = fresh({ hasWork: true, atRisk: true });
+    env.location.hash = `#b=${await linkFor(env)}`;
+    env.ShareLink.onHashChange();
+    env.calls.guards[0].proceed();
+    await untilRestored(env);
+    assert.equal(env.calls.restores.length, 1);
 });

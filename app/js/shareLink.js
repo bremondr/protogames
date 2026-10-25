@@ -473,7 +473,10 @@ const ShareLink = (() => {
 
     /** A link pasted into an already open tab changes only the hash. It opens as a new project, so nothing is replaced. */
     function onHashChange() {
-        if (hashPayload(location.hash)) openFromHash();
+        if (!hashPayload(location.hash)) return;
+        // The link opens as a new project and the open board is saved first; only when that save failed
+        // does replacing the board lose work, and then the person is asked.
+        FileManager.guardReplace(() => openFromHash(), forgetHash);
     }
 
     function init() {
