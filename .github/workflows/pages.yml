@@ -3,6 +3,8 @@ name: Deploy site
 # Production is main, published at the root of the GitHub Pages site. Every open pull request from this
 # repository is published as a preview under /preview/pr-<number>/. Each run rebuilds the whole site from
 # git (see scripts/build-site.js), so a preview disappears by itself when its pull request is closed.
+# The last step of a run that deployed comments on every open pull request (link, or why there is no preview),
+# so a run that was cancelled by a newer one is made up for by the next run that finishes.
 #
 # pull_request_target is used on purpose: the workflow that runs is always the one on main, and the
 # pull request's code is only ever copied out of git as files, never executed. Pull requests from forks
@@ -48,18 +50,21 @@ jobs:
       - name: Run unit tests
         run: npm test
 
+      # Same-repository pull requests only, filtered here (before any limit) so forks cannot crowd real ones out.
+      # The newest 40 are fetched; the build publishes the newest 20 that can really be built.
       - name: Collect open pull requests from this repository
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh pr list --state open --limit 30 --json number,title,isDraft,isCrossRepository \
-            --jq '[.[] | select(.isCrossRepository | not) | {number, title, isDraft, ref: ("refs/previews/pr-" + (.number | tostring))}]' > previews.json
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls?state=open&sort=created&direction=desc&per_page=100" \
+            --jq '.[] | select(.head.repo != null and .head.repo.full_name == "'"${GITHUB_REPOSITORY}"'") | {number, title, isDraft: .draft, ref: ("refs/previews/pr-" + (.number | tostring))}' \
+            | jq -s '.[:40]' > previews.json
           for number in $(jq -r '.[].number' previews.json); do
             git fetch --no-tags --depth=1 origin "pull/${number}/head:refs/previews/pr-${number}" || echo "::warning::Could not fetch pull request ${number}; it is left out."
           done
 
       - name: Build the site
-        run: node scripts/build-site.js --out _site --main HEAD --previews previews.json --repo "${{ github.repository }}"
+        run: node scripts/build-site.js --out _site --main HEAD --previews previews.json --repo "${{ github.repository }}" --summary build-summary.json
 
       - uses: actions/configure-pages@v6
 
@@ -71,18 +76,38 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v5
 
-      - name: Comment the preview link on the pull request
-        if: github.event_name == 'pull_request_target' && github.event.action != 'closed'
+      # Runs after every successful deploy, whatever event started the run, and covers every open pull request
+      # in the build summary: it creates or updates the one comment marked below. Only this repository's pull
+      # requests are in the summary, and no pull request code is run (the summary is written by the script on main).
+      - name: Comment on the open pull requests
         uses: actions/github-script@v9
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
         with:
           script: |
+            const fs = require('fs');
             const marker = '<!-- protogames-preview -->';
-            const base = '${{ steps.deployment.outputs.page_url }}';
-            const url = `${base}preview/pr-${context.issue.number}/`;
-            const sha = context.payload.pull_request.head.sha.slice(0, 7);
-            const body = `${marker}\n**Preview:** ${url}\n\nBuilt from \`${sha}\`. It keeps its own saved data, separate from production. The preview is removed when this pull request is closed.`;
+            const base = process.env.PAGE_URL;
             const { owner, repo } = context.repo;
-            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: context.issue.number });
-            const existing = comments.find((c) => c.body && c.body.startsWith(marker));
-            if (existing) await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
-            else await github.rest.issues.createComment({ owner, repo, issue_number: context.issue.number, body });
+            const summary = JSON.parse(fs.readFileSync('build-summary.json', 'utf8'));
+            const bodyFor = (result) => {
+              if (result.status === 'built') {
+                return `${marker}\n**Preview:** ${base}preview/pr-${result.number}/\n\nBuilt from \`${result.sha}\`. It keeps its own saved data, separate from production. The preview is removed when this pull request is closed.`;
+              }
+              if (result.status === 'over-cap') {
+                return `${marker}\n**No preview:** ${result.reason}. It gets one when an older pull request is closed.`;
+              }
+              return `${marker}\n**No preview:** ${result.reason}.`;
+            };
+            for (const result of summary.results) {
+              try {
+                const body = bodyFor(result);
+                const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: result.number });
+                const existing = comments.find((c) => c.user && c.user.login === 'github-actions[bot]' && c.body && c.body.startsWith(marker));
+                if (!existing) await github.rest.issues.createComment({ owner, repo, issue_number: result.number, body });
+                else if (existing.body !== body) await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+              } catch (error) {
+                // One pull request that cannot be commented on (for example, locked) must not stop the others.
+                core.warning(`Could not comment on pull request ${result.number}: ${error.message}`);
+              }
+            }
