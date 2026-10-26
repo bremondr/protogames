@@ -131,7 +131,8 @@ protogames/
    ├─ TILE_GENERATION_EXPLANATION.md
    ├─ PLAYTEST.md        (how playtest works; PLAYTEST_DEVICES.md is a proposal, PLAYTEST_IDEAS.md a backlog)
    ├─ BOARD_TOPOLOGIES.md (survey of the maps of published games; its schematics are in board-topologies/)
-   ├─ AUDIT.md           (code audit of 2026-10-05, a snapshot; many of its findings are fixed since)
+   ├─ audits/            (register.md = the current state of all findings; dated audit reports and their area reports are frozen logs;
+   │                      start with audits/README.md for the rules)
    ├─ notes.md           (links to reading on hex maps)
    └─ Protogames - Development Specification Document.md  (original PRD, historical)
 ```
