@@ -1,6 +1,6 @@
 # Protogames — Code Audit
 
-> **Status (2026-10-25):** this is the first audit, kept as written. Almost everything in it is fixed (all High/Medium findings fixed or superseded, 41 of 58 Low/cleanup items fixed). See [CURRENT_AUDIT.md](CURRENT_AUDIT.md) for where things stand now.
+> **Archived log (frozen 2026-10-26).** This is the report of audit A1 as written on its date. Current status of every finding: [register.md](../register.md).
 
 **Date:** 2026-10-05 · **Revision audited:** `cdf317e` (main, clean tree) · **Scope:** whole repository (≈10k lines of app JS, `index.html`, `styles.css`, tests, scripts, CI, docs)
 

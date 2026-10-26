@@ -1,8 +1,10 @@
-# Protogames — Current Audit
+# Protogames — Re-audit of 2026-10-25
 
-**Date:** 2026-10-25 · **Revision audited:** `78aa7ef` (main, 545 tests green) · **Replaces the status of:** [AUDIT.md](AUDIT.md) (first audit, 2026-10-05, revision `cdf317e`) and [BUG_AUDIT.md](BUG_AUDIT.md) (second audit, 2026-10-11, revision `39ead4a`)
+> **Archived log (frozen 2026-10-26).** This is the report of audit A3 as written on its date. Current status of every finding: [register.md](../register.md). The Status column in section 3 is the state on 2026-10-26, after PR #126 (the live status is in the register).
 
-This report merges both earlier audits with a fresh pass over the project as it is now. Five independent reviewers each re-checked every earlier finding in their area against the current code (re-running the old repros, in a real browser where the finding was about behaviour) and looked for new bugs in the code that appeared since. The full reports, with repro commands, are in [audit-2026-10-25/](audit-2026-10-25/). Section 7 is the plan for tonight.
+**Date:** 2026-10-25 · **Audit ID:** A3 · **Revision audited:** `78aa7ef` (main, 545 tests green) · **Supersedes:** [A1, the first audit](../2026-10-05-code-audit/report.md) (2026-10-05, revision `cdf317e`) and [A2, the bug audit](../2026-10-11-bug-audit/report.md) (second audit, 2026-10-11, revision `39ead4a`)
+
+This report merges both earlier audits with a fresh pass over the project as it is now. Five independent reviewers each re-checked every earlier finding in their area against the current code (re-running the old repros, in a real browser where the finding was about behaviour) and looked for new bugs in the code that appeared since. The full reports, with repro commands, are in [area-reports/](area-reports/). Section 7 is the plan for tonight.
 
 ---
 
@@ -48,7 +50,7 @@ Since the second audit the project grew a lot: several named projects in the bro
 
 ## 3. The register (open findings, with live status)
 
-The **Status** column is updated as fixes land: *Open* → *Fixed* (with the PR that merged it). Last update: 2026-10-26: all eight fix packages, the generator version and the tests-and-docs package were merged into `main` in #126 (the work was first reviewed as drafts #118-#125, which GitHub marks merged because their commits are inside #126). The findings still marked Open are not planned for this round.
+The **Status** column is a snapshot of 2026-10-26 (after PR #126). Later changes are made only in [register.md](../register.md).
 
 ### 3.1 High
 
@@ -148,7 +150,7 @@ Dead code (first audit leftovers, 8 items): `Utils.formatTimestamp`, the `pointi
 
 ## 4. What changed since the earlier audits
 
-### 4.1 Second audit (BUG_AUDIT.md) ledger
+### 4.1 Second audit (A2) ledger
 
 49 numbered findings (1 High, 17 Medium, 31 Low):
 
@@ -158,7 +160,7 @@ Dead code (first audit leftovers, 8 items): `Utils.formatTimestamp`, the `pointi
 | **Changed** | 6 | M9 (narrower: only triangle tiles at 50 layers), M10 (truncation moved from radius 16 to 23/19), M15 (kept as saved, no id remap), L12 (field now shows 1), L13 (only latent), L31 (docs mostly fixed) |
 | **Still open** | 37 | H1; M4–M8, M12–M14, M16, M17; L1–L4, L6–L11, L14, L15, L17–L30 (the register above) |
 
-### 4.2 First audit (AUDIT.md) ledger
+### 4.2 First audit (A1) ledger
 
 - **Findings H1–H6 and M1–M17:** all fixed except H6, which changed: the Tab fix became the keyboard trap (M3). H2, H3, H5 and the M-series fixes were re-confirmed by the reviewers. H4 (validator) and M1 (inflate bound) were confirmed by mutation tests.
 - **Low bullets (26), unused code (14), duplication (9), documentation drift (9) = 58 items:** 41 fixed, 8 open, 9 changed. The open ones are minor: per-frame tile scan, `linePath` on disconnected boards, `Utils.formatTimestamp`, `pointingUp`, test-only `planLine`, duplicated pointer-to-canvas maths, dead per-builder sizing, actions pinned by tag (accepted in DEPLOYMENT.md).
@@ -246,4 +248,4 @@ Not tonight: M10 `devicePixelRatio` (needs a look on a real HiDPI screen), M18 C
 
 ## 8. Reports
 
-Per-area reports with exact repros and the lists of what was checked: [1-state](audit-2026-10-25/1-state.md), [2-geometry-render](audit-2026-10-25/2-geometry-render.md), [3-ui-playtest](audit-2026-10-25/3-ui-playtest.md), [4-build-security](audit-2026-10-25/4-build-security.md), [5-leftovers-health](audit-2026-10-25/5-leftovers-health.md). They refer to repro scripts as `<scratch>/…`; the scripts (several hundred small node and DevTools scripts, generated PDFs and screenshots) were written in a scratch folder and are not committed.
+Per-area reports with exact repros and the lists of what was checked: [1-state](area-reports/1-state.md), [2-geometry-render](area-reports/2-geometry-render.md), [3-ui-playtest](area-reports/3-ui-playtest.md), [4-build-security](area-reports/4-build-security.md), [5-leftovers-health](area-reports/5-leftovers-health.md). They refer to repro scripts as `<scratch>/…`; the scripts (several hundred small node and DevTools scripts, generated PDFs and screenshots) were written in a scratch folder and are not committed.

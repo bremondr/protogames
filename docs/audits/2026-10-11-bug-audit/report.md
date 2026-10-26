@@ -1,10 +1,10 @@
 # Protogames — Bug Audit
 
-> **Status (2026-10-25):** this is the second audit, kept as written. Issues #4, #19 and #20 are fixed since; 6 of its 49 findings are fixed and 37 are still open. See [CURRENT_AUDIT.md](CURRENT_AUDIT.md) for the merged, current register and the plan.
+> **Archived log (frozen 2026-10-26).** This is the report of audit A2 as written on its date. Current status of every finding: [register.md](../register.md).
 
 **Date:** 2026-10-11 · **Revision audited:** `39ead4a` (main, after the code-audit fixes of PR #76 and the favicon) · **Scope:** the open bug issues on GitHub, plus a hunt for unknown bugs across the whole app
 
-This is the second audit. The first one ([AUDIT.md](AUDIT.md)) was a code review and led to PR #76. This one looks for bugs that only show up when the code *runs*: it drives the real modules with fuzzing and property checks, runs the app in real browsers, validates generated PDFs and SVGs with external tools, and reviews PR #76 for regressions. The full per-area reports, with repro commands and the lists of what was checked and found fine, are in [bug-audit/](bug-audit/).
+This is the second audit. The first one ([the first audit](../2026-10-05-code-audit/report.md)) was a code review and led to PR #76. This one looks for bugs that only show up when the code *runs*: it drives the real modules with fuzzing and property checks, runs the app in real browsers, validates generated PDFs and SVGs with external tools, and reviews PR #76 for regressions. The full per-area reports, with repro commands and the lists of what was checked and found fine, are in [area-reports/](area-reports/).
 
 ---
 
@@ -45,8 +45,8 @@ The five closed geometry bugs (#2, #3, #8, #9, #6) have **not** regressed.
 
 ## 2. Method and limits
 
-- **Six area audits**, each by an independent reviewer that wrote throwaway scripts against the real modules and reported only what it could demonstrate: geometry and boards; state and persistence; interaction and UI logic; rendering, export and print; a skeptical review of PR #76's diff; build, CI, security and docs. A seventh checked the GitHub issues. Reports: [bug-audit/](bug-audit/).
-- **Real browsers:** the UI audit and the PR #76 review drove headless Edge/Chromium over the DevTools protocol (trusted mouse, keyboard, wheel and touch input). The rendering audit generated its PDFs in a real browser. I also reproduced the Discard bug and #19 in Chrome myself ([bug-audit/H-browser.md](bug-audit/H-browser.md)).
+- **Six area audits**, each by an independent reviewer that wrote throwaway scripts against the real modules and reported only what it could demonstrate: geometry and boards; state and persistence; interaction and UI logic; rendering, export and print; a skeptical review of PR #76's diff; build, CI, security and docs. A seventh checked the GitHub issues. Reports: [area-reports/](area-reports/).
+- **Real browsers:** the UI audit and the PR #76 review drove headless Edge/Chromium over the DevTools protocol (trusted mouse, keyboard, wheel and touch input). The rendering audit generated its PDFs in a real browser. I also reproduced the Discard bug and #19 in Chrome myself ([bug-audit/H-browser.md](area-reports/H-browser.md)).
 - **Evidence level** is given per finding: *browser* (reproduced in a real browser), *script* (reproduced in a node harness with the real modules), *code* (derived from reading the code, not reproduced).
 - Severity: **High** = crash or hang on reachable input, data loss, or a broken release. **Medium** = a user-visible bug or a real hardening gap. **Low** = minor bugs, polish, robustness. **Info** = notes.
 - **Not covered:** Firefox and Safari, real touch/pen devices, macOS, the real Fullscreen API, screen readers, real printers and paper, iOS canvas limits, GPU performance, and GitHub Actions concurrency behaviour (reasoned about, not run). The reports list the gaps per area.
@@ -297,4 +297,4 @@ Two items need a decision from you rather than a fix: how to deal with the geome
 
 ## 9. Reports and reproduction
 
-The detailed reports are in [bug-audit/](bug-audit/): [A-geometry](bug-audit/A-geometry.md), [B-state](bug-audit/B-state.md), [C-ui](bug-audit/C-ui.md), [D-render](bug-audit/D-render.md), [E-regressions](bug-audit/E-regressions.md), [F-build](bug-audit/F-build.md), [G-issues](bug-audit/G-issues.md) and [H-browser](bug-audit/H-browser.md). They contain exact repro steps, expected and observed output, and the lists of what was checked. The repro scripts themselves (about 150 small node and DevTools scripts, plus generated PDFs and SVGs) were written in a scratch folder and are **not** committed. The reports refer to them as `<scratch>/…`. Where a script mattered, the report quotes its command and output.
+The detailed reports are in [area-reports/](area-reports/): [A-geometry](area-reports/A-geometry.md), [B-state](area-reports/B-state.md), [C-ui](area-reports/C-ui.md), [D-render](area-reports/D-render.md), [E-regressions](area-reports/E-regressions.md), [F-build](area-reports/F-build.md), [G-issues](area-reports/G-issues.md) and [H-browser](area-reports/H-browser.md). They contain exact repro steps, expected and observed output, and the lists of what was checked. The repro scripts themselves (about 150 small node and DevTools scripts, plus generated PDFs and SVGs) were written in a scratch folder and are **not** committed. The reports refer to them as `<scratch>/…`. Where a script mattered, the report quotes its command and output.
