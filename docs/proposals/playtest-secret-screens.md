@@ -1,6 +1,6 @@
 # Playtest: secret screens on other devices
 
-Status: proposal (not built). Part of the playtest work (#51); the design here is the product description for the feature issue.
+> **Status: proposal, not built.** Tracked by [#116](https://github.com/bremondr/protogames/issues/116) (open), part of the playtest work ([#51](https://github.com/bremondr/protogames/issues/51)); the design here is the product description for that issue. Nothing in the app or in [../PLAYTEST.md](../PLAYTEST.md) implements it yet (checked 2026-10-26). When it is built, move what exists into `PLAYTEST.md` and archive or delete this file (see [../README.md](../README.md)); the related backlog is [../research/playtest-ideas.md](../research/playtest-ideas.md).
 
 ## Summary
 
@@ -12,7 +12,7 @@ It has to work in Protogames' architecture: a static site with **no backend**, n
 
 - Many games have hidden information: hands of cards, secret roles or objectives, hidden units, fog of war. Today a designer can only play such a game with paper or a second device outside the tool.
 - Playtests are usually in the same room, often at one table, with everyone owning a phone. That is the case to serve first.
-- The hidden-information ideas in [PLAYTEST_IDEAS.md](PLAYTEST_IDEAS.md) (section 10) need a way to show something to one player only. This is that channel.
+- The hidden-information ideas in [playtest-ideas.md](../research/playtest-ideas.md) (section 10) need a way to show something to one player only. This is that channel.
 
 ## Principles
 
