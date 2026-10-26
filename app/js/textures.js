@@ -11,6 +11,7 @@ const Textures = (() => {
     const cache = new Map();
     let labelMap = null;
     let styleMap = null;
+    let indexedFor = null; // the palette the index was built for
 
     const customTiles = new Map();
     /** Registers an image texture for a palette color (custom tile themes). */
@@ -26,22 +27,38 @@ const Textures = (() => {
     function unregister(hex) { const key = String(hex).toLowerCase(); customTiles.delete(key); cache.delete(key); urls.drop(key); }
     function resetLabels() { labelMap = null; styleMap = null; }
 
+    const activePaletteId = () => (typeof AppState !== 'undefined' ? AppState.getState().currentPaletteId : null);
+
+    /** A colour shared by two palettes (#C62828) is named by the board's own palette first, then by the first match. */
     function indexPalettes() {
         labelMap = new Map();
         styleMap = new Map();
-        Config.COLOR_PALETTES.forEach((p) => p.colors.forEach((c) => {
+        indexedFor = activePaletteId();
+        const ordered = [...Config.COLOR_PALETTES.filter((p) => p.id === indexedFor), ...Config.COLOR_PALETTES.filter((p) => p.id !== indexedFor)];
+        ordered.forEach((p) => p.colors.forEach((c) => {
             const k = c.hex.toLowerCase();
             if (!labelMap.has(k)) { labelMap.set(k, c.label.toLowerCase()); styleMap.set(k, p.style || null); }
         }));
     }
 
+    /** Switching palette can rename a shared colour; the index and the textures made from the old names are dropped. */
+    function checkActivePalette() {
+        if (labelMap && indexedFor !== activePaletteId()) {
+            resetLabels();
+            for (const key of [...cache.keys()]) urls.drop(key);
+            cache.clear();
+        }
+    }
+
     function getLabel(hex) {
+        checkActivePalette();
         if (!labelMap) indexPalettes();
         return labelMap.get(String(hex).toLowerCase()) || null;
     }
 
     /** The drawing style of a palette colour: 'nordic' for the flat palette, null for the usual one. */
     function getStyle(hex) {
+        checkActivePalette();
         if (!styleMap) indexPalettes();
         return styleMap.get(String(hex).toLowerCase()) || null;
     }
@@ -970,5 +987,5 @@ const Textures = (() => {
         return true;
     }
 
-    return { registerImage, unregister, resetLabels, patternFor, dataUrlFor, urlFor, svgImages, isFeature, drawFeature, setFlat, isFlat, patternScale, REF_TILE_PX };
+    return { registerImage, unregister, resetLabels, getLabel, patternFor, dataUrlFor, urlFor, svgImages, isFeature, drawFeature, setFlat, isFlat, patternScale, REF_TILE_PX };
 })();

@@ -120,13 +120,12 @@ const ViewControls = (() => {
     // ---- Space key -----------------------------------------------------------------------
 
     /**
-     * Targets that keep the Space key: text entry (the shared rule), or a button or link focused
-     * with the keyboard, which Space should still press. After a mouse click a button has focus
-     * but not :focus-visible, so Space pans instead of pressing it.
+     * Space pans only when nothing else wants it: the key target is the page or the canvas (or another
+     * non-interactive element). Inputs, buttons, links, summaries and ARIA widgets keep Space, and so
+     * does everything while a dialog is open.
      */
     function ownsSpace(target) {
-        if (FocusUtils.isTypingTarget(target)) return true;
-        try { return Boolean(target && target.matches && target.matches('button:focus-visible, a:focus-visible')); } catch (e) { return false; }
+        return FocusUtils.layerOpen() || FocusUtils.keepsSpace(target);
     }
 
     function setSpace(down) {

@@ -271,3 +271,88 @@ test('objects and start markers can be left out of an export', () => {
     env.Renderer.createExportCanvas({ objects: false });
     assert.equal(drawn.length, 0, 'without: none');
 });
+
+test('hover and line preview only tint and outline: the tile is not re-filled and its object is not redrawn over the neighbours', () => {
+    const env = setup();
+    const drawn = [];
+    env.app.run('var Objects = { drawOnPolygon: (ctx, p) => { globalThis.__objects.push(p.id); } }; void 0;');
+    env.app.context.__objects = drawn;
+    const polygons = board(env, 'square', { width: 5, height: 4 });
+    polygons[5].object = 'castle';
+    const plainCtx = recordingContext();
+    env.Renderer.paint(plainCtx, { polygons, ...CANVAS });
+    const fills = (ctx) => ctx.calls.filter((c) => c[0] === 'fill').length;
+    for (const [scene, tiles] of [[{ hoverPolygonId: polygons[5].id }, 1], [{ linePreviewIds: [polygons[5].id, polygons[6].id] }, 2]]) {
+        drawn.length = 0;
+        const ctx = recordingContext();
+        env.Renderer.paint(ctx, { polygons, ...CANVAS, ...scene });
+        assert.equal(fills(ctx) - fills(plainCtx), tiles, 'one tint fill per highlighted tile, no second texture fill');
+        assert.equal(drawn.length, 1, 'the object is drawn once, with the object layer');
+    }
+});
+
+test('start outlines and objects can be hidden separately', () => {
+    const env = setup();
+    env.app.run('var Objects = { drawOnPolygon: (ctx, p) => { globalThis.__objects.push(p.id); } }; void 0;');
+    env.app.context.__objects = [];
+    const polygons = board(env);
+    polygons[2].start = '#c62828';
+    polygons[3].object = 'castle';
+    const strokes = (scene) => { const ctx = recordingContext(); env.app.context.__objects.length = 0; env.Renderer.paint(ctx, { polygons, ...CANVAS, ...scene }); return { strokes: ctx.strokes.length, objects: env.app.context.__objects.length }; };
+    const all = strokes({});
+    assert.deepEqual(all, { strokes: polygons.length + 2, objects: 1 });
+    assert.deepEqual(strokes({ showObjects: false }), { strokes: polygons.length, objects: 0 }, 'showObjects false hides both, as before');
+    assert.deepEqual(strokes({ showObjects: false, showStartMarkers: true }), { strokes: polygons.length + 2, objects: 0 }, 'tokens only: objects hidden, the outline stays');
+    assert.deepEqual(strokes({ showStartMarkers: false }), { strokes: polygons.length, objects: 1 });
+});
+
+test('the export scene of an infinite board is built once until what is painted changes', () => {
+    const env = setup({ canvas: { ...CANVAS }, polygons: [] });
+    env.app.run('var Infinite = { isPainted: (p) => Boolean(p.color || p.object || p.start), exportScene: () => { globalThis.__builds += 1; return { polygons: [], bounds: {}, view: {} }; } }; void 0;');
+    env.app.context.__builds = 0;
+    const polygons = [{ id: 'a', color: '#111' }, { id: 'b' }];
+    env.setState({ canvas: { ...CANVAS }, polygons });
+    const first = env.Renderer.exportScene(1200, 800);
+    assert.equal(env.Renderer.exportScene(1200, 800), first, 'same tiles, same size: the same scene');
+    assert.equal(env.app.context.__builds, 1);
+    env.Renderer.exportScene(1000, 800);
+    assert.equal(env.app.context.__builds, 2, 'another size is another scene');
+    polygons[1].color = '#222';
+    env.Renderer.exportScene(1000, 800);
+    assert.equal(env.app.context.__builds, 3, 'painting a tile builds it again');
+    env.Renderer.exportScene(1000, 800);
+    assert.equal(env.app.context.__builds, 3);
+});
+
+test('resizing the canvas puts the context defaults back: setting the size resets them in a browser', () => {
+    const env = setup();
+    // A canvas that forgets its context settings whenever its size is assigned, as real ones do.
+    const ctx = recordingContext();
+    const canvas = {
+        style: {},
+        parentElement: { getBoundingClientRect: () => ({ width: 640.7, height: 480.2 }) },
+        getContext: () => ctx,
+        set width(value) { this._width = value; ctx.lineJoin = 'miter'; ctx.lineCap = 'butt'; ctx.imageSmoothingEnabled = false; },
+        get width() { return this._width; },
+        height: 0
+    };
+    env.setState({ canvas, ctx, setCanvas() {} });
+    const size = env.Renderer.resizeCanvas();
+    assert.deepEqual(plain(size), { width: 640, height: 480, changed: true });
+    assert.equal(ctx.lineJoin, 'round');
+    assert.equal(ctx.lineCap, 'round');
+    assert.equal(ctx.imageSmoothingEnabled, true);
+    assert.equal(env.Renderer.resizeCanvas().changed, false, 'the same size again is reported as unchanged');
+    assert.equal(ctx.lineJoin, 'round');
+});
+
+test('initializing the canvas sets the context defaults before the first paint', () => {
+    const env = setup();
+    const ctx = recordingContext();
+    const canvas = { style: {}, parentElement: null, getContext: () => ctx, width: 10, height: 10 };
+    env.app.run(`AppState.setCanvas = (canvas, ctx) => { globalThis.__state = { canvas, ctx }; }; void 0;`);
+    env.Renderer.initializeCanvas(canvas);
+    assert.equal(canvas.style.touchAction, 'none');
+    assert.equal(ctx.lineJoin, 'round');
+    assert.equal(ctx.imageSmoothingEnabled, true);
+});

@@ -135,3 +135,54 @@ test('a country board waits for its outlines before it is laid out again, and on
     await new Promise((resolve) => setTimeout(resolve, 0));
     assert.equal(env.AppState.getState().polygons, current, 'the late outlines leave the newer board alone');
 });
+
+// ---- Generator versions: an old board keeps the tiles it was made with ----------------------------------------------------
+
+const V7_FIXTURES = ['v7-circle-hexagon.protogames.json', 'v7-circle-triangle.protogames.json'];
+
+test('a v7 circle board is opened with generator 1 and keeps every tile and colour, on any canvas', () => {
+    for (const name of V7_FIXTURES) {
+        for (const canvas of [{ width: 1000, height: 800 }, { width: 700, height: 500 }]) {
+            const env = fresh({ canvas });
+            const project = env.ProjectFormat.parse(fixture(name));
+            const saved = JSON.parse(JSON.stringify(project.appState.polygons));
+            assert.equal(project.appState.boardConfig.generator, 1, `${name} migrates to generator 1`);
+            env.FileManager.restoreState(project, { skipNotification: true });
+            const state = env.AppState.getState();
+            assert.equal(state.boardConfig.generator, 1, `${name} stays generator 1`);
+            assert.equal(state.polygons.length, saved.length, `${name}: the same number of tiles`);
+            const byId = new Map(state.polygons.map((p) => [p.id, p]));
+            for (const tile of saved) assert.equal(byId.get(tile.id)?.color, tile.color, `${name}: ${tile.id}`);
+            const b = bounds(state.polygons);
+            assert.ok(b.maxX <= canvas.width && b.maxY <= canvas.height, `${name} is regenerated for the canvas`);
+        }
+    }
+});
+
+test('the generator 1 board of a v7 file would grow tiles under generator 2: that is what the stored version prevents', () => {
+    const env = fresh({ canvas: { width: 1000, height: 800 } });
+    const project = env.ProjectFormat.parse(fixture('v7-circle-hexagon.protogames.json'));
+    const config = project.appState.boardConfig;
+    const generate = (generator) => env.app.context.Geometry.generateGrid({ ...config, generator }, { width: 1000, height: 800 }, null).length;
+    assert.equal(generate(1), project.appState.polygons.length);
+    assert.ok(generate(2) > generate(1));
+});
+
+test('a generator 1 board is saved and reloaded as generator 1, and an autosave of it too', () => {
+    const env = fresh();
+    env.FileManager.restoreState(env.ProjectFormat.parse(fixture('v7-circle-hexagon.protogames.json')), { skipNotification: true });
+    const state = env.AppState.getState();
+    const appState = { boardConfig: { ...state.boardConfig }, currentColor: state.currentColor, paletteId: state.currentPaletteId, isEraserActive: false, autoSaveEnabled: true, players: [], dice: [], polygons: state.polygons };
+    for (const make of ['createProject', 'createAutosave']) {
+        const text = JSON.stringify(env.ProjectFormat[make]({ projectName: 'again', appState, now: 0 }));
+        assert.equal(env.ProjectFormat.parse(text).appState.boardConfig.generator, 1, make);
+    }
+});
+
+test('a new board gets the current generator, even when the board that was open used an older one', () => {
+    const env = fresh();
+    env.FileManager.restoreState(env.ProjectFormat.parse(fixture('v7-circle-hexagon.protogames.json')), { skipNotification: true });
+    assert.equal(env.AppState.getState().boardConfig.generator, 1);
+    env.FileManager.startNewProject().catch(() => {}); // the naming dialog needs a page; the board is made first
+    assert.equal(env.AppState.getState().boardConfig.generator, env.Config.GENERATOR_VERSION);
+});

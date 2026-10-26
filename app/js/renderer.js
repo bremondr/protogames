@@ -72,7 +72,8 @@ const Renderer = (() => {
      * @param {string[]|null} [scene.hiddenPieceIds] pieces being carried (left out; a ghost follows each pointer)
      * @param {string|null} [scene.selectedPieceId] piece that gets a selection ring
      * @param {boolean} [scene.grid=true]           false: no grid lines (a seam-free stroke in the tile colour instead)
-     * @param {boolean} [scene.showObjects=true]    false: no objects and no start markers
+     * @param {boolean} [scene.showObjects=true]    false: no objects (and, unless showStartMarkers says otherwise, no start markers)
+     * @param {boolean} [scene.showStartMarkers]    start outlines; follows showObjects when omitted
      * @returns {{drawn:number,total:number}} how many tiles were actually drawn (the rest were off-screen)
      */
     function paint(ctx, scene) {
@@ -103,8 +104,9 @@ const Renderer = (() => {
 
         // Start markers: a coloured outline inside the tile, above the terrain and below objects and pieces.
         const showObjects = scene.showObjects !== false;
+        const showStarts = scene.showStartMarkers === undefined ? showObjects : scene.showStartMarkers !== false;
         for (const polygon of polygons) {
-            if (showObjects && polygon.start && inView(polygon)) drawStartMarker(ctx, polygon, view.scale);
+            if (showStarts && polygon.start && inView(polygon)) drawStartMarker(ctx, polygon, view.scale);
         }
 
         // Object layer sits above all terrain; sorted top-to-bottom so lower objects overlap higher ones.
@@ -128,18 +130,13 @@ const Renderer = (() => {
             Pieces.drawAll(ctx, polygons, scene.pieces, view.scale, visible, scene.hiddenPieceIds || null, scene.selectedPieceId || null);
         }
 
-        // Line tool preview: highlight the tiles the line would paint.
+        // Line tool preview: highlight the tiles the line would paint. A tint and an outline over the finished
+        // layers: re-filling the tile would cover the overhang of the object standing on the tile below.
         if (linePreviewIds.length) {
             const preview = new Set(linePreviewIds);
             polygons.forEach((poly) => {
                 if (!preview.has(poly.id) || !inView(poly)) return;
-                drawPolygon(ctx, poly, {
-                    fill: poly.color,
-                    stroke: Config.HOVER_OUTLINE,
-                    lineWidth: 2,
-                    overlay: 'rgba(47, 111, 237, 0.35)'
-                }, view.scale);
-                if (typeof Objects !== 'undefined') Objects.drawOnPolygon(ctx, poly);
+                drawPolygon(ctx, poly, { fill: poly.color, stroke: Config.HOVER_OUTLINE, lineWidth: 2, overlay: 'rgba(47, 111, 237, 0.35)', tintOnly: true }, view.scale);
             });
         }
 
@@ -147,13 +144,7 @@ const Renderer = (() => {
             const hovered = new Set(hoverIds);
             polygons.forEach((poly) => {
                 if (!hovered.has(poly.id) || !inView(poly)) return;
-                drawPolygon(ctx, poly, {
-                    fill: poly.color,
-                    stroke: Config.HOVER_OUTLINE,
-                    lineWidth: 2,
-                    overlay: 'rgba(47, 111, 237, 0.15)'
-                }, view.scale);
-                if (typeof Objects !== 'undefined') Objects.drawOnPolygon(ctx, poly);
+                drawPolygon(ctx, poly, { fill: poly.color, stroke: Config.HOVER_OUTLINE, lineWidth: 2, overlay: 'rgba(47, 111, 237, 0.15)', tintOnly: true }, view.scale);
             });
         }
 
@@ -201,6 +192,27 @@ const Renderer = (() => {
         renderListeners.push(listener);
     }
 
+    // Building the export scene of an infinite board takes about 0.2 s, and a dialog asks for it again for every
+    // control it redraws. Kept per tiles array, valid while what is painted and the canvas size stay the same.
+    const sceneCache = new WeakMap();
+
+    function paintedSignature(polygons) {
+        const parts = [];
+        for (const p of polygons) if (Infinite.isPainted(p)) parts.push(p.id, p.color, p.object, p.start);
+        return parts.join('|');
+    }
+
+    /** Infinite.exportScene(width, height), remembered until the drawing or the size changes. */
+    function exportScene(width, height) {
+        const { polygons } = AppState.getState();
+        const signature = `${width}x${height}:${paintedSignature(polygons)}`;
+        const hit = sceneCache.get(polygons);
+        if (hit && hit.signature === signature) return hit.scene;
+        const scene = Infinite.exportScene(width, height);
+        sceneCache.set(polygons, { signature, scene });
+        return scene;
+    }
+
     /**
      * A new canvas with the board painted at the identity view (the board as
      * generated, regardless of the current pan/zoom) and without hover or
@@ -216,7 +228,7 @@ const Renderer = (() => {
         out.width = canvas.width * scale;
         out.height = canvas.height * scale;
         // An infinite board has no outline to fit: frame what was drawn.
-        const scene = typeof Infinite !== 'undefined' && Infinite.isActive() ? Infinite.exportScene(canvas.width, canvas.height) : null;
+        const scene = typeof Infinite !== 'undefined' && Infinite.isActive() ? exportScene(canvas.width, canvas.height) : null;
         const ctx = out.getContext('2d');
         const layers = { grid: options.grid !== false, showObjects: options.objects !== false };
         const base = scene
@@ -270,7 +282,7 @@ const Renderer = (() => {
      *
      * @param {CanvasRenderingContext2D} ctx
      * @param {Object} polygon - Polygon definition from the grid.
-     * @param {Object} [options] - Override styles.
+     * @param {Object} [options] - Override styles. tintOnly: draw only the overlay and the outline, over what is already there.
      * @param {number} [scale=1] - Current zoom, so line widths stay constant on screen.
      */
     function drawPolygon(ctx, polygon, options = {}, scale = 1) {
@@ -288,9 +300,11 @@ const Renderer = (() => {
         });
         ctx.closePath();
 
-        ctx.fillStyle = (typeof Textures !== 'undefined' && Textures.patternFor(ctx, fill)) || fill;
-        ctx.fill();
-        if (typeof Textures !== 'undefined') Textures.drawFeature(ctx, fill, polygon);
+        if (!options.tintOnly) {
+            ctx.fillStyle = (typeof Textures !== 'undefined' && Textures.patternFor(ctx, fill)) || fill;
+            ctx.fill();
+            if (typeof Textures !== 'undefined') Textures.drawFeature(ctx, fill, polygon);
+        }
 
         if (options.overlay) {
             ctx.save();
@@ -312,6 +326,7 @@ const Renderer = (() => {
         requestRender,
         onRender,
         createExportCanvas,
+        exportScene,
         MAX_EXPORT_SIDE,
         drawPolygon
     };

@@ -10,6 +10,7 @@
         normalizeBoardDimensions,
         createHexVertices,
         resolveCenter,
+        generatorOf,
         limitBetween
     } = helpers;
 
@@ -116,7 +117,8 @@
      * (limit radius + 0.5 tile widths) or the corner shared by three tiles (limit radius + 0.72 tile widths, so radius 0
      * is those three). Centring the disc like that gives the full symmetry of the lattice around that point (6-fold
      * around a tile, 3-fold around a corner), so the board is round instead of lopsided. Laid out at a fixed scale
-     * around the canvas centre; Geometry.generateGrid fits it to the canvas.
+     * around the canvas centre; Geometry.generateGrid fits it to the canvas. Generator 1 (config.generator) is the
+     * original, which loses tiles of big discs; it is kept so that boards saved with it keep their tiles.
      */
     function buildCircleHexGrid(config, canvas, colorMap) {
         if (!canvas) return [];
@@ -127,7 +129,9 @@
         const orientation = config.orientation === 'flat-top' ? 'flat-top' : 'pointy-top';
         const size = 40;
         const width = Math.sqrt(3) * size; // distance between neighbouring tile centres
-        const span = radius + 3;
+        // Generator 1 scanned radius + 3 tiles in each axial direction, which stops covering the disc at radius 23 (tile centre)
+        // or 19 (point centre). The disc reaches radius + 0.72 tile widths, which is 2 / sqrt(3) times as many axial steps.
+        const span = generatorOf(config) >= 2 ? Math.ceil(((radius + 0.72) * 2) / Math.sqrt(3)) + 2 : radius + 3;
         const cx = canvas.width / 2;
         const cy = canvas.height / 2;
 

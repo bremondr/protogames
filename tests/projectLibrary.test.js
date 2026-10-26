@@ -146,3 +146,43 @@ test('a project is described by its board and tiles', () => {
     assert.equal(Library.describeBoard({ readable: true, boardShape: '', gridType: '', tiles: 4 }), '4 tiles');
     assert.equal(Library.describeBoard({ readable: false }), 'This project cannot be read');
 });
+
+test('a legacy autosave newer than the project it was imported into replaces it; an older one does not', () => {
+    const { Library, storage } = fresh({
+        'protogames_autosave:tabx': JSON.stringify(payload('Newer', { timestamp: 5000 })),
+        'protogames_project:recovered-tabx': JSON.stringify(payload('Imported', { timestamp: 2000 })),
+        'protogames_autosave:taby': JSON.stringify(payload('Older', { timestamp: 1500 })),
+        'protogames_project:recovered-taby': JSON.stringify(payload('Edited since', { timestamp: 3000 }))
+    });
+    assert.equal(Library.importLegacy(), 1);
+    assert.equal(JSON.parse(Library.read('recovered-tabx')).projectName, 'Newer');
+    assert.equal(JSON.parse(Library.read('recovered-taby')).projectName, 'Edited since');
+    assert.deepEqual(Object.keys(storage.dump()).filter((key) => key.startsWith('protogames_autosave')), []);
+});
+
+test('a legacy autosave that cannot be copied is kept and reported', () => {
+    const { Library, storage } = fresh({ 'protogames_autosave:tabz': JSON.stringify(payload('Big')) });
+    storage.failWritesWith = quotaError();
+    let reported = 0;
+    assert.equal(Library.importLegacy((count) => { reported = count; }), 0);
+    assert.equal(reported, 1);
+    assert.ok('protogames_autosave:tabz' in storage.dump());
+});
+
+test('an absurd saved time reads as never saved, in the summary and in the age text', () => {
+    const { Library } = fresh();
+    const now = Date.now();
+    for (const bad of [-1e20, 1e20, -5, now + 3 * 24 * 3600 * 1000, 'x', null]) {
+        assert.equal(Library.summarize(JSON.stringify(payload('A', { timestamp: bad }))).timestamp, 0, String(bad));
+        assert.equal(Library.describeAge(bad, now), 'Never saved', String(bad));
+    }
+    assert.equal(Library.describeAge(now - 1000, now), 'Edited just now');
+    assert.equal(Library.summarize(JSON.stringify(payload('A', { timestamp: now + 1000 }))).timestamp, now + 1000, 'a clock a little ahead is believed');
+});
+
+test('readStrict tells a missing project from a storage that cannot be read', () => {
+    const { Library, storage } = fresh();
+    assert.equal(Library.readStrict(ID_A), null);
+    storage.failWith = new Error('denied');
+    assert.throws(() => Library.readStrict(ID_A), /denied/);
+});

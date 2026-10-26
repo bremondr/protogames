@@ -8,37 +8,39 @@ Projects are saved as `<name>.protogames.json` and the editor also keeps every p
 
 ### Version
 
-Every file has a top-level integer `version`. The current version is **7**.
+Every file has a top-level integer `version`. The current version is **8**.
 
 | `version` in the file | Meaning |
 |---|---|
 | missing, or the string `"1.0"` | **v0**: written before versioning existed. Migrated to v1 on load. |
 | integer `1` | migrated to v2 on load (Space/Arctic colours, see below), then to v3 |
-| integer `2` | migrated to v3, v4, v5, v6, then v7 on load (only the version number changes until v5) |
-| integer `3` | migrated to v4, v5, v6, then v7 on load |
-| integer `4` | migrated to v5 (a square board becomes a rectangle, see below), then v6 and v7 on load |
-| integer `5` | migrated to v6 (no players and the standard dice, see "Playtest data"), then v7 on load |
-| integer `6` | migrated to v7 on load: gets the centre its board always had written down, see "Boards built from the middle" |
-| integer `7` | current format |
+| integer `2` | migrated to v3, v4, v5, v6, v7, then v8 on load (only the version number changes until v5) |
+| integer `3` | migrated to v4, v5, v6, v7, then v8 on load |
+| integer `4` | migrated to v5 (a square board becomes a rectangle, see below), then v6, v7 and v8 on load |
+| integer `5` | migrated to v6 (no players and the standard dice, see "Playtest data"), then v7 and v8 on load |
+| integer `6` | migrated to v7: gets the centre its board always had written down, see "Boards built from the middle"; then v8 |
+| integer `7` | migrated to v8 on load: gets `generator: 1` written down, see "Generator versions" |
+| integer `8` | current format |
 | integer greater than the app's current version | rejected: "saved by a newer version of Protogames, update to open it" |
 | anything else (`1.5`, `-1`, `"abc"`, `null`, ...) | rejected as unreadable |
 
-### Project file (v7)
+### Project file (v8)
 
 ```jsonc
 {
-  "version": 7,
+  "version": 8,
   "projectName": "my board",
   "created": "2026-10-02T13:31:51.661Z",     // ISO time of the save
   "appState": {
     "boardConfig": {
       "gridType": "hexagon",                 // tile shape: hexagon | square | triangle
       "boardShape": "hexagon",               // hexagon | rectangle | triangle | circle | infinite | country
-      "orientation": "pointy-top",           // pointy-top | flat-top (hexagon tiles / boards)
+      "orientation": "pointy-top",           // pointy-top | flat-top (hexagon tiles / boards); the validator also reads orthogonal and diagonal, which the app has no control for
       "triangleOrientation": "point-up",     // point-up | point-down (triangle boards, or the triangle a board is built around)
       "center": "tile",                      // tile | point: what a hexagon or circle board is built around (see "Boards built from the middle")
       "width": 11, "height": 11,             // columns / rows (derived from radius or size for some shapes)
-      "radius": 5, "size": 10
+      "radius": 5, "size": 10,
+      "generator": 2                         // version of the tile generator that made the board (see "Generator versions")
     },
     "currentColor": "#2D5016",               // selected swatch
     "paletteId": "landscape",                // selected palette
@@ -73,7 +75,7 @@ The autosave has the same shape except it carries `timestamp` (milliseconds sinc
 1. parses JSON text (error: "not valid JSON");
 2. detects the version (see above);
 3. migrates one version at a time until it is current (`MIGRATIONS[n]` upgrades v*n* to v*n+1*);
-4. fills in a tile's `bounds` from its vertices when an older file left them out, then validates the result: board settings (`width`/`height` 1 to 201, `radius`/`size` 0 to 100, `orientation` and `triangleOrientation` one of the known values when present) and every tile (id, 3 to 64 finite vertices, centre, finite `bounds`, colour as `#rgb` or `#rrggbb`, optional object id of 1 to 200 characters; ids unique; an infinite board has at least one tile);
+4. fills in a tile's `bounds` from its vertices when an older file left them out, then validates the result: board settings (`gridType` and `boardShape` one of the known values, `center` `tile` or `point`, `width`/`height` 1 to 201, `radius`/`size` 0 to 100, `orientation` one of `pointy-top`, `flat-top`, `orthogonal` or `diagonal` and `triangleOrientation` `point-up` or `point-down` when present (the two extra orientations have no control in the app), `generator` a whole number from 1 up to the generator this app knows: a higher one is rejected with the `newer-version` code; a country board also needs a valid `country`, and `countryParts`, `countryBorders` and `countryMain` are checked when present), the selected colour, the players (at most 8: unique colours, a seat, a piece set within its limits) and the dice (at most 20, each 2 to 1000 sides, no repeats), and every tile (id, 3 to 64 finite vertices, centre, finite `bounds` that match the vertices, colour as `#rgb` or `#rrggbb`, optional object id of 1 to 200 characters, optional `start` marker colour as `#rgb` or `#rrggbb`; ids unique; an infinite board has at least one tile and tile positions within its lattice bound);
 5. returns the project, or throws a `ProjectFormatError` whose `message` is meant for users and whose `code` is one of `not-json`, `not-a-project`, `bad-version`, `newer-version`, `invalid`, `no-migration` or `bad-migration`. The last two are developer errors rather than file problems: `no-migration` means `MIGRATIONS` has no step for a version the file claims (a missing step after bumping `CURRENT_VERSION`), and `bad-migration` means a step ran but did not set `version` to the next number.
 
 These limits only turn away files the app cannot have written (they would crash or hang it, or put markup into an exported SVG), so they changed no format version; `tests/projectFormat.test.js` checks that every fixture and showcase still loads and lists the hostile cases. Parsing never mutates its input. The editor shows these messages in a dialog when a file is opened, and when an autosave from a newer version (or a damaged one) cannot be restored.
@@ -100,6 +102,7 @@ Migrations are frozen history: do not edit one after it has been released, and d
 | 5 | The board shapes `square` and `rectangle` were united: a square is a rectangle with equal sides. Migration turns `boardShape: "square"` into `"rectangle"` with `width` and `height` both set to the old `size`; the tiles are not touched. `square` is no longer a valid board shape (the **tile** shape `square` is unchanged). |
 | 6 | Playtest: `appState.players` and `appState.dice`, and the optional tile field `start` (see "Playtest data"). Migration adds `players: []` and the standard dice (a frozen copy of d3, d4, d6, d8, d10, d12, d20). |
 | 7 | The centre of hexagon and circle boards (`boardConfig.center`, see "Boards built from the middle"): a board is built around a tile or around the point where tiles meet, for every tile shape, and the size is counted in layers from the centre. Migration writes down the centre each board always had (triangles around a point, everything else around a tile); the tiles are not touched. |
+| 8 | The generator version (`boardConfig.generator`, see "Generator versions"): a board remembers which version of the tile generator made it and is regenerated by that version, so improving the generator never changes a saved board. Migration writes `generator: 1` (what every earlier board was made with) into every project, whatever its board shape; the tiles are not touched. |
 
 ### Playtest data
 
@@ -191,16 +194,17 @@ The payload is JSON, deflate-compressed (`deflate-raw`) and written as base64url
 
 | Key | Meaning |
 |---|---|
-| `v` | Link version: **1** for fixed boards, **2** for infinite boards, **3** for country boards, **4** for any board with players or start markers (older apps can still open the links of the boards they know). A number higher than the app knows is rejected as "made by a newer version", and a link that describes a board shape newer than its version is refused. |
+| `v` | Link version: **1** for fixed boards, **2** for infinite boards, **3** for country boards, **4** for any board with players or start markers, **5** for circle boards (they carry `g`); older apps can still open the links of the boards they know. A number higher than the app knows is rejected as "made by a newer version", and a link that describes a board shape newer than its version is refused. |
 | `f` | **Project file format** the colours belong to. On opening, the link is turned into a project of this version and passed through `ProjectFormat.parse`, so a link made before a palette change migrates exactly like a saved file. |
 | `n` | Project name |
-| `c` | Board settings (`boardConfig`); every size must be an integer from 1 to 100 |
+| `c` | Board settings (`boardConfig`) without the generator, which travels as `g`; every size must be an integer from 1 to 100 (`ProjectFormat.MAX_BOARD_DIMENSION`; a width or height up to `MAX_BOARD_SPAN`, 201) |
 | `p` | Palette id |
 | `k` | Distinct tile colours (`#rrggbb`) |
 | `t` | One entry per tile, in generated-board order: index into `k`, base 36, dot separated |
 | `ob` | Distinct object ids |
 | `o` | Tiles that hold an object: `tileIndex:objectIndex` pairs (base 36), dot separated |
 | `i` | Infinite boards only: the ids of the drawn tiles, dot separated, in the order of `t` and `o`. The tiles are rebuilt from the ids instead of regenerated from `c`. |
+| `g` | Circle boards only: the **board generator** version that made the board (an integer from 1 to the app's current generator; see "Generator versions"). A circle link without `g` was made before generator versions and is read as generator 1. Other boards carry none (their tiles do not depend on it), so their links stay readable by older apps. A `g` that is not a whole number from 1 up, or a link below version 5 that has one, is refused as unrecognised; a `g` above the app's generator is refused as "made by a newer version". |
 | `pl` | Only with players: `[colour, seat, [[kind, count], ...]]` per player (colour as `#rrggbb`, lower case) |
 | `sc` | Only with start markers: the distinct start colours (`#rrggbb`) |
 | `s` | Only with start markers: `tileIndex:colourIndex` pairs (base 36, dot separated, same tile order as `t` and `o`) |
@@ -209,7 +213,7 @@ The dice set is not in the link: every design has the standard set until it can 
 
 A country board link carries the country settings in `c` and regenerates the tiles from the outlines, so opening it downloads them first (an offline or failed download refuses the link with a message). Limits for `c`: width up to 120 and height up to 201 for country boards, up to 100 for others.
 
-Tile geometry is not stored: the board is regenerated from `c`, which fixes the tile order, so `t` must have exactly one entry per generated tile (for an infinite board, per id in `i`). Anything unexpected (wrong version, bad colour, out-of-range index, size mismatch) is refused with a message instead of opening a damaged board. The payload is inflated through a reader that stops at 2 MB of output, the settings and tile count are checked before any tile is built, and the link is removed from the address before it is decoded, so a hostile link cannot hang the tab again after a reload.
+Tile geometry is not stored: the board is regenerated from `c`, which fixes the tile order, so `t` must have exactly one entry per generated tile (for an infinite board, per id in `i`). A circle link whose tile count does not match the board this version generates (it was made with a different generator) is refused with "This link does not match the board this version of Protogames generates (it was made with a different board generator)"; other boards say "Board size mismatch". Anything unexpected (wrong version, bad colour, out-of-range index, size mismatch) is refused with a message instead of opening a damaged board. The payload is inflated through a reader that stops at 2 MB of output, the settings and tile count are checked before any tile is built, and the link is removed from the address before it is decoded, so a hostile link cannot hang the tab again after a reload.
 
 Links are not capped, but the dialog warns about length: a note above 2,000 characters and a stronger one above 8,000 (rules of thumb for chat and email apps), always with a "Download project file instead" button. The link stays copyable at every size.
 
@@ -227,13 +231,46 @@ Hexagon and circle boards are built outwards from a centre, in **layers**. The b
 |---|---|---|---|---|---|
 | Hexagons | 1 hexagon | 3 hexagons | 1, 6, 12, 18 | 3, 9, 15, 21 | 6-fold / 3-fold |
 | Triangles | 1 triangle | 6 triangles | 1, 12, 24, 36 | 6, 18, 30, 42 | 3-fold / 6-fold |
-| Squares | 1 square | 4 squares | a square, 2n - 1 across | a square, 2n across | 4-fold / 4-fold |
+| Squares | 1 square | 4 squares | not offered: the sidebar blocks square tiles on a hexagon board (see below) | not offered | 4-fold / 4-fold |
 
-The hexagon board follows the layers exactly (a hexagon of tiles for hexagons and triangles, a square for squares clipped by the outline). The circle board keeps every tile whose centre lies within a distance of the middle, chosen so that no tile sits exactly on the edge and the board has the symmetry of the lattice at that point. With triangle tiles, a tile at the rim that would touch only one other tile (or none) sticks out as a spike and is left out; this repeats until every tile touches at least two others (a board of one triangle excepted). Ids are not changed, only fewer tiles exist: a board saved earlier keeps its tiles, and when its grid is regenerated (a window resize) the colours of the spikes that are no longer there go with them.
+The hexagon board follows the layers exactly: a hexagon of tiles for hexagons and triangles. Squares cannot fill a hexagon, so the sidebar blocks that combination. Asked directly, the generator clips the squares to the hexagon outline: layers 1 to 4 hold 1, 7, 19 and 37 tiles around a tile and 4, 12, 28 and 48 around a point (not "a square, 2n - 1 across", which is what a rectangle of squares would give). The circle board keeps every tile whose centre lies within a distance of the middle, chosen so that no tile sits exactly on the edge and the board has the symmetry of the lattice at that point. With triangle tiles, a tile at the rim that would touch only one other tile (or none) sticks out as a spike and is left out; this repeats until every tile touches at least two others (a board of one triangle excepted). Ids are not changed, only fewer tiles exist: a board saved earlier keeps its tiles, and when its grid is regenerated (a window resize) the colours of the spikes that are no longer there go with them.
 
 **Stored values.** The saved `radius` counts from the first ring for hexagon and square tiles (`radius` 0 is layer 1) and as the layer count for triangles (`radius` 1 is layer 1), exactly as before; the panel converts (hexagon and square tiles: layers = `radius` + 1, triangles: layers = `radius`). `width` and `height` of a hexagon or circle board are the diameter in tiles: `2 * radius + 1` around a tile, `2 * radius + 2` around a point.
 
 **Older boards.** Before format 7 the centre was fixed by the tile shape: triangles were built around a point and everything else around a tile. The migration writes exactly that into `center`, so existing boards are unchanged. The generator also reads a missing `center` that way, so an old share link builds the same blank board before it is migrated.
+
+## Generator versions
+
+The tiles of a board come from a generator (`Geometry.generateGrid`) that turns the board settings into tiles with ids. A saved board is not stored only as settings: its colours, objects and start markers belong to tile **ids**, and the grid is generated again whenever the window is resized or a project is opened on another canvas. If a later release generated other tiles for the same settings, saved boards would silently lose painting. So the generator has a version, and a board remembers it.
+
+- `boardConfig.generator` is a whole number from 1 up. `Config.GENERATOR_VERSION` (also `Geometry.GENERATOR_VERSION`) is the current one, **2**. New boards (the board controls, a new project) get the current version; `Geometry.generateGrid` reads `config.generator`, and settings without one (previews, tests) are built by the current generator. Regenerating a board (a window resize, opening a project, a showcase) passes the board's own stored settings, so an old board keeps its own generator and its tiles.
+- **The rule: any change to the tiles a generator produces for existing settings is a new generator version. An old version is never edited.** Add the new behaviour under `generator >= n`, bump `Config.GENERATOR_VERSION` and extend `tests/generatorVersion.test.js` (the golden values of the old versions must keep passing). The field is already stored, so no new project format version is needed: an older app refuses a board of a generator it does not know as saved by a newer version. A change that does not alter the tiles of existing settings (speed, code structure) needs no new version.
+- A project whose `generator` is above the app's is refused as saved by a newer version; `0`, negative, fractional or non-numeric values are invalid.
+
+| Generator | What it builds |
+|---|---|
+| 1 | Everything the app generated before generator versions existed. Circles of hexagons scan a window of `radius + 3` tiles around the middle, which stops covering the disc at radius 23 around a tile and radius 19 around a point: from there tiles at the rim are missing. Circles of triangles drop spikes (tiles that touch fewer than two others, repeated until none is left). |
+| 2 | Generator 1 plus the circle-of-hexagons fix: the scan window is `ceil((radius + 0.72) * 2 / sqrt(3)) + 2` tiles, which always covers the disc. Nothing else differs. |
+
+Generator 2 is a superset of generator 1 with the same ids, so colours, objects and start markers carry over by id. Tile counts of a circle of hexagons (pointy-top and flat-top are equal), `radius` as stored:
+
+| Radius | Around a tile, gen 1 / gen 2 | Around a point, gen 1 / gen 2 |
+|---|---|---|
+| 1 | 7 / 7 | 12 / 12 |
+| 5 | 109 / 109 | 120 / 120 |
+| 18 | 1237 / 1237 | 1272 / 1272 |
+| 19 | 1381 / 1381 | 1407 / 1413 |
+| 22 | 1813 / 1813 | 1846 / 1866 |
+| 23 | 1977 / 1993 | 2018 / 2046 |
+| 30 | 3283 / 3367 | 3318 / 3426 |
+| 50 | 8731 / 9271 | 8772 / 9336 |
+| 100 | 33541 / 36601 | 33626 / 36786 |
+
+Other board shapes and circles of triangles are the same in both versions today. Files saved by older apps than this one regenerate with generator 1 too (the pre-layers circle of hexagons, around a tile with a scan window of `radius + 2`, is a subset of generator 1, so their colours are found again by id).
+
+**Migration.** Format 8 adds the field. `MIGRATIONS[7]` sets `boardConfig.generator = 1` on every older project (for boards other than circles of hexagons it makes no difference); fixtures `tests/fixtures/v7-circle-hexagon.protogames.json` (radius 20 around a point, where generator 2 differs) and `v7-circle-triangle.protogames.json` show it.
+
+**Share links.** A circle link is link version 5 and carries `g` (see "Share link format"); no other board does. Old circle links without `g` open as generator 1.
 
 ## Square and rectangle boards
 

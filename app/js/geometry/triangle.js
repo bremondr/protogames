@@ -219,7 +219,7 @@
     }
 
     /**
-     * Hexagon-shaped board tiled with triangles: exactly 6 * radius^2 tiles.
+     * Hexagon-shaped board tiled with triangles: exactly 6 * radius^2 tiles around a point (6 * N * (N - 1) + 1 around a triangle).
      *
      * A flat-top hexagon (vertices left/right) follows lattice lines exactly, so a
      * centroid test is never ambiguous; pointy-top is the same layout rotated 90 degrees.
@@ -375,6 +375,7 @@
         buildHexagonTriangleGrid,
         buildCircleTriangleGrid,
         buildTessellatedTriangle,
-        layersAroundTriangle
+        layersAroundTriangle,
+        withoutSpikes
     };
 })(typeof window !== 'undefined' ? window : globalThis);

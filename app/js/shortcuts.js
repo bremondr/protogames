@@ -6,19 +6,23 @@
  * Node); the browser glue at the bottom binds keydown, runs the actions, shows
  * hints in tooltips and renders the "?" help overlay from the same list.
  *
- * Key descriptors: "mod+shift+z", "e", "bracketleft", "tab", ...
+ * Key descriptors: "mod+shift+z", "e", "bracketleft", "period", ...
  *   mod   = Cmd on macOS, Ctrl elsewhere
  *   named keys stand for symbols: plus equal minus underscore bracketleft
- *   bracketright question numpadadd numpadsubtract tab
+ *   bracketright question comma period numpadadd numpadsubtract
+ *
+ * The app never claims Tab: it always moves focus, so the canvas cannot trap a keyboard user.
  */
 const Shortcuts = (() => {
     // ---- The registry: add or change shortcuts here, nowhere else --------------------------
 
-    const GROUPS = ['Edit', 'Tools', 'Colors', 'View', 'File', 'Help'];
+    const GROUPS = ['Edit', 'Tools', 'Colors', 'View', 'File', 'Playtest', 'Help'];
 
     const BINDINGS = [
         { id: 'undo', group: 'Edit', label: 'Undo', keys: ['mod+z'], repeat: true },
         { id: 'redo', group: 'Edit', label: 'Redo', keys: ['mod+shift+z', 'mod+y'], repeat: true },
+        // Esc is handled where the thing it cancels lives (Interactions, Playtest, the dialogs); listed here for the overlay.
+        { id: 'cancel', group: 'Edit', label: 'Cancel a line or a drag in progress', display: 'Esc', keys: [], documentation: true },
 
         { id: 'tool-brush', group: 'Tools', label: 'Brush', keys: ['b'] },
         { id: 'tool-fill', group: 'Tools', label: 'Fill', keys: ['g'] },
@@ -37,8 +41,8 @@ const Shortcuts = (() => {
             keys: [String(i + 1)],
             listed: i === 0 ? '1 – 9' : false
         })),
-        { id: 'swatch-next', group: 'Colors', label: 'Next swatch', keys: ['tab'], when: 'focus-neutral', repeat: true },
-        { id: 'swatch-prev', group: 'Colors', label: 'Previous swatch', keys: ['shift+tab'], when: 'focus-neutral', repeat: true },
+        { id: 'swatch-next', group: 'Colors', label: 'Next swatch', keys: ['period'], repeat: true },
+        { id: 'swatch-prev', group: 'Colors', label: 'Previous swatch', keys: ['comma'], repeat: true },
 
         { id: 'zoom-in', group: 'View', label: 'Zoom in', keys: ['plus', 'equal', 'numpadadd'], repeat: true },
         { id: 'zoom-out', group: 'View', label: 'Zoom out', keys: ['minus', 'underscore', 'numpadsubtract'], repeat: true },
@@ -49,7 +53,16 @@ const Shortcuts = (() => {
 
         { id: 'save', group: 'File', label: 'Save project', keys: ['mod+s'] },
 
-        { id: 'help', group: 'Help', label: 'Show keyboard shortcuts', keys: ['question'] }
+        // Handled by the playtest code; listed so the overlay documents every way to play.
+        { id: 'play-leave', group: 'Playtest', label: 'Leave playtest (a drag in progress is cancelled first)', display: 'Esc', keys: [], documentation: true },
+        { id: 'play-tab', group: 'Playtest', label: 'Move between trays, dice and the piece list', display: 'Tab / Shift+Tab', keys: [], documentation: true },
+        { id: 'play-send', group: 'Playtest', label: 'Send a tray piece to a free start', display: 'Enter / Space', keys: [], documentation: true },
+        { id: 'play-move', group: 'Playtest', label: 'Move the focused piece one tile', display: 'Arrow keys', keys: [], documentation: true },
+        { id: 'play-return', group: 'Playtest', label: 'Return the focused piece to its tray', display: 'Delete / Backspace', keys: [], documentation: true },
+
+        { id: 'help', group: 'Help', label: 'Show keyboard shortcuts', keys: ['question'] },
+        { id: 'move-focus', group: 'Help', label: 'Move between controls', display: 'Tab / Shift+Tab', keys: [], documentation: true },
+        { id: 'close-dialog', group: 'Help', label: 'Close the top dialog', display: 'Esc', keys: [], documentation: true }
     ];
 
     // ---- Key descriptors -----------------------------------------------------------------------
@@ -63,7 +76,8 @@ const Shortcuts = (() => {
         bracketleft: '[',
         bracketright: ']',
         question: '?',
-        tab: 'Tab'
+        comma: ',',
+        period: '.'
     };
     // Symbols are typed with or without Shift depending on the keyboard, so Shift is not part of the match.
     const SHIFT_AGNOSTIC = new Set(['plus', 'equal', 'minus', 'underscore', 'bracketleft', 'bracketright', 'question', 'numpadadd', 'numpadsubtract']);
@@ -79,8 +93,10 @@ const Shortcuts = (() => {
     /** The descriptor name of the key an event represents ("z", "5", "plus", "tab"...), or null. */
     function eventKeyName(event) {
         const code = event.code || '';
-        const digit = /^(?:Digit|Numpad)(\d)$/.exec(code);
-        if (digit) return digit[1];
+        const digit = /^(Digit|Numpad)(\d)$/.exec(code);
+        // With NumLock off a numpad digit reports its navigation key (End, ArrowDown...), which is not a digit.
+        if (digit && (digit[1] === 'Digit' || event.key === digit[2])) return digit[2];
+        if (digit) return null;
         if (CODE_NAMES[code]) return CODE_NAMES[code];
         const key = event.key;
         if (typeof key !== 'string' || !key) return null;
@@ -93,22 +109,22 @@ const Shortcuts = (() => {
     function matchesCombo(descriptor, event, isMac) {
         const combo = typeof descriptor === 'string' ? parseCombo(descriptor) : descriptor;
         if (eventKeyName(event) !== combo.key) return false;
-        const modPressed = isMac ? Boolean(event.metaKey) : Boolean(event.ctrlKey);
-        const otherPressed = isMac ? Boolean(event.ctrlKey) : Boolean(event.metaKey);
+        // AltGr is reported as Ctrl+Alt on Windows; it types characters ([ ] on Czech and German layouts), so it is no modifier.
+        const altGr = typeof event.getModifierState === 'function' && event.getModifierState('AltGraph');
+        const ctrl = Boolean(event.ctrlKey) && !altGr;
+        const alt = Boolean(event.altKey) && !altGr;
+        const modPressed = isMac ? Boolean(event.metaKey) : ctrl;
+        const otherPressed = isMac ? ctrl : Boolean(event.metaKey);
         if (modPressed !== combo.mod || otherPressed) return false;
-        if (Boolean(event.altKey) !== combo.alt) return false;
+        if (alt !== combo.alt) return false;
         if (!SHIFT_AGNOSTIC.has(combo.key) && Boolean(event.shiftKey) !== combo.shift) return false;
         return true;
     }
 
-    /**
-     * The binding an event triggers, or null. `context.focusNeutral` says whether the canvas
-     * has keyboard focus (so Tab may cycle swatches instead of moving focus).
-     */
-    function findBinding(event, isMac, context = {}, bindings = BINDINGS) {
+    /** The binding an event triggers, or null. */
+    function findBinding(event, isMac, bindings = BINDINGS) {
         for (const binding of bindings) {
             if (binding.available === false || binding.documentation) continue;
-            if (binding.when === 'focus-neutral' && !context.focusNeutral) continue;
             if (binding.keys.some((descriptor) => matchesCombo(descriptor, event, isMac))) return binding;
         }
         return null;
@@ -145,7 +161,8 @@ const Shortcuts = (() => {
         bracketleft: '[',
         bracketright: ']',
         question: '?',
-        tab: 'Tab',
+        comma: ',',
+        period: '.',
         numpadadd: 'Num +',
         numpadsubtract: 'Num −'
     };
@@ -182,8 +199,7 @@ const Shortcuts = (() => {
     // ---- Registry sanity ---------------------------------------------------------------------------------
 
     /**
-     * Pairs of bindings that would fire on the same key press (same descriptor in
-     * the same focus context). Used by the tests to keep the registry conflict-free.
+     * Pairs of bindings that would fire on the same key press (same descriptor). Used by the tests to keep the registry conflict-free.
      */
     function findConflicts(bindings = BINDINGS) {
         const seen = new Map();
@@ -192,7 +208,7 @@ const Shortcuts = (() => {
             if (binding.documentation) continue;
             for (const descriptor of binding.keys) {
                 const combo = parseCombo(descriptor);
-                const normalized = `${binding.when || 'always'}|${combo.mod ? 'mod+' : ''}${combo.shift ? 'shift+' : ''}${combo.alt ? 'alt+' : ''}${combo.key}`;
+                const normalized = `${combo.mod ? 'mod+' : ''}${combo.shift ? 'shift+' : ''}${combo.alt ? 'alt+' : ''}${combo.key}`;
                 // Shift-agnostic symbols collide regardless of Shift.
                 const keyId = SHIFT_AGNOSTIC.has(combo.key) ? normalized.replace('shift+', '') : normalized;
                 if (seen.has(keyId)) conflicts.push([seen.get(keyId), binding.id, descriptor]);
@@ -243,20 +259,22 @@ const Shortcuts = (() => {
     }
 
     /**
-     * Tab cycles swatches only while the board canvas itself has focus. With focus on the
-     * page (or anything else) Tab keeps moving focus, so keyboard users can reach the controls.
+     * Ctrl/Cmd+S is the one key the app takes even while a text field has focus (the permanent
+     * "Project name" field, prompts): the browser's own Save Page dialog is never what anyone wants.
+     * Everything else, Ctrl+Z and Ctrl+Y included, stays with the field.
      */
-    function isFocusNeutral(active, canvas) {
-        return Boolean(canvas) && active === canvas;
-    }
-
-    function focusNeutral() {
-        return isFocusNeutral(document.activeElement, document.getElementById('gameCanvas'));
+    function isSaveInField(event) {
+        return FocusUtils.isTypingTarget(event.target) && !event.isComposing && !event.defaultPrevented && matchesCombo('mod+s', event, isMac());
     }
 
     function onKeyDown(event) {
+        if (isSaveInField(event)) {
+            event.preventDefault();
+            if (!event.repeat && !dialogOpen() && !AppState.getState().playtest) FileManager.saveProjectFile();
+            return;
+        }
         if (shouldIgnore(event, { dialogOpen: dialogOpen() })) return;
-        const binding = findBinding(event, isMac(), { focusNeutral: focusNeutral() });
+        const binding = findBinding(event, isMac());
         if (!binding) return;
         const action = ACTIONS[binding.id];
         if (!action) return;
@@ -265,7 +283,7 @@ const Shortcuts = (() => {
             event.preventDefault();
             return;
         }
-        // Claim the key (stops Tab moving focus, Ctrl+S saving the page, Ctrl+Y opening history...).
+        // Claim the key (Ctrl+S saving the page, Ctrl+Y opening history...).
         event.preventDefault();
         if (event.repeat && !binding.repeat) return;
         action(event);
@@ -274,7 +292,7 @@ const Shortcuts = (() => {
     /** "Control+Shift+Z"-style value for aria-keyshortcuts. */
     function ariaShortcut(descriptor) {
         const combo = parseCombo(descriptor);
-        const names = { plus: '+', equal: '=', minus: '-', underscore: '_', bracketleft: '[', bracketright: ']', question: '?', tab: 'Tab', numpadadd: '+', numpadsubtract: '-' };
+        const names = { plus: '+', equal: '=', minus: '-', underscore: '_', bracketleft: '[', bracketright: ']', question: '?', comma: ',', period: '.', numpadadd: '+', numpadsubtract: '-' };
         const parts = [];
         if (combo.mod) parts.push(isMac() ? 'Meta' : 'Control');
         if (combo.alt) parts.push('Alt');
@@ -305,23 +323,37 @@ const Shortcuts = (() => {
     // ---- Help overlay ("?") -------------------------------------------------------------------------------------------
 
     let helpReturnFocus = null;
+    let stopHelpKeys = null;
+
+    /** The help overlay if it is on screen. A hidden one (a share link opened over it) is a leftover. */
+    function helpOverlay() {
+        const overlay = document.getElementById('shortcutHelp');
+        return overlay && !overlay.classList.contains('hidden') ? overlay : null;
+    }
 
     function closeHelp() {
         const overlay = document.getElementById('shortcutHelp');
         if (!overlay) return;
+        if (stopHelpKeys) stopHelpKeys();
+        stopHelpKeys = null;
         overlay.remove();
         if (helpReturnFocus && helpReturnFocus.focus) helpReturnFocus.focus();
         helpReturnFocus = null;
     }
 
     function toggleHelp() {
-        if (document.getElementById('shortcutHelp')) closeHelp();
+        if (helpOverlay()) closeHelp();
         else showHelp();
     }
 
     /** Lists the current bindings, grouped, straight from the registry. */
     function showHelp() {
-        if (document.getElementById('shortcutHelp')) return;
+        if (helpOverlay()) return;
+        if (document.getElementById('shortcutHelp')) { // hidden leftover
+            const opener = helpReturnFocus;
+            closeHelp();
+            helpReturnFocus = opener;
+        }
         helpReturnFocus = document.activeElement;
         const overlay = document.createElement('div');
         overlay.id = 'shortcutHelp';
@@ -382,14 +414,7 @@ const Shortcuts = (() => {
 
         close.addEventListener('click', closeHelp);
         overlay.addEventListener('pointerdown', (event) => { if (event.target === overlay) closeHelp(); });
-        overlay.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape' || event.key === '?') {
-                event.preventDefault();
-                event.stopPropagation();
-                closeHelp();
-            }
-        });
-        FocusUtils.trapTab(overlay);
+        stopHelpKeys = FocusUtils.modalKeys(overlay, { Escape: closeHelp, '?': closeHelp });
         close.focus();
     }
 
@@ -413,7 +438,6 @@ const Shortcuts = (() => {
         matchesCombo,
         findBinding,
         isTypingTarget,
-        isFocusNeutral,
         shouldIgnore,
         formatCombo,
         displayFor,

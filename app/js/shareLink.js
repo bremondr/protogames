@@ -15,10 +15,11 @@
 const ShareLink = (() => {
     /**
      * Version of the link payload (not the project file format). 2 added infinite boards, 3 country
-     * boards and 4 players and start markers; links without any of these are still written as version 1
-     * so older apps can open them.
+     * boards, 4 players and start markers and 5 the board generator of circle boards (key `g`); links without
+     * any of these are still written as version 1 so older apps can open them.
      */
-    const LINK_VERSION = 4;
+    const LINK_VERSION = 5;
+    const GENERATOR_LINK_VERSION = 5;
     const PLAYER_LINK_VERSION = 4;
     // First project file format that has players and dice; links made before it get them from the migration.
     const FORMAT_WITH_PLAYERS = 6;
@@ -28,32 +29,50 @@ const ShareLink = (() => {
     // A country board is cut from a rectangle up to this wide and (derived from the outline) this tall.
     const COUNTRY_MAX_ACROSS = 120;
     const COUNTRY_MAX_SPAN = 201;
-    const LINK_VERSION_FOR_SHAPE = { infinite: 2, country: 3 };
+    // The link version a board shape needs. Circle boards carry their generator (`g`); a circle link without it is
+    // still valid (generator 1), so unlike the others the shape does not require its version when reading.
+    const LINK_VERSION_FOR_SHAPE = { infinite: 2, country: 3, circle: GENERATOR_LINK_VERSION };
+    const SHAPES_REQUIRING_VERSION = ['infinite', 'country'];
     const MAX_TILES = 20000;
-    const MAX_DIMENSION = 100;
+    // The same caps as the project file validator, which owns them.
+    const MAX_DIMENSION = ProjectFormat.MAX_BOARD_DIMENSION;
     // A link for the biggest board (20000 tiles) inflates to well under 1 MB; this leaves room and stops bombs.
     const MAX_INFLATED_BYTES = 2 * 1024 * 1024;
     const HASH_PATTERN = /[#&]b=([A-Za-z0-9_-]+)/;
-    const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+    // Project files accept #rgb too; links carry only the long form, so either is accepted on the way in.
+    const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+    // A side of a board may be as wide as a radius-100 hexagon board.
+    const MAX_SPAN = ProjectFormat.MAX_BOARD_SPAN;
     // Rules of thumb for the apps a link gets pasted into (chat, email); browsers themselves take far more.
     const LONG_LINK = 2000;
     const VERY_LONG_LINK = 8000;
 
     // ---- Pure: payload -------------------------------------------------------------------------
 
+    /** "#RGB" or "#RRGGBB" in any case as lower-case "#rrggbb"; anything else is only lower-cased (and refused later). */
+    function normalizeHex(value) {
+        const text = String(value || '').toLowerCase();
+        const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/.exec(text);
+        return short ? `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}` : text;
+    }
+
     /**
      * Compact payload for a board: { v, f, n, c, p, k, t, ob, o }
      *  k = distinct colours, t = per-tile colour index (base 36, dot separated),
      *  ob = distinct object ids, o = "tileIndex:objectIndex" pairs.
+     * g = the board generator version, for circle boards only (see the specification, "Generator versions").
      * Only when the design has them: pl = players as [colour, seat, [[kind, count], ...]],
      *  sc = distinct start colours, s = "tileIndex:colourIndex" pairs of start markers.
      * The dice set is not carried: every design has the standard set until it can be edited.
      */
-    function pack({ projectName, boardConfig, paletteId, polygons, formatVersion, players }) {
+    function pack({ projectName, boardConfig: fullConfig, paletteId, polygons, formatVersion, players }) {
+        // The generator travels as `g` and only for circle boards; every other board stays readable by older apps.
+        const { generator, ...boardConfig } = fullConfig || {};
+        const isCircle = boardConfig.boardShape === 'circle';
         const colors = [];
         const colorIndex = new Map();
         const tiles = polygons.map((polygon) => {
-            const color = String(polygon.color || '').toLowerCase();
+            const color = normalizeHex(polygon.color);
             if (!colorIndex.has(color)) {
                 colorIndex.set(color, colors.length);
                 colors.push(color);
@@ -76,7 +95,7 @@ const ShareLink = (() => {
         const starts = [];
         polygons.forEach((polygon, index) => {
             if (!polygon.start) return;
-            const color = String(polygon.start).toLowerCase();
+            const color = normalizeHex(polygon.start);
             if (!startIndex.has(color)) {
                 startIndex.set(color, startColors.length);
                 startColors.push(color);
@@ -89,16 +108,17 @@ const ShareLink = (() => {
             v: Math.max(LINK_VERSION_FOR_SHAPE[boardConfig && boardConfig.boardShape] || 1, hasPlayers ? PLAYER_LINK_VERSION : 1),
             f: formatVersion,
             n: projectName || '',
-            c: boardConfig,
+            c: fullConfig ? boardConfig : fullConfig,
             p: paletteId,
             k: colors,
             t: tiles.join('.'),
             ob: objects,
             o: placed.join('.'),
             ...(playerList.length
-                ? { pl: playerList.map((p) => [String(p.color).toLowerCase(), p.seat, (p.pieces || []).map((e) => [e.kind, e.count])]) }
+                ? { pl: playerList.map((p) => [normalizeHex(p.color), p.seat, (p.pieces || []).map((e) => [e.kind, e.count])]) }
                 : {}),
             ...(starts.length ? { sc: startColors, s: starts.join('.') } : {}),
+            ...(isCircle ? { g: Number.isInteger(generator) && generator >= 1 ? generator : Config.GENERATOR_VERSION } : {}),
             ...(boardConfig && boardConfig.boardShape === 'infinite' ? { i: polygons.map((p) => p.id).join('.') } : {})
         };
     }
@@ -107,10 +127,22 @@ const ShareLink = (() => {
         throw new Error(message);
     }
 
-    function boardConfigFrom(raw) {
+    /** The generator version a payload's board was made with: `g`, or generator 1 for a circle link that has none. */
+    function generatorOf(data) {
+        if (data.g !== undefined) return data.g;
+        return data.c && data.c.boardShape === 'circle' ? 1 : Config.GENERATOR_VERSION;
+    }
+
+    function boardConfigFrom(raw, generator = Config.GENERATOR_VERSION) {
         if (!raw || typeof raw !== 'object') fail('The link has no board settings.');
-        const config = { ...raw };
-        const limit = (key) => (config.boardShape === 'country' ? (key === 'width' ? COUNTRY_MAX_ACROSS : key === 'height' ? COUNTRY_MAX_SPAN : MAX_DIMENSION) : MAX_DIMENSION);
+        // The generator never comes from the settings themselves, only from the link's `g`.
+        const config = { ...raw, generator };
+        const limit = (key) => {
+            if (key === 'radius' || key === 'size') return MAX_DIMENSION;
+            if (config.boardShape === 'country') return key === 'width' ? COUNTRY_MAX_ACROSS : COUNTRY_MAX_SPAN;
+            // Hexagon and circle boards are 2 * radius + 1 or 2 wide, so a width or height reaches past 100.
+            return MAX_SPAN;
+        };
         for (const key of ['width', 'height', 'radius', 'size']) {
             if (config[key] === undefined) continue;
             if (!Number.isInteger(config[key]) || config[key] < 1 || config[key] > limit(key)) fail(`The board ${key} in the link is out of range.`);
@@ -125,8 +157,12 @@ const ShareLink = (() => {
         if (!Number.isInteger(data.v) || data.v < 1) fail('Unrecognised link.');
         if (data.v > LINK_VERSION) fail('This link was made by a newer version of Protogames.');
         if (!Number.isInteger(data.f) || data.f < 0) fail('Unrecognised link.');
-        const needs = data.c && LINK_VERSION_FOR_SHAPE[data.c.boardShape];
+        const needs = data.c && SHAPES_REQUIRING_VERSION.includes(data.c.boardShape) && LINK_VERSION_FOR_SHAPE[data.c.boardShape];
         if (needs && data.v < needs) fail('Unrecognised link.');
+        if (data.g !== undefined) {
+            if (!Number.isInteger(data.g) || data.g < 1 || data.v < GENERATOR_LINK_VERSION) fail('Unrecognised link.');
+            if (data.g > Config.GENERATOR_VERSION) fail('This link was made by a newer version of Protogames (a newer board generator).');
+        }
         if ((data.pl !== undefined || data.sc !== undefined || data.s !== undefined) && data.v < PLAYER_LINK_VERSION) fail('Unrecognised link.');
     }
 
@@ -150,11 +186,15 @@ const ShareLink = (() => {
         if (!Array.isArray(data.k) || !data.k.every((c) => typeof c === 'string' && HEX_COLOR.test(c))) fail('The link has invalid colours.');
         if (typeof data.t !== 'string') fail('The link has no tiles.');
         const tiles = data.t ? data.t.split('.') : [];
-        if (tiles.length !== polygons.length) fail('Board size mismatch.');
+        if (tiles.length !== polygons.length) {
+            fail(data.c && data.c.boardShape === 'circle'
+                ? 'This link does not match the board this version of Protogames generates (it was made with a different board generator).'
+                : 'Board size mismatch.');
+        }
         const result = polygons.map((polygon, i) => {
             const color = data.k[parseInt(tiles[i], 36)];
             if (color === undefined) fail('The link refers to a colour it does not contain.');
-            return { ...polygon, color };
+            return { ...polygon, color: normalizeHex(color) };
         });
         const objects = Array.isArray(data.ob) ? data.ob : [];
         if (!objects.every((id) => typeof id === 'string' && id.length > 0 && id.length <= 200)) fail('The link has invalid items.');
@@ -173,8 +213,8 @@ const ShareLink = (() => {
             version: data.f,
             projectName: typeof data.n === 'string' && data.n ? data.n : defaultProjectName,
             appState: {
-                boardConfig: boardConfigFrom(data.c),
-                currentColor: data.k[0] || '#ffffff',
+                boardConfig: boardConfigFrom(data.c, generatorOf(data)),
+                currentColor: data.k[0] ? normalizeHex(data.k[0]) : '#ffffff',
                 paletteId,
                 isEraserActive: false,
                 autoSaveEnabled: true,
@@ -200,7 +240,7 @@ const ShareLink = (() => {
             const target = tiles[parseInt(tile, 36)];
             const hex = data.sc[parseInt(color, 36)];
             if (!target || !hex) fail('The link places a start marker on a tile that does not exist.');
-            target.start = hex;
+            target.start = normalizeHex(hex);
         }
         return entries.length;
     }
@@ -216,7 +256,7 @@ const ShareLink = (() => {
                 fail('The link has invalid players.');
             }
             return {
-                color,
+                color: normalizeHex(color),
                 seat,
                 pieces: pieces.map((piece) => {
                     if (!Array.isArray(piece) || piece.length !== 2 || !PIECE_KINDS.includes(piece[0]) || !Number.isInteger(piece[1])) fail('The link has invalid pieces.');
@@ -249,7 +289,8 @@ const ShareLink = (() => {
     }
 
     function urlFor(baseUrl, encoded) {
-        return `${baseUrl.split('#')[0]}#b=${encoded}`;
+        // Only the page itself: the sender's query (?project=<id>, ?showcase=...) means nothing to the recipient.
+        return `${baseUrl.split('#')[0].split('?')[0]}#b=${encoded}`;
     }
 
     /** How risky a link of this many characters is to paste around: 'ok', 'long' or 'veryLong'. */
@@ -324,6 +365,15 @@ const ShareLink = (() => {
         });
     }
 
+    /**
+     * Why a board cannot be shared as a link, or '' when it can: the same limits openFromHash applies, so the
+     * dialog never shows a link that the recipient (or this tab) would refuse.
+     */
+    function shareProblem(config, tileCount) {
+        const tooBig = tileCount > MAX_TILES || (config.boardShape !== 'infinite' && estimateTiles(config) > MAX_TILES * 8);
+        return tooBig ? `This board has too many tiles for a link (at most ${MAX_TILES}). Save the project file to share it.` : '';
+    }
+
     function usesCustomContent(state) {
         const builtIn = Config.COLOR_PALETTES.some((p) => p.id === state.currentPaletteId);
         const customObject = state.polygons.some((p) => p.object && String(p.object).includes(':'));
@@ -340,8 +390,14 @@ const ShareLink = (() => {
             UI.showNotification('Generate a board before sharing.');
             return;
         }
+        const painted = Infinite.isActive() ? Infinite.paintedTiles(state.polygons) : state.polygons;
+        const problem = shareProblem(state.boardConfig, painted.length);
+        if (problem) {
+            UI.showNotification(problem, 6000);
+            return;
+        }
         try {
-            currentUrl = urlFor(location.href, await encode(currentPayload()));
+            currentUrl = urlFor(location.origin && location.origin !== 'null' ? location.origin + location.pathname : location.href, await encode(currentPayload()));
         } catch (error) {
             UI.showNotification(`Could not create link: ${error.message}`);
             return;
@@ -407,7 +463,7 @@ const ShareLink = (() => {
         try {
             const data = await decode(payload);
             checkEnvelope(data);
-            const config = boardConfigFrom(data.c);
+            const config = boardConfigFrom(data.c, generatorOf(data));
             // An infinite board has no fixed tile list: its tiles are named in the link and rebuilt from their ids.
             let polygons;
             if (config.boardShape === 'infinite') {
@@ -442,7 +498,10 @@ const ShareLink = (() => {
 
     /** A link pasted into an already open tab changes only the hash. It opens as a new project, so nothing is replaced. */
     function onHashChange() {
-        if (hashPayload(location.hash)) openFromHash();
+        if (!hashPayload(location.hash)) return;
+        // The link opens as a new project and the open board is saved first; only when that save failed
+        // does replacing the board lose work, and then the person is asked.
+        FileManager.guardReplace(() => openFromHash(), forgetHash);
     }
 
     function init() {
@@ -464,6 +523,7 @@ const ShareLink = (() => {
         LINK_VERSION,
         pack,
         unpack,
+        shareProblem,
         toBase64Url,
         fromBase64Url,
         hashPayload,

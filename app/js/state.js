@@ -338,6 +338,9 @@ const AppState = (() => {
         state.isDirty = false;
     }
 
+    // What the latest recordHistory removed; only discardLastStep reads it.
+    let lastRecord = null;
+
     /**
      * Pushes the current polygon colors into the undo stack.
      */
@@ -350,14 +353,15 @@ const AppState = (() => {
             start: polygon.start || null
         }));
 
-        if (state.historyIndex < state.history.length - 1) {
-            state.history.splice(state.historyIndex + 1);
-        }
+        // Kept so discardLastStep can put back what this step pushed out (the redo branch, the oldest step).
+        const tail = state.history.splice(state.historyIndex + 1);
+        let dropped = null;
 
         state.history.push(snapshot);
         if (state.history.length > Config.HISTORY_LIMIT) {
-            state.history.shift();
+            dropped = state.history.shift();
         }
+        lastRecord = { tail, dropped };
         state.historyIndex = state.history.length - 1;
     }
 
@@ -385,6 +389,7 @@ const AppState = (() => {
     function resetHistory() {
         state.history = [];
         state.historyIndex = -1;
+        lastRecord = null;
     }
 
     /**
@@ -410,22 +415,28 @@ const AppState = (() => {
 
     /**
      * Steps back to the previous snapshot and forgets the step left behind, so it cannot be redone.
-     * Used to take back a change that should never have counted (a fill when a pinch begins).
+     * Used to take back a change that should never have counted (a fill when a pinch begins);
+     * the redo branch and the oldest step that recording it pushed out come back.
      */
     function discardLastStep() {
         if (state.historyIndex <= 0) return null;
         state.history.splice(state.historyIndex);
-        state.historyIndex -= 1;
+        if (lastRecord?.dropped) state.history.unshift(lastRecord.dropped);
+        state.historyIndex = state.history.length - 1;
+        if (lastRecord?.tail.length) state.history.push(...lastRecord.tail);
+        lastRecord = null;
         return state.history[state.historyIndex];
     }
 
     function undo() {
+        lastRecord = null;
         if (state.historyIndex <= 0) return null;
         state.historyIndex -= 1;
         return state.history[state.historyIndex];
     }
 
     function redo() {
+        lastRecord = null;
         if (state.historyIndex >= state.history.length - 1) return null;
         state.historyIndex += 1;
         return state.history[state.historyIndex];

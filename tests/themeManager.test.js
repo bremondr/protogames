@@ -65,3 +65,25 @@ test('a theme edit that recolours nothing does not touch the autosave', async ()
     assert.equal(AppState.getState().isDirty, false);
     assert.deepEqual(calls.saves, []);
 });
+
+test('a tile colour is its identity: a colour another palette (or the same theme) already uses is moved to a free one', async () => {
+    const { ThemeManager, Config } = fresh();
+    const taken = Config.COLOR_PALETTES[0].colors[0].hex.toLowerCase();
+    await ThemeManager.saveTheme('tiles', { name: 'Clash', tiles: [{ label: 'Same as built-in', hex: taken }, { label: 'Fresh', hex: '#4b5d3a' }, { label: 'Fresh again', hex: '#4b5d3a' }] });
+    const hexes = ThemeManager.get('tiles', ThemeManager.list('tiles')[0].id).tiles.map((tile) => tile.hex);
+    assert.equal(new Set(hexes).size, 3, 'three different colours');
+    assert.notEqual(hexes[0], taken, 'not the built-in one');
+    assert.equal(hexes[1], '#4b5d3a', 'a free colour is kept as it is');
+    assert.equal(hexes[2], '#4b5d3b', 'the next one up');
+    // A second theme asking for the same colours gets neither of them.
+    await ThemeManager.saveTheme('tiles', { name: 'Second', tiles: [{ label: 'Fresh', hex: '#4b5d3a' }] });
+    const second = ThemeManager.get('tiles', ThemeManager.list('tiles')[1].id).tiles[0].hex;
+    assert.ok(!hexes.includes(second) && second !== taken, 'unique across themes');
+});
+
+test('white is blank, so a theme that asks for it gets the colour just below instead of wrapping past the top of the range', async () => {
+    const { ThemeManager } = fresh();
+    await ThemeManager.saveTheme('tiles', { name: 'Snow', tiles: [{ label: 'Snow', hex: '#ffffff' }, { label: 'Snow too', hex: '#ffffff' }] });
+    const hexes = ThemeManager.get('tiles', ThemeManager.list('tiles')[0].id).tiles.map((tile) => tile.hex);
+    assert.deepEqual(Array.from(hexes), ['#fffffe', '#fffffd']);
+});
