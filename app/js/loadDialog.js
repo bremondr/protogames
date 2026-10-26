@@ -24,11 +24,19 @@ const LoadDialog = (() => {
             button.type = 'button';
             button.className = 'load-item';
             const isCurrent = entry.id === currentId;
-            const lines = [
-                ['load-name', entry.name + (isCurrent ? ' (open now)' : '')],
-                ['load-detail', ProjectLibrary.describeBoard(entry)],
-                ['load-detail', ProjectLibrary.describeAge(entry.timestamp, now)]
-            ];
+            // One odd entry must not blank the whole list, so each row is built on its own.
+            let lines;
+            try {
+                lines = [
+                    ['load-name', String(entry.name) + (isCurrent ? ' (open now)' : '')],
+                    ['load-detail', ProjectLibrary.describeBoard(entry)],
+                    ['load-detail', ProjectLibrary.describeAge(entry.timestamp, now)]
+                ];
+            } catch (error) {
+                console.error('Could not describe a project.', error);
+                lines = [['load-name', 'Unreadable project'], ['load-detail', 'This project cannot be read']];
+                entry.readable = false;
+            }
             for (const [className, text] of lines) {
                 const line = document.createElement('span');
                 line.className = className;
@@ -45,8 +53,8 @@ const LoadDialog = (() => {
 
     function open() {
         if (!el.root) return;
-        // The open project is written first, so the list shows it as it is now.
-        FileManager.autoSaveToLocalStorage(true);
+        // The open project is written first (only when it changed, so looking does not bump its time).
+        FileManager.autoSaveToLocalStorage();
         renderList();
         el.root.classList.remove('hidden');
         el.close.focus();

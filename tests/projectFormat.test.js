@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { ROOT, loadApp, plain } = require('./support/load');
 
-const app = loadApp(['app/js/projectFormat.js']);
+const app = loadApp(['app/js/config.js', 'app/js/projectFormat.js']);
 const PF = app.run('ProjectFormat');
 const fixture = (name) => JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', name), 'utf8'));
 const legacyProject = () => fixture('v0-legacy-project.protogames.json');
@@ -55,7 +55,7 @@ test('a legacy v0 project (string version "1.0") still loads and keeps its data'
     assert.equal(loaded.projectName, 'legacy-board');
     assert.equal(loaded.created, legacy.created);
     assert.equal(loaded.appState.polygons.length, legacy.appState.polygons.length);
-    assert.deepEqual(loaded.appState.boardConfig, { ...legacy.appState.boardConfig, center: 'tile' }, 'the board is untouched, the centre written down');
+    assert.deepEqual(loaded.appState.boardConfig, { ...legacy.appState.boardConfig, center: 'tile', generator: 1 }, 'the board is untouched, the centre and generator written down');
     assert.equal(loaded.appState.polygons[0].color, '#2D5016');
     assert.equal(loaded.appState.polygons[2].object, 'castle');
 });
@@ -420,6 +420,51 @@ test('a file without bounds gets them from the vertices instead of crashing the 
     assert.deepEqual(loaded.appState.polygons[0].bounds, expected);
 });
 
+test('disagreeing bounds are recomputed from the vertices (a huge box would exhaust the point locator)', () => {
+    const project = hostile();
+    const polygon = project.appState.polygons[0];
+    const expected = plain(polygon.bounds);
+    polygon.bounds = { minX: -3e6, maxX: 3e6, minY: -3e6, maxY: 3e6 };
+    const loaded = plain(PF.parse(JSON.stringify(project)));
+    assert.deepEqual(loaded.appState.polygons[0].bounds, expected);
+});
+
+test('coordinates beyond what a board can hold are refused, not looped over', () => {
+    const far = (project, value) => {
+        const polygon = project.appState.polygons[0];
+        polygon.vertices = polygon.vertices.map((v) => ({ x: v.x + value, y: v.y + value }));
+        polygon.center = { x: polygon.center.x + value, y: polygon.center.y + value };
+    };
+    const finite = hostile();
+    far(finite, 1e18);
+    throwsFormatError(() => PF.parse(JSON.stringify(finite)), 'invalid', /too far/);
+    const justOver = hostile();
+    far(justOver, 2e7);
+    throwsFormatError(() => PF.parse(JSON.stringify(justOver)), 'invalid', /too far/);
+
+    const infinite = hostile();
+    infinite.appState.boardConfig.boardShape = 'infinite';
+    far(infinite, 1e18);
+    throwsFormatError(() => PF.parse(JSON.stringify(infinite)), 'invalid', /too far/);
+    const farButFine = hostile();
+    farButFine.appState.boardConfig.boardShape = 'infinite';
+    far(farButFine, 5e9); // an infinite board panned very far stays valid
+    assert.doesNotThrow(() => PF.parse(JSON.stringify(farButFine)));
+});
+
+test('an infinite tile id near 2^53 is refused', () => {
+    for (const id of ['inf_s_9007199254740991_0', 'inf_t_0_-9007199254740991_up', 'inf_hp_1000000001_0']) {
+        const project = hostile();
+        project.appState.boardConfig.boardShape = 'infinite';
+        project.appState.polygons[0].id = id;
+        throwsFormatError(() => PF.parse(JSON.stringify(project)), 'invalid', /too large/);
+    }
+    const ok = hostile();
+    ok.appState.boardConfig.boardShape = 'infinite';
+    ok.appState.polygons[0].id = 'inf_s_1000000_-1000000';
+    assert.doesNotThrow(() => PF.parse(JSON.stringify(ok)));
+});
+
 test('values at the edge of the allowed range, and three-digit colours, are still accepted', () => {
     const project = hostile();
     Object.assign(project.appState.boardConfig, { radius: 100, size: 100, width: 201, height: 201, orientation: 'flat-top', triangleOrientation: 'point-down' });
@@ -597,7 +642,7 @@ test('v5 to v6 keeps players and dice a file already has', () => {
 test('a v5 file loads through parse() as a current project with the standard dice', () => {
     const loaded = plain(PF.parse(JSON.stringify(v5Project())));
     assert.equal(loaded.version, PF.CURRENT_VERSION);
-    assert.equal(PF.CURRENT_VERSION, 7);
+    assert.equal(PF.CURRENT_VERSION, 8);
     assert.deepEqual(loaded.appState.players, []);
     assert.deepEqual(loaded.appState.dice, STANDARD_DICE);
 });
@@ -757,4 +802,98 @@ test('a legacy triangle hexagon board keeps its tiles: the file loads and its ti
     const loaded = plain(PF.parse(JSON.stringify(withBoard({ boardShape: 'hexagon', gridType: 'triangle' }))));
     assert.equal(loaded.appState.boardConfig.center, 'point');
     assert.equal(loaded.appState.polygons.length, v6Project().appState.polygons.length, 'the tiles are untouched');
+});
+
+// ---- v7 -> v8: the generator version -------------------------------------------------------------------------------------
+
+const v7Project = (name = 'v7-circle-hexagon.protogames.json') => fixture(name);
+const V7_FIXTURES = ['v7-circle-hexagon.protogames.json', 'v7-circle-triangle.protogames.json'];
+
+test('v7 to v8 writes down the generator every earlier board was made with: generator 1, for every board shape', () => {
+    for (const boardShape of ['hexagon', 'rectangle', 'triangle', 'circle', 'infinite', 'country']) {
+        const source = v7Project();
+        source.appState.boardConfig.boardShape = boardShape;
+        assert.equal(plain(PF.MIGRATIONS[7](source)).appState.boardConfig.generator, 1, boardShape);
+    }
+});
+
+test('v7 to v8 changes nothing else, keeps a generator a file already has, and does not mutate its input', () => {
+    const source = v7Project('v7-circle-triangle.protogames.json');
+    const migrated = plain(PF.MIGRATIONS[7](source));
+    assert.equal(migrated.version, 8);
+    const expected = JSON.parse(JSON.stringify(source));
+    expected.version = 8;
+    expected.appState.boardConfig.generator = 1;
+    assert.deepEqual(migrated, expected);
+    assert.equal(source.version, 7, 'the input is not mutated');
+    assert.equal(source.appState.boardConfig.generator, undefined);
+    source.appState.boardConfig.generator = 2;
+    assert.equal(plain(PF.MIGRATIONS[7](source)).appState.boardConfig.generator, 2);
+    assert.equal(plain(PF.MIGRATIONS[7]({ version: 7 })).version, 8, 'incomplete data does not throw');
+    assert.equal(plain(PF.MIGRATIONS[7]({ version: 7, appState: { boardConfig: null } })).version, 8);
+});
+
+test('every older fixture arrives with generator 1; what the app saves now carries the current one', () => {
+    for (const name of ['v0-legacy-project.protogames.json', 'v1-space-arctic.protogames.json', 'v2-space-arctic.protogames.json', 'v3-space-arctic.protogames.json', 'v4-space-arctic.protogames.json', 'v4-square-board.protogames.json', 'v5-space-arctic.protogames.json', 'v6-space-arctic.protogames.json', ...V7_FIXTURES]) {
+        const loaded = plain(PF.parse(JSON.stringify(fixture(name))));
+        assert.equal(loaded.version, 8, name);
+        assert.equal(loaded.appState.boardConfig.generator, 1, name);
+    }
+    assert.equal(app.run('Config.DEFAULT_BOARD_CONFIG.generator'), 2);
+});
+
+test('the generator survives saving and loading: a generator 1 board stays generator 1', () => {
+    const loaded = plain(PF.parse(JSON.stringify(v7Project())));
+    const saved = plain(PF.createProject({ projectName: 'again', appState: loaded.appState, now: 0 }));
+    assert.equal(saved.appState.boardConfig.generator, 1);
+    assert.equal(plain(PF.parse(JSON.stringify(saved))).appState.boardConfig.generator, 1);
+    const autosave = plain(PF.createAutosave({ projectName: 'again', appState: loaded.appState, now: 1 }));
+    assert.equal(plain(PF.parse(JSON.stringify(autosave))).appState.boardConfig.generator, 1);
+});
+
+test('the generator is checked: a whole number from 1 up to what this app knows', () => {
+    const project = plain(PF.parse(JSON.stringify(v7Project('v7-circle-triangle.protogames.json'))));
+    for (const generator of [1, 2]) {
+        project.appState.boardConfig.generator = generator;
+        assert.doesNotThrow(() => PF.validate(project), String(generator));
+    }
+    for (const bad of [0, -1, 2.5, 'x', '1', null, undefined, NaN]) {
+        project.appState.boardConfig.generator = bad;
+        throwsFormatError(() => PF.validate(project), 'invalid', /invalid generator version/);
+    }
+    project.appState.boardConfig.generator = 3;
+    throwsFormatError(() => PF.validate(project), 'newer-version', /made by a newer version.*generator 3.*up to 2/);
+    // the same through parse: the file says it is current, but its board comes from the future
+    throwsFormatError(() => PF.parse(JSON.stringify(project)), 'newer-version', /newer version/);
+});
+
+test('the board size caps are shared: share links read them from here', () => {
+    assert.equal(PF.MAX_BOARD_DIMENSION, 100);
+    assert.equal(PF.MAX_BOARD_SPAN, 201);
+});
+
+test('a migration that forgets to set the version is caught (bad-migration), and a missing step is reported (no-migration)', () => {
+    const original = PF.MIGRATIONS[7];
+    try {
+        PF.MIGRATIONS[7] = (project) => JSON.parse(JSON.stringify(project)); // upgrades nothing, keeps version 7
+        throwsFormatError(() => PF.migrate({ version: 7, projectName: 'x', appState: {} }), 'bad-migration', /did not set the version/);
+        delete PF.MIGRATIONS[7];
+        throwsFormatError(() => PF.migrate({ version: 7, projectName: 'x', appState: {} }), 'no-migration', /No migration is available from file format 7/);
+    } finally {
+        PF.MIGRATIONS[7] = original;
+    }
+    assert.equal(PF.migrate({ version: 7, projectName: 'x', appState: {} }).version, PF.CURRENT_VERSION, 'the real step is back');
+});
+
+test('parse never mutates its input, not even a current-version object whose tile bounds it has to fix', () => {
+    const project = currentProject();
+    delete project.appState.polygons[0].bounds;
+    project.appState.polygons[1].bounds = { minX: 0, minY: 0, maxX: 1e9, maxY: 1e9 }; // disagrees with the vertices
+    const before = JSON.stringify(project);
+    const parsed = PF.parse(project);
+    assert.equal(JSON.stringify(project), before, 'the caller\'s object is untouched');
+    assert.notEqual(parsed, project);
+    assert.ok(parsed.appState.polygons[0].bounds, 'the copy got its bounds');
+    assert.ok(parsed.appState.polygons[1].bounds.maxX < 1e9, 'and the wrong ones were recomputed');
+    assert.notEqual(parsed.appState.polygons, project.appState.polygons);
 });

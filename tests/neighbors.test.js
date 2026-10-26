@@ -116,3 +116,45 @@ test('shortestPath returns a connected path with the expected length', () => {
     assert.equal(Geometry.shortestPath(adjacency, 'square_0_0', 'missing'), null);
     assert.deepEqual(plain(Geometry.shortestPath(adjacency, 'square_2_2', 'square_2_2')), ['square_2_2']);
 });
+
+test('the point locator copes with a tile whose bounds are huge (audit L16)', () => {
+    const board = generate({ ...Checks.allCombinations().find((c) => c.valid && c.config.gridType === 'square').config });
+    const R = 3e6;
+    const huge = {
+        id: 'huge', type: 'square', center: { x: 0, y: 0 }, color: '#ffffff',
+        vertices: [{ x: -R, y: -R }, { x: R, y: -R }, { x: R, y: R }, { x: -R, y: R }],
+        bounds: { minX: -R, maxX: R, minY: -R, maxY: R }
+    };
+    const list = board.concat([huge]);
+    const started = Date.now();
+    const { locate } = Geometry.buildLocator(list);
+    assert.ok(Date.now() - started < 1000, 'building is quick');
+    const at = board[5].center;
+    const hit = locate(at);
+    assert.ok(hit && hit.id === board[5].id, 'a normal tile still wins when it is closer to the point');
+    assert.equal(locate({ x: 2e6, y: 2e6 }).id, 'huge', 'the huge tile is found where nothing else is');
+    assert.equal(locate({ x: 4e6, y: 0 }), null);
+    // NaN / Infinity bounds must not hang or throw either.
+    const odd = { ...huge, id: 'odd', bounds: { minX: -Infinity, maxX: Infinity, minY: NaN, maxY: 1 } };
+    assert.doesNotThrow(() => Geometry.buildLocator([odd, ...board]).locate(at));
+});
+
+test('a line across a board made of separate pieces (islands) still returns a path instead of failing', () => {
+    // Two pairs of squares with a gap between them: no chain of shared edges joins the pairs.
+    const square = (id, x) => ({
+        id, type: 'square', color: '#ffffff', center: { x: x + 5, y: 5 },
+        vertices: [{ x, y: 0 }, { x: x + 10, y: 0 }, { x: x + 10, y: 10 }, { x, y: 10 }],
+        bounds: { minX: x, maxX: x + 10, minY: 0, maxY: 10 }
+    });
+    const polygons = [square('a', 0), square('b', 10), square('c', 40), square('d', 50)];
+    const adjacency = Geometry.buildAdjacency(polygons);
+    assert.deepEqual(adjacency.neighbors.map((list) => list.length), [1, 1, 1, 1], 'two separate pairs');
+    const { locate } = Geometry.buildLocator(polygons);
+    let path;
+    assert.doesNotThrow(() => { path = plain(Geometry.linePath(polygons, adjacency, 'a', 'd', locate)); });
+    assert.equal(path[0], 'a');
+    assert.equal(path[path.length - 1], 'd');
+    assert.ok(path.includes('b') && path.includes('c'), 'the tiles on either side of the gap are both on it');
+    assert.equal(new Set(path).size, path.length);
+    assert.deepEqual(plain(Geometry.linePath(polygons, adjacency, 'a', 'b', locate)), ['a', 'b'], 'within a piece it is as before');
+});

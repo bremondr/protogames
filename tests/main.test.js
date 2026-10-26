@@ -84,3 +84,33 @@ test('with nothing to open start-up asks for a new project', async () => {
     await env.Main.startBoard();
     assert.deepEqual(env.log, ['import', 'new']);
 });
+
+function resizeEnv(size, { dirty = false } = {}) {
+    const log = [];
+    const state = { boardConfig: {}, polygons: [], isDirty: dirty };
+    const app = loadApp(['app/js/main.js'], {
+        document: { addEventListener() {} },
+        window: { addEventListener() {} },
+        Utils: { debounce: (fn) => fn },
+        Renderer: { resizeCanvas: () => size, renderBoard: () => log.push('render') },
+        Interactions: { generateBoard: () => { log.push('generate'); state.isDirty = false; } },
+        AppState: { getState: () => state, markDirty: () => { state.isDirty = true; } }
+    });
+    return { log, state, Main: app.run('Main') };
+}
+
+test('a resize that leaves the canvas size alone only redraws, so zoom and pan stay', () => {
+    const env = resizeEnv({ width: 800, height: 600, changed: false });
+    env.Main.handleResize();
+    assert.deepEqual(env.log, ['render']);
+});
+
+test('a resize to a new size lays the board out again and keeps an unsaved change unsaved', () => {
+    const env = resizeEnv({ width: 700, height: 600, changed: true }, { dirty: true });
+    env.Main.handleResize();
+    assert.deepEqual(env.log, ['generate']);
+    assert.equal(env.state.isDirty, true);
+    const clean = resizeEnv({ width: 700, height: 600, changed: true });
+    clean.Main.handleResize();
+    assert.equal(clean.state.isDirty, false);
+});

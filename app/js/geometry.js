@@ -22,7 +22,10 @@
         }
     }
 
-    /** Builds the tiles, then fits whatever survived clipping into the drawable area. */
+    /**
+     * Builds the tiles, then fits whatever survived clipping into the drawable area. The tiles depend on the settings
+     * and on config.generator (see Config.GENERATOR_VERSION); settings without one are built by the current generator.
+     */
     function generateGrid(config, canvas, colorMap) {
         return helpers.fitPolygonsToCanvas(buildGrid(config, canvas, colorMap), canvas);
     }
@@ -30,6 +33,7 @@
     const neighbors = global.GeometryNeighbors;
 
     const Geometry = {
+        GENERATOR_VERSION: Config.GENERATOR_VERSION,
         generateGrid,
         isPointInPolygon: helpers.isPointInPolygon,
         findPolygonAtPoint: helpers.findPolygonAtPoint,

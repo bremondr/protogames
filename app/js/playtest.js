@@ -115,8 +115,11 @@ const Playtest = (() => {
             AppState.setHoverPolygonId(null, null);
             syncGame();
             Renderer.renderBoard();
-        } else if (typeof PlaytestDrag !== 'undefined') {
-            PlaytestDrag.cancel();
+        } else {
+            if (typeof PlaytestDrag !== 'undefined') PlaytestDrag.cancel();
+            // The trays are about to go: focus would drop to the page, so it goes to the play button.
+            const layer = $('trayLayer');
+            if (layer && layer.contains(document.activeElement)) $('playButton')?.focus();
         }
         AppState.setPlaytest(wanted);
         document.body.classList.toggle('playtest', wanted);

@@ -67,7 +67,7 @@ const ThemeEditor = (() => {
             : kind === 'tiles'
                 ? [{ label: 'Plains', hex: '#a7c46a' }, { label: 'Forest', hex: '#2f6b3a' }, { label: 'Water', hex: '#2f7fd1' }].map((r) => ({ ...newRow(kind, r), orig: null }))
                 : [newRow(kind)];
-        editor = { kind, id: existing ? id : null, name: existing ? existing.name : '', rows, blankRows: rows, base: '', autoName: '', saving: false };
+        editor = { kind, id: existing ? id : null, name: existing ? existing.name : '', rows, blankRows: rows, base: '', autoName: '', saving: false, discarding: false, snapshot: '' };
         lastFocus = document.activeElement;
 
         const tiles = kind === 'tiles';
@@ -82,6 +82,7 @@ const ThemeEditor = (() => {
         setError('');
         renderBaseChoice();
         renderRows();
+        editor.snapshot = snapshot();
         el.root.classList.remove('hidden');
         el.name.focus();
     }
@@ -147,19 +148,39 @@ const ThemeEditor = (() => {
         renderRows();
     }
 
-    /** Closes on the person's request. While a save is running the dialog stays, so the save can finish and report. */
+    /** Everything the person can change, as text, to tell whether anything was changed since the editor opened. */
+    function snapshot() {
+        return JSON.stringify([editor.name, editor.rows.map((r) => [r.label, r.hex, r.image, r.id])]);
+    }
+
+    /**
+     * Closes on the person's request. While a save is running the dialog stays, so the save can finish and report.
+     * With unsaved changes the first request only asks (Escape, the backdrop, Close and Cancel all end up here);
+     * asking again discards them, and any further edit takes the question back.
+     */
     function close() {
         if (editor && editor.saving) return;
+        if (editor && !editor.discarding && snapshot() !== editor.snapshot) {
+            editor.discarding = true;
+            el.error.textContent = 'You have unsaved changes. Save them, or press Cancel again to discard them.';
+            el.cancel.textContent = 'Discard changes';
+            return;
+        }
         finish();
     }
 
     function finish() {
         editor = null;
+        el.cancel.textContent = 'Cancel';
         el.root.classList.add('hidden');
         if (lastFocus && lastFocus.focus) lastFocus.focus();
     }
 
     function setError(message) {
+        if (editor && editor.discarding) {
+            editor.discarding = false;
+            el.cancel.textContent = 'Cancel';
+        }
         el.error.textContent = message;
     }
 

@@ -1,5 +1,6 @@
 _site/
 previews.json
+build-summary.json
 node_modules/
 .DS_Store
 Thumbs.db

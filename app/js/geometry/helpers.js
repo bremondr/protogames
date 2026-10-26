@@ -166,6 +166,15 @@
     }
 
     /**
+     * The generator version a board is built with: the one stored in its settings, or the current one for settings
+     * that carry none (previews, tests). A version this app does not know is built with the current generator.
+     */
+    function generatorOf(config) {
+        const version = config && config.generator;
+        return Number.isInteger(version) && version >= 1 && version <= Config.GENERATOR_VERSION ? version : Config.GENERATOR_VERSION;
+    }
+
+    /**
      * A distance limit for a disc that no tile sits exactly on. Takes the achievable squared distances from the middle
      * and a wanted squared limit, and returns a squared limit halfway between the two achievable values around it
      * (rounding makes values that differ only by float noise count as one).
@@ -295,6 +304,7 @@
         createBoardTriangleOutline,
         isPointInCircle,
         resolveCenter,
+        generatorOf,
         limitBetween,
         normalizeBoardDimensions,
         createHexVertices,

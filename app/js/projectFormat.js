@@ -17,7 +17,9 @@
  * read live app config inside them.
  */
 const ProjectFormat = (() => {
-    const CURRENT_VERSION = 7;
+    const CURRENT_VERSION = 8;
+    // The board generator this app builds new boards with (see Config.GENERATOR_VERSION and the specification).
+    const GENERATOR_VERSION = Config.GENERATOR_VERSION;
 
     const GRID_TYPES = ['hexagon', 'square', 'triangle'];
     const BOARD_CENTERS = ['tile', 'point'];
@@ -26,7 +28,7 @@ const ProjectFormat = (() => {
     const MAX_COUNTRY_NAME = 100;
     const ORIENTATIONS = ['pointy-top', 'flat-top', 'orthogonal', 'diagonal'];
     const TRIANGLE_ORIENTATIONS = ['point-up', 'point-down'];
-    const MAX_BOARD_DIMENSION = 100; // same cap as share links
+    const MAX_BOARD_DIMENSION = 100; // share links read the same cap from here
     const MAX_BOARD_SPAN = 2 * MAX_BOARD_DIMENSION + 1;
     const MAX_VERTICES = 64;
     const MAX_OBJECT_ID = 200;
@@ -41,6 +43,13 @@ const ProjectFormat = (() => {
     // #rgb or #rrggbb: what palettes and the colour pickers produce. Anything else could end up in markup or CSS.
     const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
     const BOUND_KEYS = ['minX', 'maxX', 'minY', 'maxY'];
+    // Coordinate limits. Finite boards stay far inside 1e7 (100 tiles of 100 px across); an infinite board
+    // is bounded by its tile ids (|lattice index| <= MAX_LATTICE, see infinite.js), which sit at most
+    // about 1e11 px from the origin. Beyond that, rebuilding or drawing the board could never finish.
+    const MAX_COORDINATE = 1e7;
+    const MAX_INFINITE_COORDINATE = 1e11;
+    const MAX_LATTICE = 1e9;
+    const INFINITE_ID = /^inf_(?:hp|hf|s|t)_(-?\d+)_(-?\d+)(?:_(?:up|down))?$/;
 
     /** Raised for any file we cannot (or must not) load. `message` is user-readable. */
     class ProjectFormatError extends Error {
@@ -229,6 +238,20 @@ const ProjectFormat = (() => {
         return next;
     }
 
+    /**
+     * v7 -> v8: the generator version. A board remembers which version of the tile generator made it
+     * (boardConfig.generator) so that improving the generator never changes a saved board. Every board saved
+     * before this was made by generator 1; the migration writes that down. Frozen history: it does not read
+     * the live generator version.
+     */
+    function migrateV7toV8(project) {
+        const next = clone(project);
+        next.version = 8;
+        const config = isObject(next.appState) && isObject(next.appState.boardConfig) ? next.appState.boardConfig : null;
+        if (config && config.generator === undefined) config.generator = 1;
+        return next;
+    }
+
     /** MIGRATIONS[n] upgrades a version-n project to version n + 1. */
     const MIGRATIONS = {
         0: migrateV0toV1,
@@ -237,7 +260,8 @@ const ProjectFormat = (() => {
         3: migrateV3toV4,
         4: migrateV4toV5,
         5: migrateV5toV6,
-        6: migrateV6toV7
+        6: migrateV6toV7,
+        7: migrateV7toV8
     };
 
     /**
@@ -300,6 +324,15 @@ const ProjectFormat = (() => {
         if (config.triangleOrientation !== undefined && !TRIANGLE_ORIENTATIONS.includes(config.triangleOrientation)) {
             fail(`The board has an unknown triangle orientation (${JSON.stringify(config.triangleOrientation)}).`);
         }
+        if (!Number.isInteger(config.generator) || config.generator < 1) {
+            fail(`The board has an invalid generator version (${JSON.stringify(config.generator)}).`);
+        }
+        if (config.generator > GENERATOR_VERSION) {
+            throw new ProjectFormatError(
+                `This project's board was made by a newer version of Protogames (board generator ${config.generator}; this app understands up to ${GENERATOR_VERSION}). Update Protogames to open it.`,
+                'newer-version'
+            );
+        }
         if (config.boardShape === 'country') {
             if (typeof config.country !== 'string' || !config.country.trim() || config.country.length > MAX_COUNTRY_NAME) {
                 fail('The country board has no valid country (boardConfig.country).');
@@ -313,7 +346,7 @@ const ProjectFormat = (() => {
         }
     }
 
-    function validatePolygon(polygon, index) {
+    function validatePolygon(polygon, index, limit) {
         const label = `Tile ${index + 1}`;
         if (!isObject(polygon)) fail(`${label} is not an object.`);
         if (typeof polygon.id !== 'string' || !polygon.id) fail(`${label} has no id.`);
@@ -322,8 +355,17 @@ const ProjectFormat = (() => {
             fail(`${named} has invalid vertices.`);
         }
         if (!isPoint(polygon.center)) fail(`${named} has an invalid centre.`);
+        const outside = (v) => Math.abs(v) > limit;
+        if (polygon.vertices.some((v) => outside(v.x) || outside(v.y)) || outside(polygon.center.x) || outside(polygon.center.y)) {
+            fail(`${named} lies too far from the board origin (more than ${limit.toExponential(0)} pixels).`);
+        }
+        const lattice = INFINITE_ID.exec(polygon.id);
+        if (lattice && (Math.abs(Number(lattice[1])) > MAX_LATTICE || Math.abs(Number(lattice[2])) > MAX_LATTICE)) {
+            fail(`${named} has a tile position that is too large.`);
+        }
         // The renderer intersects every tile's bounds with the view on every frame.
         if (!isObject(polygon.bounds) || !BOUND_KEYS.every((key) => isFiniteNumber(polygon.bounds[key]))) fail(`${named} has invalid bounds.`);
+        if (!boundsMatch(polygon)) fail(`${named} has bounds that do not match its vertices.`);
         if (typeof polygon.color !== 'string') fail(`${named} has no colour.`);
         if (!HEX_COLOR.test(polygon.color)) fail(`${named} has an invalid colour (${JSON.stringify(polygon.color.slice(0, 40))}).`);
         if (polygon.object !== undefined && (typeof polygon.object !== 'string' || !polygon.object || polygon.object.length > MAX_OBJECT_ID)) {
@@ -380,18 +422,37 @@ const ProjectFormat = (() => {
         }
     }
 
+    function boundsOf(vertices) {
+        const b = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+        for (const v of vertices) {
+            if (v.x < b.minX) b.minX = v.x;
+            if (v.x > b.maxX) b.maxX = v.x;
+            if (v.y < b.minY) b.minY = v.y;
+            if (v.y > b.maxY) b.maxY = v.y;
+        }
+        return b;
+    }
+
+    // A little slack covers rounding in files written by other tools.
+    const BOUNDS_TOLERANCE = 1e-3;
+    function boundsMatch(polygon) {
+        const b = boundsOf(polygon.vertices);
+        return BOUND_KEYS.every((key) => Math.abs(polygon.bounds[key] - b[key]) <= BOUNDS_TOLERANCE * Math.max(1, Math.abs(b[key])));
+    }
+
     /**
-     * Older builds may have left out a tile's bounds; they follow from the vertices, so they are filled
-     * in rather than refusing a file that used to load. Runs on a copy, before validation.
+     * A tile's bounds follow from its vertices. Older builds may have left them out, and a file may carry
+     * bounds that disagree (the point locator and the renderer trust them, so a huge box would exhaust
+     * memory), so they are recomputed rather than refusing a file that used to load. Runs on a copy,
+     * before validation.
      */
     function fillBounds(project) {
         const polygons = isObject(project.appState) && Array.isArray(project.appState.polygons) ? project.appState.polygons : [];
         for (const polygon of polygons) {
-            if (!isObject(polygon) || polygon.bounds !== undefined) continue;
-            if (!Array.isArray(polygon.vertices) || polygon.vertices.length < 1 || !polygon.vertices.every(isPoint)) continue;
-            const xs = polygon.vertices.map((v) => v.x);
-            const ys = polygon.vertices.map((v) => v.y);
-            polygon.bounds = { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+            if (!isObject(polygon)) continue;
+            if (!Array.isArray(polygon.vertices) || polygon.vertices.length < 1 || polygon.vertices.length > MAX_VERTICES || !polygon.vertices.every(isPoint)) continue;
+            if (polygon.bounds !== undefined && !(isObject(polygon.bounds) && BOUND_KEYS.every((key) => isFiniteNumber(polygon.bounds[key])))) continue; // validation reports it
+            if (polygon.bounds === undefined || !boundsMatch(polygon)) polygon.bounds = boundsOf(polygon.vertices);
         }
         return project;
     }
@@ -412,7 +473,8 @@ const ProjectFormat = (() => {
         if (typeof state.isEraserActive !== 'boolean') fail('The eraser setting is not true/false.');
         if (typeof state.autoSaveEnabled !== 'boolean') fail('The auto-save setting is not true/false.');
         if (!Array.isArray(state.polygons)) fail('The project has no tile list (appState.polygons).');
-        state.polygons.forEach(validatePolygon);
+        const limit = state.boardConfig.boardShape === 'infinite' ? MAX_INFINITE_COORDINATE : MAX_COORDINATE;
+        state.polygons.forEach((polygon, index) => validatePolygon(polygon, index, limit));
         validatePlayers(state.players);
         validateDice(state.dice);
         // Infinite files keep at least one tile (the board type survives in it), see the specification.
@@ -462,6 +524,8 @@ const ProjectFormat = (() => {
 
     return {
         CURRENT_VERSION,
+        MAX_BOARD_DIMENSION,
+        MAX_BOARD_SPAN,
         MIGRATIONS,
         ProjectFormatError,
         detectVersion,
