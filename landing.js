@@ -26,7 +26,7 @@
         if (note) note.textContent = text;
     }
 
-    function render() {
+    function render(focusId, restoreFocus = false) {
         const entries = ProjectLibrary.list();
         listElement.textContent = '';
         section.hidden = entries.length === 0;
@@ -38,6 +38,14 @@
                 listElement.appendChild(renderEntry(entry, now));
             } catch (error) {
                 console.error('Could not show a saved project:', error);
+            }
+        }
+        if (restoreFocus) {
+            const button = focusId ? listElement.children[entries.findIndex((entry) => entry.id === focusId)] : null;
+            if (button) button.children[1].focus();
+            else {
+                const heading = document.getElementById('projects-title');
+                if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus(); }
             }
         }
     }
@@ -66,13 +74,23 @@
                 // The first press only asks; it goes back by itself if nothing follows.
                 del.classList.add('sure');
                 del.textContent = 'Delete for good?';
-                timer = setTimeout(() => { del.classList.remove('sure'); del.textContent = 'Delete'; }, 4000);
+                del.setAttribute('aria-label', `Delete ${entry.name} for good?`);
+                say(`Press again to delete ${entry.name} for good.`);
+                timer = setTimeout(() => {
+                    del.classList.remove('sure');
+                    del.textContent = 'Delete';
+                    del.setAttribute('aria-label', `Delete ${entry.name}`);
+                    say('');
+                }, 4000);
                 return;
             }
             clearTimeout(timer);
+            const entries = ProjectLibrary.list();
+            const index = entries.findIndex((project) => project.id === entry.id);
+            const focusId = entries[index + 1]?.id || entries[index - 1]?.id;
             ProjectLibrary.remove(entry.id);
             say(`Deleted "${entry.name}".`);
-            render();
+            render(focusId, true);
         });
 
         item.append(open, del);
