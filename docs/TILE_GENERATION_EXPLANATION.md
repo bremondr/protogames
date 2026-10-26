@@ -1,9 +1,11 @@
 # Triangle Board Generation - How It Works
 
-How the triangle tile grid is generated for the hexagon and circle board shapes (`js/geometry/triangle.js`, helpers in `js/geometry/helpers.js`, entry point `Geometry.generateGrid` in `js/geometry.js`).
+Purpose: how the tile grid is generated, in detail for triangle tiles on hexagon and circle boards (`app/js/geometry/triangle.js`, helpers in `app/js/geometry/helpers.js`, entry point `Geometry.generateGrid` in `app/js/geometry.js`), with the tile counts of every generator version.
+
+**Status:** current reference. **Last verified:** 2026-10-26 against `d6ca3be` (`main`); every count in this page was measured with `loadApp` (`tests/support/load.js`) on a 1600 x 1000 canvas. Part of the [documentation index](README.md). The rules that tie a saved board to its generator version are in [SPECIFICATION.md](SPECIFICATION.md#generator-versions).
 
 ## Entry point
-`Geometry.generateGrid(config, canvas, colorMap)` builds the tiles for `config.gridType` and then fits them to the canvas:
+`Geometry.generateGrid(config, canvas, colorMap)` builds the tiles for `config.gridType` (`hexagon` in `geometry/hex.js`, `square` in `geometry/square.js`, `triangle` in `geometry/triangle.js`) and then fits them to the canvas:
 
 ```javascript
 function generateGrid(config, canvas, colorMap) {
@@ -34,7 +36,7 @@ The hexagon and circle builders both use the shared `buildLatticeTriangles`.
 5. With `rotate`, the finished layout is turned by 90 degrees about the centre.
 6. Each kept triangle becomes a polygon with id `<idPrefix>_<j>_<i>_<kind>` and `type: 'triangle'`. The `pointingUp` flag is set only when the layout is not rotated; a rotated triangle points sideways, so it gets none.
 
-`span` only has to be large enough to cover the board (`2 * radius + 1` for hexagons, `2 * radius + 2` for circles); the predicate does the real selection.
+`span` only has to be large enough to cover the board: `2 * radius + 1` for hexagons around a point, `2 * radius + 2` for hexagons around a triangle and for circles; the predicate does the real selection.
 
 ## Hexagon board
 This section is about the board around a lattice vertex (`center: 'point'`, the only way triangle boards were built before generator versions and centres). `radius` is the number of triangle sides from the centre to the edge (rings). The predicate describes a flat-top hexagon (corners left and right) whose edges follow lattice lines, so no centroid ever lies on the boundary:
@@ -54,7 +56,7 @@ Rings of triangles around the centre vertex hold `6 * (2k - 1)` triangles for ri
 triangles: 6 for `N = 1`, 24 for `N = 2`, 54 for `N = 3`, 96 for `N = 4`. Tests and `dev/geometry-checks.js` assert `6 * radius^2` for this centre.
 
 ### Around a triangle
-With `center: 'tile'` the board is built around one triangle (`triangleOrientation` says whether it points up or down) by `layersAroundTriangle` in `triangle.js`: layer 1 is that triangle and every next layer adds the triangles that share a corner with the previous one, the same rule that makes hexagons grow in rings. A board of `N` layers has `6 * N * (N - 1) + 1` triangles: 1, 13, 37, 73 for `N = 1` to 4 (layers add 12, 24, 36, ...). `6 * radius^2` does not apply to it.
+With `center: 'tile'` the board is built around one triangle (`triangleOrientation` says whether it points up or down) by `layersAroundTriangle` in `triangle.js`: layer 1 is that triangle and every next layer adds the triangles that share a corner with the previous one, the same rule that makes hexagons grow in rings. A board of `N` layers has `6 * N * (N - 1) + 1` triangles: 1, 13, 37, 73 for `N = 1` to 4 (layers add 12, 24, 36, ...). `6 * radius^2` does not apply to it. The `orientation` (pointy or flat) has no effect here: the shape follows `triangleOrientation` and the lattice.
 
 ## Circle board
 Around a lattice vertex (`center: 'point'`), every triangle whose centroid lies within `radius` triangle sides of the vertex:
@@ -75,22 +77,34 @@ Counts after the spikes are removed (there is no `6 * radius^2` rule here):
 | around a vertex | 6 | 24 | 54 | 96 | 180 | 690 | 2874 |
 | around a triangle | 1 | 13 | 37 | 82 | 136 | 625 | 2737 |
 
-Circles of triangles are identical in generator 1 and generator 2 (see "Generator versions" below); the counts above were measured from the code and are asserted for generator 1 in `tests/generatorVersion.test.js`.
+Circles of triangles are identical in generator 1 and generator 2 (see "Generator versions" below); the counts above were re-measured for both generators and are asserted for generator 1 in `tests/generatorVersion.test.js`.
 
 ## Generator versions
-`Geometry.generateGrid` reads `config.generator` (an integer from 1; `Config.GENERATOR_VERSION` is the current one, 2; missing means current). A board stores the version it was made with so that regenerating it (resize, opening a file) never changes its tiles; see "Generator versions" in `docs/SPECIFICATION.md` for the rule (*a change to the tiles generated for existing settings is a new generator version; an old version is never edited*) and the format.
+`Geometry.generateGrid` reads `config.generator` (an integer from 1; `Config.GENERATOR_VERSION` is the current one, 2; missing means current). A board stores the version it was made with so that regenerating it (resize, opening a file) never changes its tiles; see "Generator versions" in [SPECIFICATION.md](SPECIFICATION.md#generator-versions) for the rule (*a change to the tiles generated for existing settings is a new generator version; an old version is never edited*) and the format.
 
-The two versions differ only in the **circle of hexagon tiles** (`buildCircleHexGrid` in `js/geometry/hex.js`), which scans a window of axial coordinates `(q, r)` around the middle and keeps the tiles within the disc:
+The two versions differ only in the **circle of hexagon tiles** (`buildCircleHexGrid` in `app/js/geometry/hex.js`), which scans a window of axial coordinates `(q, r)` around the middle and keeps the tiles within the disc:
 
 | | scan window (`span`) | tiles of a disc of radius 30 around a tile | complete up to |
 |---|---|---|---|
 | generator 1 | `radius + 3` | 3283 | radius 22 (tile), 18 (point) |
 | generator 2 | `ceil((radius + 0.72) * 2 / sqrt(3)) + 2` | 3367 | every radius |
 
-The disc of radius `radius + 0.72` tile widths reaches `2 / sqrt(3)` times as many axial steps as its radius, so a window that grows one step per radius runs out of tiles to scan. Generator 2 contains every tile of generator 1 with the same id. Circles of triangles are not affected: their window (`2 * radius + 2`) was always large enough.
+The disc of radius `radius + 0.72` tile widths reaches `2 / sqrt(3)` times as many axial steps as its radius, so a window that grows one step per radius runs out of tiles to scan. Generator 2 contains every tile of generator 1 with the same id. Circles of triangles are not affected: their window (`2 * radius + 2`) was always large enough. The full table of circle-of-hexagon counts (radius 1 to 100, both centres, both generators) is in [SPECIFICATION.md](SPECIFICATION.md#generator-versions).
+
+## Hexagon and square tiles at a glance
+Measured with the same script (hexagon, circle and square tiles share the layers rule of [SPECIFICATION.md](SPECIFICATION.md#boards-built-from-the-middle-centre-and-size); pointy-top and flat-top give equal counts; the two generators agree except for the circle of hexagons above):
+
+| Tiles and board | Layers (stored `radius` + 1 for hexagon and square tiles) 1, 2, 3, 4 around a tile | around a point |
+|---|---|---|
+| hexagons, hexagon board | 1, 7, 19, 37 | 3, 12, 27, 48 |
+| squares, hexagon board (clipped to the outline) | 1, 7, 19, 37 | 4, 12, 28, 48 |
+| squares, circle board | 1, 9, 21, 37 | 4, 12, 32, 52 |
+| triangles, hexagon board | 1, 13, 37, 73 | 6, 24, 54, 96 |
+
+The square-tile hexagon board is only reachable from old links or code: the sidebar switches it off. A rectangle of hexagons or squares is `width * height` tiles (`hex_<row>_<col>`, `square` ids likewise); a hexagon or circle board is `2 * radius + 1` (around a tile) or `2 * radius + 2` (around a point) tiles across.
 
 ## Fitting to the canvas
-`fitPolygonsToCanvas(polygons, canvas)` measures the bounding box of the tiles that remain, scales it to fit the drawable area (canvas minus `CANVAS_PADDING` on every side and `TOOLBAR_CLEARANCE` at the bottom) and centres it, updating each polygon's `vertices`, `center` and `bounds`. Builders may therefore lay tiles out at any scale, and nothing can overflow or sit off-centre.
+`fitPolygonsToCanvas(polygons, canvas)` measures the bounding box of the tiles that remain, scales it to fit the drawable area (canvas minus `CANVAS_PADDING`, 48 px, on every side and `TOOLBAR_CLEARANCE`, 56 px, at the bottom) and centres it, updating each polygon's `vertices`, `center` and `bounds`. Builders may therefore lay tiles out at any scale, and nothing can overflow or sit off-centre.
 
 ## Triangle board (for comparison)
 `buildTessellatedTriangle` does not use the lattice builder. It computes the size from the canvas up front (`Math.max(12, ...)`), then lays out `size` rows of `2 * row + 1` triangles, alternating up and down (reversed rows for `point-down`). Ids are `triangle_<row>_<col>`.
@@ -98,4 +112,4 @@ The disc of radius `radius + 0.72` tile widths reaches `2 / sqrt(3)` times as ma
 ## Related
 - `createTriangleVertices(origin, size, pointingUp)` in `helpers.js` builds one triangle from the top-left of its bounding box; the rectangular fallback and the triangle board use it, the lattice builder computes corners from lattice points instead.
 - `boundsCenter(vertices)` and `shouldIncludePolygon` clip the rectangular fallback to a board outline; the lattice builders do not need clipping.
-- Adjacency (for every tile shape) is computed by welding coincident vertices and matching shared edges in `js/geometry/neighbors.js`.
+- Adjacency (for every tile shape) is computed by welding coincident vertices and matching shared edges in `app/js/geometry/neighbors.js`.
