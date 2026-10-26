@@ -16,7 +16,7 @@ const { loadGeometry } = require('../tests/support/load');
 const { Geometry, Checks, Config } = loadGeometry();
 const OUT = path.join(__dirname, '..', 'app', 'showcases');
 const CANVAS = { width: 1200, height: 800 };
-const VERSION = 7; // ProjectFormat.CURRENT_VERSION; tests/projectFormat.test.js parses every file written here
+const VERSION = 7; // the format these files are written in; the app migrates them to ProjectFormat.CURRENT_VERSION (8) when it opens them; tests/projectFormat.test.js parses every file written here
 const CREATED = '2026-10-20T12:00:00.000Z';
 
 const palette = (id) => Object.fromEntries(Config.getPaletteById(id).colors.map((c) => [c.label, c.hex]));

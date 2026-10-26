@@ -1,8 +1,28 @@
-# Playtest mode: idea backlog
+# Playtest ideas (backlog)
+
+> **Status: research backlog, not a plan.** Nothing here is a commitment. What exists today is described in [../PLAYTEST.md](../PLAYTEST.md); this file only lists what could come next. Last checked against `PLAYTEST.md` and the code: 2026-10-26.
+
+**Already built** (so no longer an idea): piece trays at each seat, movable pieces, the standard dice set d3 to d20 rolled from the trays (the first part of item 2), and undo and redo of piece moves (the first part of item 4; item 8 is built only as "tap or drag a piece between tray and board"). Keyboard moves of pieces and the screen-reader announcements are built too (see `PLAYTEST.md`, "Keyboard and screen readers").
+
+**Which item is tracked where** (GitHub issues of `bremondr/protogames`; all are still open, #51 is the umbrella):
+
+| Item in this file | Issue |
+|---|---|
+| 1 Measuring on the grid | [#88](https://github.com/bremondr/protogames/issues/88) measure distance and highlight range |
+| 2 Dice (what remains), 3 Counters and turn tracker | [#51](https://github.com/bremondr/protogames/issues/51) playtest mode: tokens, dice and turn tracker (no separate issue yet) |
+| 5 Action log, 6 Snapshots, 7 Feedback capture | [#89](https://github.com/bremondr/protogames/issues/89) action log, saved positions and feedback notes |
+| 8 Piece tray in playtest | [#85](https://github.com/bremondr/protogames/issues/85) trays and moving pieces (the built part) |
+| 10 Hidden information, 11 Solo and online | [#116](https://github.com/bremondr/protogames/issues/116) phones as secret screens, proposal in [../proposals/playtest-secret-screens.md](../proposals/playtest-secret-screens.md) |
+| Items 4, 9 and "Related ideas": share links, keyboard and screen-reader support | [#86](https://github.com/bremondr/protogames/issues/86) (share links of positions are not built) |
+| Related ideas: print pieces as tokens | [#87](https://github.com/bremondr/protogames/issues/87) |
+
+Items 4 (beyond piece moves), 9 and the "out of scope" list have no issue.
+
+---
 
 Parked ideas, not commitments. Written 2026-10-11 and updated when the first playtest step shipped.
 
-Where we start from: playtest now has players, piece sets, start markers, trays at each seat, movable pieces and a standard set of dice; see [PLAYTEST.md](PLAYTEST.md) for what exists. There is still no Select tool, no counters or turn tracker, no log, and the dice set has no editor.
+Where we start from: playtest now has players, piece sets, start markers, trays at each seat, movable pieces and a standard set of dice; see [PLAYTEST.md](../PLAYTEST.md) for what exists. There is still no Select tool, no counters or turn tracker, no log, and the dice set has no editor.
 
 Rough order is by value for a board-game prototyper. "Needs" lists what must exist first.
 
@@ -14,7 +34,7 @@ Needs: nothing (works in a pure lock mode; pieces now exist, so ranges can start
 - Open questions: distance for triangle grids (edge or vertex adjacency?), and whether diagonals count on square grids (a setting).
 
 ## 2. Dice and randomizers
-Built: the standard d3 to d20 set, saved with the design and rolled from each player's tray (see [PLAYTEST.md](PLAYTEST.md)). What remains:
+Built: the standard d3 to d20 set, saved with the design and rolled from each player's tray (see [PLAYTEST.md](../PLAYTEST.md)). What remains:
 - An editor for the design's dice set, with custom face lists and colours (additive format bump, plus a share-link key).
 - Several dice per roll, modifiers, `2d6+1` notation.
 - Coin flip, random number in a range, random tile, random direction.
@@ -62,12 +82,12 @@ Needs: pieces.
 ## 10. Seeded shuffles and hidden information
 Needs: decks or hidden pieces, neither of which exists.
 - Fog of war (tiles or pieces hidden per player) and a hot-seat screen cover.
-- Secret cards per player on their own phone, over a direct browser-to-browser connection with no server: proposed in [PLAYTEST_DEVICES.md](PLAYTEST_DEVICES.md).
+- Secret cards per player on their own phone, over a direct browser-to-browser connection with no server: proposed in [playtest-secret-screens.md](../proposals/playtest-secret-screens.md).
 - Seeded randomness so a game can be replayed or two strategies compared on the same order.
 
 ## 11. Solo seats and online sessions
 - Solo: switch between player seats quickly.
-- Online: a shared session link for remote playtesters. Large, needs a server or peer-to-peer, and sync of every state above. Keep for last. (The connection layer of [PLAYTEST_DEVICES.md](PLAYTEST_DEVICES.md) is the first step towards it.)
+- Online: a shared session link for remote playtesters. Large, needs a server or peer-to-peer, and sync of every state above. Keep for last. (The connection layer of [playtest-secret-screens.md](../proposals/playtest-secret-screens.md) is the first step towards it.)
 
 ## Out of scope unless the tool grows beyond boards
 - Decks, hands, discard piles, draw and shuffle actions, card editing. This is a separate subsystem (a card model, art, layout, print), not an add-on to playtest.
