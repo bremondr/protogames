@@ -57,11 +57,13 @@ test('the landing page loads the project library before its own script, and link
 /** Just enough of a document for the list: elements with children, text, classes and listeners. */
 function fakeDocument() {
     const byId = {};
+    const document = { activeElement: null };
     const make = (tag) => {
         const el = {
             tag, children: [], attributes: {}, listeners: {}, className: '', textContent: '', hidden: false, href: '', type: '',
             classList: { _set: new Set(), add(n) { this._set.add(n); }, remove(n) { this._set.delete(n); }, contains(n) { return this._set.has(n); } },
             setAttribute(k, v) { el.attributes[k] = v; },
+            focus() { document.activeElement = el; },
             appendChild(c) { el.children.push(c); return c; },
             append(...cs) { cs.forEach((c) => el.children.push(c)); },
             addEventListener(type, fn) { el.listeners[type] = fn; },
@@ -70,9 +72,9 @@ function fakeDocument() {
         Object.defineProperty(el, 'textContent', { get: () => el._text || '', set: (v) => { el._text = v; if (v === '') el.children = []; } });
         return el;
     };
-    for (const id of ['projects', 'projectList', 'navProjects', 'projectsNote']) byId[id] = make('x');
+    for (const id of ['projects', 'projectList', 'navProjects', 'projectsNote', 'projects-title']) byId[id] = make('x');
     byId.projects.hidden = true;
-    return { byId, createElement: make, getElementById: (id) => byId[id] };
+    return Object.assign(document, { byId, createElement: make, getElementById: (id) => byId[id] });
 }
 
 function visitWithProjects(entries, { build, describeBoard } = {}) {
@@ -110,10 +112,26 @@ test('deleting asks twice: the first press only asks, the second deletes', () =>
     button().click();
     assert.deepEqual(removed, [], 'nothing deleted by the first press');
     assert.equal(button().textContent, 'Delete for good?');
+    assert.equal(button().attributes['aria-label'], 'Delete Dragon isle for good?');
+    assert.match(document.byId.projectsNote.textContent, /Press again to delete .* for good/);
     button().click();
+    assert.equal(document.activeElement, document.byId['projects-title']);
     assert.deepEqual(removed, ['aaaaaa-1111']);
     assert.equal(document.byId.projects.hidden, true, 'the last project is gone, the list hides');
     assert.match(document.byId.projectsNote.textContent, /Deleted "Dragon isle"/);
+});
+
+test('deleting a project focuses the next project when one remains', () => {
+    const second = { ...ENTRY, id: 'bbbbbb-2222', name: 'Second' };
+    const third = { ...ENTRY, id: 'cccccc-3333', name: 'Third' };
+    const { document, removed } = visitWithProjects([ENTRY, second, third]);
+    const projects = () => document.byId.projectList.children;
+    projects()[1].children[1].click();
+    projects()[1].children[1].click();
+    assert.deepEqual(removed, [second.id]);
+    assert.equal(projects().length, 2);
+    assert.equal(projects()[1].children[1].attributes['aria-label'], 'Delete Third');
+    assert.equal(document.activeElement, projects()[1].children[1]);
 });
 
 test('a change made in another tab refreshes the list', () => {
