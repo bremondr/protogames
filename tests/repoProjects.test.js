@@ -210,6 +210,44 @@ test('history lists the versions with their notes; an old one reads back and res
     assert.match(fake.commits(REPO)[0].message, /^Restore Settlers One as it was in [0-9a-f]{7}$/);
 });
 
+test('a restore on top of the version the board has open asks first when the file was saved since (base)', async () => {
+    const { m, fake, store } = await setup({ token: WRITE });
+    await store.load(REPO);
+    const opened = await store.open(REPO, 'settlers');
+    const versions = await store.history(REPO, 'settlers');
+    // someone saves a newer version after this board was opened
+    await fake.edit(REPO, 'projects/settlers.json', { ...showcase('island-settlers'), projectName: 'Settlers (laptop)' }, { message: 'From the laptop' });
+    await store.load(REPO);
+    let conflict;
+    try { await store.restore(REPO, 'settlers', versions[0].commit, { base: opened.sha }); } catch (error) { conflict = error; }
+    assert.ok(conflict instanceof m.GitStoreConflict, 'not overwritten without the question');
+    assert.equal(conflict.theirs.item.name, 'Settlers (laptop)');
+    assert.equal(fake.file(REPO, 'projects/settlers.json').projectName, 'Settlers (laptop)');
+    const over = await store.resolve(conflict, 'overwrite');
+    assert.equal(over.kept, 'mine');
+    assert.equal(fake.file(REPO, 'projects/settlers.json').projectName, 'Island settlers');
+    // on top of the newest version it simply saves
+    const again = await store.restore(REPO, 'settlers', versions[0].commit, { base: over.sha });
+    assert.match(fake.commits(REPO)[0].message, /^Restore Island settlers as it was in/);
+    assert.ok(again.sha);
+});
+
+test('the fake GitHub of the practice mode survives a reload: export, JSON, import', async () => {
+    const { m, fake, store } = await setup({ token: WRITE });
+    await store.load(REPO);
+    const opened = await store.open(REPO, 'chess');
+    await store.save(REPO, { ...opened.item, name: 'Chess 2' }, { base: opened.sha, note: 'Renamed' });
+    const copy = m.createFakeGitHub({ state: JSON.parse(JSON.stringify(fake.export())) });
+    assert.equal(copy.file(REPO, 'projects/chess.json').projectName, 'Chess 2');
+    assert.deepEqual(copy.commits(REPO).map((c) => c.message), fake.commits(REPO).map((c) => c.message));
+    const again = m.createProjectStore({ ProjectFormat, cleanName: ProjectLibrary.cleanName, fetch: copy.fetch, cache: m.memoryCache(), storage: memoryStorage() });
+    again.follow(PRIVATE);
+    again.setToken(PRIVATE, WRITE);
+    const source = await again.load(PRIVATE);
+    assert.equal(source.error, null, 'private repo and its token came back too');
+    assert.deepEqual(source.items.map((i) => i.id), ['pegs']);
+});
+
 test('following from a link: #repo=owner/name, and nothing that is not a repo name', async () => {
     const { m } = await setup();
     const store = m.createProjectStore({ ProjectFormat, cleanName: ProjectLibrary.cleanName, fetch: () => { throw new Error('no network'); }, cache: m.memoryCache(), storage: memoryStorage() });
@@ -278,5 +316,5 @@ test('the page allows the two GitHub hosts and loads the module and its styleshe
     assert.match(html, /<link rel="stylesheet" href="vendor\/git-store-kit\/git-store-kit\.css">/);
     for (const id of ['repoBlock', 'repoSaveBtn', 'repoHistoryBtn', 'repoPanelBtn', 'loadRepo']) assert.match(html, new RegExp(`id="${id}"`));
     const vendor = JSON.parse(fs.readFileSync(path.join(ROOT, 'vendor.json'), 'utf8'));
-    assert.equal(vendor.modules['git-store-kit'], '1.0.0');
+    assert.equal(vendor.modules['git-store-kit'], '1.1.0');
 });

@@ -9,7 +9,8 @@
  *  - "Save to repo" (Project panel) writes it back as one commit, with an optional note, only when asked. If the file
  *    changed meanwhile, the kit's panel asks: overwrite, keep theirs, or save a copy.
  *  - "History" lists the versions of the file: one can be looked at (a picture, read only), opened as a new project,
- *    or restored.
+ *    or restored. A restore saves on top of the version the board has open (`base`), so restoring over a newer save
+ *    asks the conflict question first, and the restored version is put on the board.
  *
  * Reading a public repo needs nothing; a private repo, and every save, needs a fine-grained token for that repo, pasted
  * once per device in the kit's panel. The part without a page is repo-projects.js (tested in Node).
@@ -337,8 +338,18 @@ async function runSave(repo, item, options) {
 function showHistory() {
     const link = currentLink();
     if (!link) return;
-    historyOpen = true;
-    panel.showHistory(link.repo, link.id, { name: AppState.getState().currentProjectName, onOpen: (version) => showVersion(link, version) });
+    const projectId = currentId();
+    // `base` is the version the board was opened at or saved as, so restoring over a newer save asks first (kit 1.1.0)
+    panel.showHistory(link.repo, link.id, {
+        name: AppState.getState().currentProjectName,
+        base: link.sha || undefined,
+        onOpen: (version) => showVersion(link, version),
+        onRestore: (result) => {
+            if (currentId() !== projectId) return;   // another project was opened meanwhile
+            const kept = editedSince(projectId, link) ? keepBoardAsProject('before restoring') : null;
+            putRestored(link, result, kept);
+        }
+    });
 }
 
 /** One version, read only: a picture of the board, and what can be done with it. */
@@ -384,16 +395,14 @@ async function restoreVersion(link, commit) {
     busy = true;
     try {
         let result;
-        try { result = await store.restore(link.repo, link.id, commit); }
+        try { result = await store.restore(link.repo, link.id, commit, { base: link.sha || undefined }); }
         catch (error) {
             if (!(error instanceof GitStoreConflict)) throw error;
             const choice = await panel.askConflict(error);
             if (!choice) return;
             result = await store.resolve(error, choice);
         }
-        if (result.item) FileManager.restoreState(result.item.project, { skipNotification: true });
-        linkCurrent({ repo: link.repo, id: result.id, sha: result.sha, created: result.item?.project.created || link.created, saved: true, commit: result.commit || null });
-        notify(`Restored: the version of ${short(commit)} is the newest in ${link.repo} and on your board.`, 5000);
+        putRestored(link, result, null);
     } catch (error) {
         FileManager.showMessage('Not restored', message(error));
     } finally {
@@ -402,26 +411,41 @@ async function restoreVersion(link, commit) {
     }
 }
 
-/* The kit's history list has its own Restore button (shown to editors), which makes an older version the newest in the
-   repo without telling the app. Seen here when the history closes: if the file's version changed meanwhile, the
-   restored version is put on the board, as the version view's Restore does. */
-let historyOpen = false;
-function afterHistory() {
-    if (!historyOpen || !panel.element.hidden) return;
-    historyOpen = false;
-    const link = currentLink();
-    if (!link || busy) return;
-    const item = sourceOf(link.repo)?.items.find((i) => i.id === link.id);
-    if (item && item.sha !== link.sha) takeNewest(link, { restored: true });
+/**
+ * What a restore saved (the version view's Restore, or the kit's history list through onRestore): it goes on the board,
+ * and the project stays linked to it, or to the copy when it was saved as one. After "keep theirs" nothing was restored
+ * and the repo's version goes on the board. `kept` names a project the board's own edits were kept in.
+ */
+function putRestored(link, { id, item, sha, commit, kept }, keptAs) {
+    if (!item) { renderProject(); return; }
+    const theirs = kept === 'theirs';
+    FileManager.restoreState(item.project, { skipNotification: true });
+    linkCurrent({ repo: link.repo, id, sha, created: item.project.created || link.created, saved: !theirs, commit: theirs ? null : commit || null });
+    const what = theirs ? `Not restored: the version in ${link.repo} was kept, and it is on your board.`
+        : kept === 'copy' ? `Restored as a copy, ${fileOf({ id })}, next to the newer version; this project now saves to the copy.`
+            : `Restored: it is the newest version in ${link.repo} and on your board.`;
+    notify(keptAs ? `${what} Your edits are kept as the project “${keptAs}”.` : what, 6000);
 }
-new MutationObserver(afterHistory).observe(panel.element, { attributes: true, attributeFilter: ['hidden'] });
+
+/** Keeps the board as it is now as a new project of this browser (not linked to any repo); returns its name, or null. */
+function keepBoardAsProject(why) {
+    const payload = FileManager.projectData();
+    const name = ProjectLibrary.cleanName(`${payload.projectName} (${why})`);
+    try {
+        ProjectLibrary.write(ProjectLibrary.newId(), ProjectFormat.createAutosave({ projectName: name, appState: payload.appState }));
+        return name;
+    } catch (error) {
+        notify('Browser storage is full: your edits could not be kept as a project.', 6000);
+        return null;
+    }
+}
 
 /** Puts the newest version from the repo on the board (asking first when the board has edits that are not there). */
-async function takeNewest(link, { restored = false } = {}) {
+async function takeNewest(link) {
     if (editedSince(currentId(), link)) {
-        const answer = await choose(restored ? 'Put the restored version on your board?' : 'Open the newest version?',
-            `Your board has edits that are not in ${link.repo}. ${restored ? 'The restored version' : 'The newest version'} replaces them here (Save to repo first to keep them as a version).`,
-            restored ? 'Put it on my board' : 'Open the newest', 'Keep my board');
+        const answer = await choose('Open the newest version?',
+            `Your board has edits that are not in ${link.repo}. The newest version replaces them here (Save to repo first to keep them as a version).`,
+            'Open the newest', 'Keep my board');
         if (answer !== 'primary') { renderProject(); return; }
     }
     let opened;
@@ -430,7 +454,7 @@ async function takeNewest(link, { restored = false } = {}) {
     if (!opened) { notify('The project is not in the repo any more.', 5000); renderProject(); return; }
     FileManager.restoreState(opened.item.project, { skipNotification: true });
     linkCurrent({ ...link, sha: opened.sha, created: opened.item.project.created || link.created, saved: false, commit: null });
-    notify(restored ? 'The restored version is on your board.' : `The newest version from ${link.repo} is on your board.`, 4000);
+    notify(`The newest version from ${link.repo} is on your board.`, 4000);
 }
 
 /* ---- a link to give playtesters ---- */

@@ -270,7 +270,7 @@ export function createGitStore({
     const ctx = ctxFor(st.repo);
     if (!ctx.token) throw new GitHubError('no-token');
     let id = idOf(item);
-    if (asCopy){ id = newId(); item = setId(item, id); }
+    if (asCopy){ id = newId(item); item = setId(item, id); }   // newId gets the item being copied
     if (typeof id !== 'string' || !ID.test(id)) throw new GitHubError('invalid', {detail: 'the item has no usable id'});
     const json = write(item), text = JSON.stringify(json, null, indent) + '\n';
     if (new TextEncoder().encode(text).length > maxBytes) throw new GitHubError('too-big');
@@ -338,12 +338,16 @@ export function createGitStore({
     if (!e) throw new GitHubError('invalid', {detail: 'the app could not read this version'});
     return {item: e.item, sha: f.sha};
   }
-  /** Saves an older version as the newest one (history stays as it was, with one more commit). */
-  async function restore(repo, id, commit, {note = ''} = {}){
+  /** Saves an older version as the newest one (history stays as it was, with one more commit). `base` is the version
+      the app has open (working folder): when the file changed since then, it throws a GitStoreConflict, as save does.
+      Without it, the version this store last saw is the base. Resolves to what save resolves to. */
+  async function restore(repo, id, commit, {base, note = ''} = {}){
     const old = await version(repo, id, commit);
     const st = needRepo(repo);
     const known = st.items.get(id);
-    return save(st.repo, old.item, {note: note || `Restore ${nameOf(old.item) ?? id} as it was in ${commit.slice(0, 7)}`, op: 'restore', base: known ? known.sha : undefined, overwrite: !known});
+    const message = note || `Restore ${nameOf(old.item) ?? id} as it was in ${commit.slice(0, 7)}`;
+    if (base !== undefined) return save(st.repo, old.item, {note: message, op: 'restore', base});
+    return save(st.repo, old.item, {note: message, op: 'restore', base: known ? known.sha : undefined, overwrite: !known});
   }
 
   /* ---- tokens ---- */

@@ -10,6 +10,7 @@
      addTokenButton.addEventListener('click', () => panel.open({token: repo}));   // straight to that repo's token field
      await panel.save(repo, item, {note});     // asks if there is a conflict; null when the person cancels
      panel.showHistory(repo, id, {onOpen: ({item, commit}) => showReadOnly(item)});
+     panel.showHistory(repo, id, {base: sha, onRestore: ({item, sha}) => putOnTheBoard(item, sha)});   // working folder
 
    Link git-store-kit.css; its colours and fonts come from --gs-* custom properties (see that file). Esc closes the
    panel. Nothing here shows a stored token: the field to paste one is always empty. */
@@ -260,15 +261,18 @@ export function createPanel(store, {title = 'Shared sources', noun = 'item', nou
 
   /* ---------- history ---------- */
   /** Shows an item's versions. `onOpen({item, commit, date})` gets one opened read-only (the panel closes first);
-      Restore saves an older version as the newest. */
-  async function showHistory(repo, id, {onOpen = null, name = null} = {}){
+      Restore saves an older version as the newest, and `onRestore({id, item, sha, commit, kept})` gets what was
+      saved. `base` is the version the app has open (working folder): a restore on top of a newer version asks the
+      conflict question. `restore: false` leaves out the Restore buttons, for an app that offers its own. */
+  async function showHistory(repo, id, {onOpen = null, onRestore = null, name = null, base, restore: canRestore = true} = {}){
     if (unsubscribe){ unsubscribe(); unsubscribe = null; }
     const known = (store.source(repo)?.items || []).find(i => i.id === id);
     const label = name || (known && known.name) || id;
     const status = el('p', {class: 'gs-note', role: 'status', text: 'Loading the versions…'});
     const list = el('ol', {class: 'gs-versions'});
     show('history', () => [head(`Versions of “${label}”`, repo), el('div', {class: 'gs-body'}, status, list)]);
-    const canWrite = store.source(repo)?.canWrite;
+    const canWrite = store.source(repo)?.canWrite && canRestore;
+    let at = base;   // the version the app has open; a restore here moves it on
     const fill = async (done = '') => {
       let versions;
       try { versions = await store.history(repo, id); }
@@ -282,7 +286,20 @@ export function createPanel(store, {title = 'Shared sources', noun = 'item', nou
         restore.addEventListener('click', async () => {
           if (!confirming){ confirming = true; restore.textContent = 'Restore this version'; restore.classList.add('gs-primary'); return; }
           restore.disabled = true; restore.textContent = 'Restoring…';
-          try { await withConflict(() => store.restore(repo, id, v.commit)); await fill('Restored: it is now the newest version.'); }
+          let r;
+          try { r = await withConflict(() => store.restore(repo, id, v.commit, {base: at})); }
+          catch (e){ status.textContent = e.message; status.className = 'gs-note gs-warn'; restore.disabled = false; restore.textContent = 'Restore…'; confirming = false; return; }
+          if (!r){ await fill('Not restored.'); return; }
+          if (r.kept === 'theirs'){ if (at !== undefined) at = r.sha; await fill('Not restored: the version on GitHub was kept.'); return; }
+          if (at !== undefined && r.id === id) at = r.sha;
+          const copy = r.kept === 'copy';
+          if (onRestore) try { onRestore({id: r.id, item: r.item, sha: r.sha, commit: r.commit, kept: r.kept || null}); } catch (e){ setTimeout(() => { throw e; }); }
+          try {
+            if (view !== 'history') return;
+            await fill(copy ? 'Restored as a copy, next to the newer version.' : 'Restored: it is now the newest version.');
+            // the button that had the focus is gone with the old list: keep the focus in the panel, so Esc closes it
+            if (view === 'history' && !root.contains(document.activeElement)) card.querySelector('.gs-x')?.focus({preventScroll: true});
+          }
           catch (e){ status.textContent = e.message; status.className = 'gs-note gs-warn'; restore.disabled = false; restore.textContent = 'Restore…'; confirming = false; }
         });
         const openBtn = onOpen ? el('button', {class: 'gs-btn', type: 'button', text: 'Open', onclick: async () => {

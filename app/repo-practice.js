@@ -7,16 +7,16 @@
  *
  * Two sample repos, made from the showcases: practice/game-design (public, three projects, one with a history) and
  * practice/class-library (private). The tokens to paste are shown in the "Practice GitHub" dialog. What is saved is
- * replayed after a reload (kept in sessionStorage), so opening another project, which reloads the page, keeps it.
+ * kept with the fake's whole state (fake.export(), in sessionStorage) and put back after a reload (fake.import()), so
+ * opening another project, which reloads the page, keeps it.
  */
 import { createFakeGitHub } from './vendor/git-store-kit/fake-github.js';
-import { fromBase64 } from './vendor/git-store-kit/github.js';
 
 export const PUBLIC = 'practice/game-design';
 export const PRIVATE = 'practice/class-library';
 export const WRITE_TOKEN = 'github_pat_PRACTICE_write_token_for_both_practice_repos';
 export const READ_TOKEN = 'github_pat_PRACTICE_read_only_token_for_class_library';
-const LOG_KEY = 'protogames_fake_github_log';
+const STATE_KEY = 'protogames_fake_github_state';
 
 const text = (json) => JSON.stringify(json, null, 2) + '\n';
 
@@ -40,17 +40,17 @@ function recolour(project, count, seed = 0) {
     return copy;
 }
 
-function readLog() {
-    try { const log = JSON.parse(sessionStorage.getItem(LOG_KEY)); return Array.isArray(log) ? log : []; } catch (error) { return []; }
+/** The fake's state saved in this tab (fake.export()), or null. */
+function savedState() {
+    try { return JSON.parse(sessionStorage.getItem(STATE_KEY)); } catch (error) { return null; }
 }
-function appendLog(entry) {
-    const log = readLog();
-    log.push(entry);
-    try { sessionStorage.setItem(LOG_KEY, JSON.stringify(log)); return true; } catch (error) { return false; }
+/** Keeps the fake's whole state in this tab; false when the tab's storage refused it (full). */
+function keepState(fake) {
+    try { sessionStorage.setItem(STATE_KEY, JSON.stringify(fake.export())); return true; } catch (error) { return false; }
 }
 
-export async function startPractice() {
-    const fake = createFakeGitHub();
+/** The two sample repos, made from the showcases, with a little history and the practice tokens. */
+async function seed(fake) {
     const [landscape, settlers, checkers, chess, pegs] = await Promise.all([
         showcase('fantasy-landscape', 'Fantasy landscape'),
         showcase('island-settlers', 'Island settlers'),
@@ -74,35 +74,34 @@ export async function startPractice() {
     fake.addToken(WRITE_TOKEN, PRIVATE, 'write');
     fake.addToken(READ_TOKEN, PRIVATE, 'read');
 
-    // what was saved before a reload
-    let keeps = true;
-    for (const entry of readLog()) {
-        try { await fake.edit(entry.repo, entry.path, entry.text, { author: entry.author, message: entry.message }); } catch (error) { /* the seed changed */ }
-    }
-    // and from now on: every save and removal that GitHub (the fake) accepted
+}
+
+export async function startPractice() {
+    // what this tab saved before a reload (opening another project reloads the page), else the samples
+    const fake = createFakeGitHub();
+    let restored = false;
+    const state = savedState();
+    if (state) { try { fake.import(state); restored = true; } catch (error) { /* an older or damaged state */ } }
+    // the 60 reads without a token start afresh with every page, or they would add up over reloads
+    fake.used = 0;
+    fake.resetAt = Date.now() + 3600e3;
+    if (!restored) await seed(fake);
+    let keeps = keepState(fake);
+    // from now on, the state is kept after every save and removal that GitHub (the fake) accepted
     const answer = fake.fetch;
     fake.fetch = async (input, init = {}) => {
         const res = await answer(input, init);
         const method = (init.method || 'GET').toUpperCase();
-        if ((method === 'PUT' || method === 'DELETE') && res.ok) {
-            const m = /^\/repos\/([^/]+)\/([^/]+)\/contents\/(.+)$/.exec(new URL(typeof input === 'string' ? input : input.url).pathname);
-            const body = JSON.parse(init.body || '{}');
-            if (m) keeps = appendLog({
-                repo: `${decodeURIComponent(m[1])}/${decodeURIComponent(m[2])}`,
-                path: m[3].split('/').map(decodeURIComponent).join('/'),
-                text: method === 'PUT' ? fromBase64(body.content) : null,
-                author: 'owner',
-                message: body.message
-            }) && keeps;
-        }
+        if ((method === 'PUT' || method === 'DELETE') && res.ok) keeps = keepState(fake);
         return res;
     };
+    const keep = () => { keeps = keepState(fake); };
 
-    return { fake, mount: (app) => mount(fake, app, () => keeps) };
+    return { fake, mount: (app) => mount(fake, app, () => keeps, keep) };
 }
 
 /** The "Practice GitHub" pill in the header and its dialog: the tokens, a change "on another device", reset, off. */
-function mount(fake, { store, currentLink, h, dialog, head, notify }, keeps) {
+function mount(fake, { store, currentLink, h, dialog, head, notify }, keeps, keep) {
     if (!store.following().length) { store.follow(PUBLIC); store.follow(PRIVATE); store.load(); }
     const pill = h('button', { type: 'button', class: 'secondary-button practice-pill', title: 'Practice GitHub: a fake GitHub in this tab, for trying the repo features' },
         'Practice', h('span', { class: 'practice-wide', text: ' GitHub' }));
@@ -134,7 +133,7 @@ function mount(fake, { store, currentLink, h, dialog, head, notify }, keeps) {
             if (!now) { notify('That project is not in the repo any more.'); return; }
             const edited = recolour(now, 4, Date.now() % 11);
             await fake.edit(practiceLink.repo, path, text(edited), { author: 'another device', message: 'Changed on the laptop' });
-            appendLog({ repo: practiceLink.repo, path, text: text(edited), author: 'another device', message: 'Changed on the laptop' });
+            keep();
             await store.load();
             notify('Changed on “another device”. Save to repo now to see the question.', 5000);
         } else if (action === 'limit') {
@@ -142,7 +141,7 @@ function mount(fake, { store, currentLink, h, dialog, head, notify }, keeps) {
             await store.load();
             notify('The 60 reads an hour without a token are used up: repos without a token show their saved copy.', 5000);
         } else if (action === 'reset') {
-            try { sessionStorage.removeItem(LOG_KEY); } catch (error) { /* nothing kept */ }
+            try { sessionStorage.removeItem(STATE_KEY); } catch (error) { /* nothing kept */ }
             location.reload();
         } else if (action === 'off') {
             location.assign(`${location.pathname}?fake-github=off`);

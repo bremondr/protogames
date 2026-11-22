@@ -16,7 +16,7 @@ The module knows nothing about the items: the project says how to read and write
 - **Saving.** One item, one commit, with a message from the project (a note the person typed, or "Update Angel drill").
   - Files are written as indented JSON, one property per line, so GitHub's history shows what changed.
   - **Conflicts:** if the file changed since it was loaded (another device, someone on GitHub), the save is refused. The person chooses: replace what is on GitHub with their version, keep what is on GitHub, or save their version as a copy. Nothing is lost either way, because the other version stays in git's history.
-- **History.** An item's versions (date, note, author), one opened read-only, or restored as a new save.
+- **History.** An item's versions (date, note, author), one opened read-only, or restored as a new save. A restore in working folder mode saves on top of the version the app has open, so a newer save on GitHub brings up the conflict question.
 - **Two ways to use it**, with the same calls:
   - *Publish:* work stays in the browser as before, and "Publish" writes one item to a repo. Readers see the newest published version. (Ultimate Playbook's team drills.)
   - *Working folder:* open an item from the repo (`open`), edit it, and save it back with the version it was opened at (`base`). (Protogames' boards.)
@@ -31,7 +31,8 @@ The module knows nothing about the items: the project says how to read and write
 | `github.js` | the GitHub requests, UTF-8 base64, git's blob hash, and `GitHubError`. No DOM |
 | `sources.js` | link values, repo names, folders and item files. No DOM |
 | `cache.js` | the saved copy of each source in IndexedDB, or in memory where there is none |
-| `fake-github.js` | `createFakeGitHub()`: a small GitHub in memory, for a project's tests and for the demo |
+| `fake-github.js` | `createFakeGitHub()`: a small GitHub in memory, for a project's tests and for the demo. Its state can be exported and imported |
+| `package.json` | only `{"type": "module"}`: tells Node the `.js` files are ES modules, so a project's Node tests import them without a warning. Not a dependency; browsers ignore it |
 | `git-store-kit.css` | the panel; themed with `--gs-*` custom properties |
 
 ## Using it
@@ -54,6 +55,7 @@ const store = createGitStore({
   id: item => item.id,                        // default: item.id. Ids are letters, digits, '-' and '_', up to 64
   name: item => item.name,                    // default: item.name. For commit messages and the panel
   setId: (item, id) => ({...item, id}),       // default as shown: a copy of the item under a new id
+  newId: item => `${slug(item.name)}-copy`,   // optional: the id of a copy, given the item being copied. Default: random
   commitMessage: ({op, name, note}) => note || `${op} ${name}`,   // op: add, update, remove, copy, restore
 });
 const panel = createPanel(store, {title: 'Teams', noun: 'drill', sourceLabel: 'team'});
@@ -93,17 +95,32 @@ await panel.remove(repo, id);
 
 `panel.save` and `panel.remove` ask the conflict question when there is one. Without the panel, `store.save` and `store.remove` throw a `GitStoreConflict` instead (with `theirs`: `{item, sha}`, or null when it was removed), which `store.resolve(conflict, 'overwrite' | 'theirs' | 'copy')` settles. A save resolves to `{id, sha, commit, item, kept}`; `kept` is `'mine'`, `'theirs'` or `'copy'` after a conflict. After `'copy'`, `item` and `id` are the copy's.
 
-Other options of `save`: `overwrite: true` (replace whatever is there), `asCopy: true` (a new id), `base: null` (it must be a new file).
+Other options of `save`: `overwrite: true` (replace whatever is there), `asCopy: true` (a new id, from the `newId` option, which gets the item being copied), `base: null` (it must be a new file).
 
 ### History
 
 ```js
 panel.showHistory(repo, id, {onOpen: ({item, commit, date}) => showReadOnly(item)});
+// working folder: restore on top of the version the app has open, and put what was restored on the board
+panel.showHistory(repo, id, {base: opened.sha, onRestore: ({id, item, sha}) => { opened = {id, sha}; showOnBoard(item); }});
 // or without the panel:
 const versions = await store.history(repo, id);          // [{commit, date, author, message}], newest first
 const {item} = await store.version(repo, id, versions[2].commit);
 await store.restore(repo, id, versions[2].commit);       // that version becomes the newest
+await store.restore(repo, id, versions[2].commit, {base: opened.sha, note: 'Back to the first plan'});
 ```
+
+`store.restore(repo, id, commit, {base, note})` resolves to what `save` resolves to. With `base`, it saves on top of that version, and throws a `GitStoreConflict` (`op: 'restore'`) when the file changed since, which `store.resolve` settles as for a save. Without `base`, it saves on top of the version the store last loaded: fine in publish mode, but in working folder mode pass the version the app opened, or a newer save on GitHub can be overwritten without the question.
+
+Options of `panel.showHistory(repo, id, options)`:
+
+| Option | What it does |
+|---|---|
+| `onOpen({item, sha, commit, date})` | adds an "Open" button to each version: the panel closes and gives the app that version, read-only |
+| `onRestore({id, item, sha, commit, kept})` | called after a Restore saved something, also after the conflict question. `sha` is the file's new version and `commit` the new commit; `kept` is `null`, `'mine'` (after "Overwrite with mine") or `'copy'` (saved as a copy: `id` is the copy's). Not called when the restore was cancelled or the version on GitHub was kept |
+| `base` | the version the app has open (working folder). Restore saves on top of it, asking the conflict question when GitHub has a newer one; after a restore the panel moves it on to the restored version |
+| `restore: false` | leaves out the Restore buttons, for an app that offers its own |
+| `name` | the item's name in the heading, when the store doesn't know it |
 
 ### Tokens
 
@@ -141,7 +158,7 @@ Every failure is a `GitHubError` (exported from `store.js`) with a `code` and a 
 - `panel.open()` shows the sources. A source that needs a token says why, with an "Add a token" (or "Replace the token") button. After a token is saved, the panel says what it changed ("Token saved. owner/repo: 3 drills, you can edit.");
 - `panel.open({token: repo})` shows them with that source's token field open and focused, ready to paste in. Under the field, "How do I make a token?" folds out the steps for making one on GitHub (`tokenHelp` replaces them with the project's own text);
 - `panel.save` and `panel.remove` ask about conflicts;
-- `panel.showHistory(repo, id, {onOpen, name})` shows an item's versions;
+- `panel.showHistory(repo, id, {onOpen, onRestore, base, restore, name})` shows an item's versions (see History above);
 - `panel.askConflict(conflict)` asks without saving, and resolves to the choice or null;
 - `panel.close()`.
 
@@ -152,6 +169,18 @@ Esc closes it. Set these on `:root` or `.gs`; the defaults are neutral greys and
 ### Testing a project's adapter
 
 `createFakeGitHub()` from `fake-github.js` answers the store's requests in memory: give its `fetch` to `createGitStore`, and `memoryCache()` from `cache.js` as `cache`, and the adapter's tests run in plain Node. See this folder's `store.test.mjs`.
+
+The kit's files are ES modules. Its own `package.json` (`{"type": "module"}`) tells Node so, whatever the project's `package.json` says, so importing them in the project's tests gives no `MODULE_TYPELESS_PACKAGE_JSON` warning. Keep that file when the kit is vendored (`update-vendor.mjs` copies it).
+
+The fake's state can be kept and put back, for example so a practice mode survives a reload:
+
+```js
+sessionStorage.setItem('practice', JSON.stringify(fake.export()));   // repos, files, commits, tokens, the limit
+const again = createFakeGitHub({state: JSON.parse(sessionStorage.getItem('practice'))});
+fake.import(state);                                                   // the same, into an existing fake
+```
+
+`export()` gives plain data that survives `JSON.stringify`; `import()` replaces everything the fake keeps (not its request log, `offline` or `staleRaw`), and throws for anything that isn't such a state.
 
 ## Setting it up in a project
 
