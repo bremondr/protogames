@@ -27,6 +27,18 @@
     --shadow-soft: 0 4px 12px rgba(31, 41, 55, 0.08);
     --sidebar-width: clamp(240px, 22vw, 300px);
     --header-height: 56px;
+    /* The Send feedback panel (vendor/feedback-kit), in the app's colours. --fk-z is above the modals (9999). */
+    --fk-surface: var(--color-panel);
+    --fk-ink: var(--color-text);
+    --fk-muted: var(--color-muted);
+    --fk-rule: var(--color-border);
+    --fk-accent: var(--color-accent);
+    --fk-on-accent: #ffffff;
+    --fk-warn: var(--color-danger);
+    --fk-stage: var(--color-canvas);
+    --fk-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --fk-display: var(--fk-font);
+    --fk-z: 10000;
 }
 
 /* ==============================================================
@@ -139,6 +151,13 @@ button {
     height: 32px;
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.15);
+}
+
+/* Shorter than the other secondary buttons, so it sits comfortably in the 56px header. */
+.feedback-button {
+    min-height: 40px;
+    padding: 0.4rem 0.9rem;
+    white-space: nowrap;
 }
 
 .header-tagline {

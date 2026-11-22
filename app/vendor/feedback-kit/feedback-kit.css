@@ -1,0 +1,52 @@
+/* feedback-kit: the Send feedback panel (kit.js). Big, so there is room to draw: nearly the whole screen.
+   Theme it with these custom properties, on :root or on .fk (the defaults are neutral):
+     --fk-surface --fk-ink --fk-muted --fk-rule --fk-accent --fk-on-accent --fk-warn --fk-stage
+     --fk-font (text) --fk-display (heading) --fk-z (stacking order) */
+.fk{position:fixed;inset:0;z-index:var(--fk-z,1000);display:grid;place-items:center;background:rgba(10,15,12,.5);
+  padding:max(12px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) max(12px,env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px));
+  font-family:var(--fk-font,system-ui,-apple-system,"Segoe UI",sans-serif);color:var(--fk-ink,#18201b)}
+.fk[hidden]{display:none}
+.fk-card{display:flex;flex-direction:column;width:min(1280px,100%);height:min(960px,100%);background:var(--fk-surface,#fff);
+  border:1px solid var(--fk-rule,#d6dcd4);border-radius:16px;box-shadow:0 16px 48px rgba(0,0,0,.3);overflow:hidden}
+.fk-head{display:flex;align-items:flex-start;gap:12px;padding:12px 12px 8px 18px}
+.fk-head>div{flex:1;min-width:0}
+.fk h2{font-family:var(--fk-display,inherit);font-weight:700;font-size:24px;line-height:1.1;margin:0;text-transform:uppercase}
+.fk-sub{margin:2px 0 0;font-size:13px;color:var(--fk-muted,#5b665e);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fk-x{flex:none;width:44px;height:44px;border:0;border-radius:10px;background:transparent;color:inherit;font-size:28px;line-height:1;cursor:pointer}
+.fk-x:hover{background:color-mix(in srgb,currentColor 10%,transparent)}
+
+/* the picture beside the controls on a wide screen, above them on an upright one */
+.fk-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:14px;padding:0 14px 14px}
+.fk-stage{min-width:0;min-height:0;display:grid;place-items:center;background:var(--fk-stage,#e9ede7);border-radius:10px;overflow:hidden;position:relative}
+.fk-canvas{display:block;max-width:100%;max-height:100%;touch-action:none;cursor:crosshair;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.fk-canvas[hidden]{display:none}   /* while the picture is being made */
+.fk-wait{margin:0;color:var(--fk-muted,#5b665e)}
+.fk-side{display:flex;flex-direction:column;gap:10px;overflow-y:auto;min-height:0;padding:5px 2px 2px 5px}   /* room for the chosen pen's ring */
+.fk-tools,.fk-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.fk-pens{display:flex;gap:8px;flex-basis:100%;margin-bottom:2px}   /* pens on a line of their own beside the picture */
+.fk-pen{width:36px;height:36px;border-radius:50%;border:2px solid var(--fk-rule,#d6dcd4);background:var(--pen);cursor:pointer;padding:0}
+.fk-pen[aria-pressed="true"]{outline:3px solid var(--fk-accent,#1e6b39);outline-offset:2px}
+.fk-btn{flex:1 1 auto;display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:8px 12px;border-radius:10px;
+  border:1px solid var(--fk-rule,#d6dcd4);background:transparent;color:inherit;font:inherit;font-size:14px;text-decoration:none;cursor:pointer}
+.fk-tools .fk-btn{flex:0 0 auto}
+.fk-btn:disabled,.fk-btn[aria-disabled="true"]{opacity:.45;cursor:default;pointer-events:none}
+.fk-primary{display:flex;align-items:center;justify-content:center;min-height:48px;padding:10px 16px;border-radius:10px;
+  background:var(--fk-accent,#1e6b39);color:var(--fk-on-accent,#fff);font-weight:600;text-decoration:none;text-align:center}
+.fk-primary[aria-disabled="true"]{opacity:.5;pointer-events:none}
+.fk-status{margin:0;font-size:14px}
+.fk-status.fk-warn{color:var(--fk-warn,#b4500f)}
+.fk-note{margin:0;font-size:12.5px;color:var(--fk-muted,#5b665e)}
+.fk-note[hidden]{display:none}
+
+@media (max-aspect-ratio:1/1), (max-width:720px){
+  .fk-body{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto}
+  .fk-side{overflow:visible}
+  .fk-pens{flex-basis:auto;margin:0 auto 0 0}   /* one line under the picture */
+}
+@media (max-width:520px){
+  .fk{padding:0}
+  .fk-card{width:100%;height:100%;border-radius:0;border:0}
+  .fk-head{padding-top:max(10px,env(safe-area-inset-top,0px))}
+  .fk-body{gap:10px;padding:0 10px max(10px,env(safe-area-inset-bottom,0px))}
+  .fk-side>.fk-note:last-child{display:none}   /* room for the picture; the hint above says what to do */
+}
