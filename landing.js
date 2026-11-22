@@ -84,7 +84,7 @@
     ProjectLibrary.importLegacy();
     render();
     // Another tab changed the library (a project saved, deleted): keep the list true.
-    // A preview keeps its keys under a prefix of its own (see scripts/preview-runtime.js), which the event shows as it is.
+    // A preview keeps its keys under a prefix of its own (see tools/preview-runtime.js), which the event shows as it is.
     const storagePrefix = (typeof PG_BUILD !== 'undefined' && PG_BUILD && PG_BUILD.storagePrefix) || '';
     window.addEventListener('storage', (event) => {
         if (!event.key) return render();

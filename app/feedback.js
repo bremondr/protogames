@@ -75,7 +75,7 @@ const feedback = createFeedback({
     // The whole page first. The editor fills the window and does not scroll (html and body are overflow: hidden), so
     // 'screen' (what is visible) and 'full' would be the same picture; 'screen' says what is meant. The page uses only
     // system fonts, so there are no web fonts to pass. Anything that should stay out of the picture has data-fk-skip
-    // (the preview badge does; see scripts/preview-runtime.js).
+    // (the preview badge does; see tools/preview-runtime.js).
     page: { area: 'screen' },
     // The board on its own stays available as a switch: it is a big canvas, and a picture of just it is the clearest
     // way to point at a tile.

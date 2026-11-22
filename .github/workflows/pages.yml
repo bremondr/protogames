@@ -1,14 +1,21 @@
-name: Deploy site
-
-# Production is main, published at the root of the GitHub Pages site. Every open pull request from this
-# repository is published as a preview under /preview/pr-<number>/. Each run rebuilds the whole site from
-# git (see scripts/build-site.js), so a preview disappears by itself when its pull request is closed.
-# The last step of a run that deployed comments on every open pull request (link, or why there is no preview),
-# so a run that was cancelled by a newer one is made up for by the next run that finishes.
+# Publish the site with GitHub Pages: main at the root, and every open pull request from this repository as a
+# preview under /preview/pr-<number>/. Each run rebuilds the whole site from git (tools/build-site.mjs), so a
+# preview disappears by itself when its pull request is closed or merged. The last step comments on every open
+# pull request with its preview link (or why it has none).
 #
-# pull_request_target is used on purpose: the workflow that runs is always the one on main, and the
-# pull request's code is only ever copied out of git as files, never executed. Pull requests from forks
-# are skipped, because everything on the site shares one origin.
+# The original of this workflow is consumer/pages.yml in bremondr/web-kit; projects keep a copy in
+# .github/workflows/pages.yml, with copies of consumer/build-site.mjs and consumer/preview-runtime.js in tools/.
+# Don't edit the copies: what differs between projects (the site's folder, the checks, files left out, a service
+# worker, the Feedback link) goes in site.json at the repository's root (see tools/build-site.mjs). The one line
+# here that a project may change is SITE_TOOLS below, if it keeps the two scripts somewhere other than tools/.
+#
+# Needs: Settings, Pages, Source: "GitHub Actions". With a custom domain set there, links use it by themselves.
+#
+# pull_request_target is used on purpose: the workflow, the build script and site.json that run are always the
+# ones on main, and a pull request's files are only copied out of git, never run here. Pull requests from forks are
+# skipped, because every version on the site shares one origin (and so one browser storage).
+
+name: Deploy site
 
 on:
   push:
@@ -23,12 +30,14 @@ permissions:
   id-token: write
   pull-requests: write
 
+env:
+  SITE_TOOLS: tools
+
 jobs:
   deploy:
     if: github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository
-    # The latest run wins: every run builds all versions, so an older one is never needed.
-    # This is set on the job, not the workflow, on purpose: a workflow-level group is entered even by a
-    # run whose only job is skipped (a fork pull request), and such a run would cancel a deploy in flight.
+    # The latest run wins: every run builds all versions. Set on the job, not the workflow, so a skipped run
+    # (a fork's pull request) can't cancel a deploy in flight.
     concurrency:
       group: pages
       cancel-in-progress: true
@@ -45,13 +54,12 @@ jobs:
         with:
           node-version: 22
 
-      # Every run publishes main, whatever event started it, so every run tests main first. A pull request
-      # event (or a manual run) must not be able to deploy an untested or broken main.
-      - name: Run unit tests
-        run: npm test
+      # Every run publishes main, so every run checks main first (site.json's "checks", "node --test" if it has
+      # none): a broken main is never published, whatever started the run.
+      - name: Check main
+        run: node "$SITE_TOOLS/build-site.mjs" --run-checks
 
-      # Same-repository pull requests only, filtered here (before any limit) so forks cannot crowd real ones out.
-      # The newest 40 are fetched; the build publishes the newest 20 that can really be built.
+      # Same-repository pull requests only, filtered before any limit so forks can't crowd real ones out.
       - name: Collect open pull requests from this repository
         env:
           GH_TOKEN: ${{ github.token }}
@@ -64,7 +72,7 @@ jobs:
           done
 
       - name: Build the site
-        run: node scripts/build-site.js --out _site --main HEAD --previews previews.json --repo "${{ github.repository }}" --summary build-summary.json
+        run: node "$SITE_TOOLS/build-site.mjs" --out _site --main HEAD --previews previews.json --repo "${{ github.repository }}" --summary build-summary.json
 
       - uses: actions/configure-pages@v6
 
@@ -76,9 +84,8 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v5
 
-      # Runs after every successful deploy, whatever event started the run, and covers every open pull request
-      # in the build summary: it creates or updates the one comment marked below. Only this repository's pull
-      # requests are in the summary, and no pull request code is run (the summary is written by the script on main).
+      # After every successful deploy, whatever started the run: creates or updates the one marked comment on
+      # each open pull request in the build summary (written by the script on main; no pull request code runs).
       - name: Comment on the open pull requests
         uses: actions/github-script@v9
         env:
@@ -86,13 +93,15 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const marker = '<!-- protogames-preview -->';
-            const base = process.env.PAGE_URL;
-            const { owner, repo } = context.repo;
             const summary = JSON.parse(fs.readFileSync('build-summary.json', 'utf8'));
+            const marker = (summary.comment && summary.comment.marker) || '<!-- site-preview -->';
+            const note = (summary.comment && summary.comment.note) || '';
+            const base = process.env.PAGE_URL.replace(/\/?$/, '/');
+            const start = summary.start || '';
+            const { owner, repo } = context.repo;
             const bodyFor = (result) => {
               if (result.status === 'built') {
-                return `${marker}\n**Preview:** ${base}preview/pr-${result.number}/\n\nBuilt from \`${result.sha}\`. It keeps its own saved data, separate from production. The preview is removed when this pull request is closed.`;
+                return `${marker}\n**Preview:** ${base}preview/pr-${result.number}/${start}\n\nBuilt from \`${result.sha}\`. ${note}`.trimEnd();
               }
               if (result.status === 'over-cap') {
                 return `${marker}\n**No preview:** ${result.reason}. It gets one when an older pull request is closed.`;
@@ -107,7 +116,7 @@ jobs:
                 if (!existing) await github.rest.issues.createComment({ owner, repo, issue_number: result.number, body });
                 else if (existing.body !== body) await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
               } catch (error) {
-                // One pull request that cannot be commented on (for example, locked) must not stop the others.
+                // one pull request that can't be commented on (locked, say) must not stop the others
                 core.warning(`Could not comment on pull request ${result.number}: ${error.message}`);
               }
             }
