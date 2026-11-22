@@ -9,8 +9,11 @@
     const hex = global.GeometryHex;
     const tri = global.GeometryTriangle;
     const square = global.GeometrySquare;
+    const radial = global.GeometryRadial;
 
     function buildGrid(config, canvas, colorMap) {
+        // A radial board has its own tiles; the tile shape setting does not apply to it.
+        if (config.boardShape === 'radial') return radial.buildRadialGrid(config, canvas, colorMap);
         switch (config.gridType) {
             case 'triangle':
                 return tri.buildTriangleGrid(config, canvas, colorMap);

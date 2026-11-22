@@ -2225,13 +2225,15 @@ kbd {
 }
 
 /* Country board: the settings that replace the width and height fields */
-#countryFields {
+#countryFields,
+#radialFields {
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
 }
 
-#countryFields.hidden {
+#countryFields.hidden,
+#radialFields.hidden {
     display: none;
 }
 

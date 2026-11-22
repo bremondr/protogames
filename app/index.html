@@ -115,6 +115,7 @@
                             <option value="circle">Circle</option>
                             <option value="infinite">Infinite canvas</option>
                             <option value="country">Country</option>
+                            <option value="radial">Radial</option>
                         </select>
                         <div id="boardShapePicker" class="board-picker" data-labelled-by="boardShapeLabel"></div>
                     </div>
@@ -176,6 +177,25 @@
                         </label>
                         <p class="field-hint" id="countryStatus" role="status"></p>
                         <p class="field-hint">Outlines: Natural Earth (1:50m)</p>
+                    </div>
+                    <div class="hidden" id="radialFields">
+                        <label class="field">
+                            <span class="field-label">Rings</span>
+                            <input type="number" id="radialRings" min="1" max="24" step="1" value="4" aria-label="Number of rings">
+                        </label>
+                        <label class="field">
+                            <span class="field-label">Spaces in the first ring</span>
+                            <input type="number" id="radialSectors" min="3" max="48" step="1" value="12" aria-label="Spaces in the first ring">
+                        </label>
+                        <label class="field">
+                            <span class="field-label">Empty middle (rings)</span>
+                            <input type="number" id="radialHole" min="0" max="4" step="1" value="1" aria-label="Width of the empty middle, in rings">
+                            <p class="field-hint">0 lets the first ring reach the centre as pie slices.</p>
+                        </label>
+                        <label class="country-borders" id="radialGrowRow">
+                            <input type="checkbox" id="radialGrow" checked>
+                            More spaces in the outer rings
+                        </label>
                     </div>
                     <div class="field dimension-fields" id="rectangularFields">
                         <label>
@@ -695,6 +715,7 @@
     <script defer src="js/geometry/hex.js"></script>
     <script defer src="js/geometry/triangle.js"></script>
     <script defer src="js/geometry/square.js"></script>
+    <script defer src="js/geometry/radial.js"></script>
     <script defer src="js/geometry/neighbors.js"></script>
     <script defer src="js/geometry.js"></script>
     <script defer src="js/renderer.js"></script>
@@ -721,6 +742,7 @@
     <script defer src="js/boardPicker.js"></script>
     <script defer src="js/countryBoard.js"></script>
     <script defer src="js/countryRegions.js"></script>
+    <script defer src="js/radialBoard.js"></script>
     <script defer src="js/print.js"></script>
     <script defer src="js/exportDialog.js"></script>
     <script defer src="js/loadDialog.js"></script>

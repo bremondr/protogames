@@ -17,15 +17,17 @@
  * read live app config inside them.
  */
 const ProjectFormat = (() => {
-    const CURRENT_VERSION = 8;
+    const CURRENT_VERSION = 9;
     // The board generator this app builds new boards with (see Config.GENERATOR_VERSION and the specification).
     const GENERATOR_VERSION = Config.GENERATOR_VERSION;
 
     const GRID_TYPES = ['hexagon', 'square', 'triangle'];
     const BOARD_CENTERS = ['tile', 'point'];
-    const BOARD_SHAPES = ['hexagon', 'rectangle', 'triangle', 'circle', 'infinite', 'country'];
+    const BOARD_SHAPES = ['hexagon', 'rectangle', 'triangle', 'circle', 'infinite', 'country', 'radial'];
     const COUNTRY_PARTS = ['main', 'nearby', 'all'];
     const MAX_COUNTRY_NAME = 100;
+    // Radial boards (js/geometry/radial.js has the same limits and clamps to them when it builds).
+    const RADIAL_LIMITS = { rings: [1, 24], sectors: [3, 48], hole: [0, 4] };
     const ORIENTATIONS = ['pointy-top', 'flat-top', 'orthogonal', 'diagonal'];
     const TRIANGLE_ORIENTATIONS = ['point-up', 'point-down'];
     const MAX_BOARD_DIMENSION = 100; // share links read the same cap from here
@@ -252,6 +254,17 @@ const ProjectFormat = (() => {
         return next;
     }
 
+    /**
+     * v8 -> v9: the board shape "radial" was added (boardConfig.rings, sectors, hole, sectorsGrow). Nothing in an
+     * existing project changes; the bump makes an older app say "saved by a newer version" instead of
+     * "unknown board shape" when it meets a radial board.
+     */
+    function migrateV8toV9(project) {
+        const next = clone(project);
+        next.version = 9;
+        return next;
+    }
+
     /** MIGRATIONS[n] upgrades a version-n project to version n + 1. */
     const MIGRATIONS = {
         0: migrateV0toV1,
@@ -261,7 +274,8 @@ const ProjectFormat = (() => {
         4: migrateV4toV5,
         5: migrateV5toV6,
         6: migrateV6toV7,
-        7: migrateV7toV8
+        7: migrateV7toV8,
+        8: migrateV8toV9
     };
 
     /**
@@ -332,6 +346,14 @@ const ProjectFormat = (() => {
                 `This project's board was made by a newer version of Protogames (board generator ${config.generator}; this app understands up to ${GENERATOR_VERSION}). Update Protogames to open it.`,
                 'newer-version'
             );
+        }
+        if (config.boardShape === 'radial') {
+            for (const [key, [min, max]] of Object.entries(RADIAL_LIMITS)) {
+                if (!Number.isInteger(config[key]) || config[key] < min || config[key] > max) {
+                    fail(`The radial board setting ${key} must be a whole number from ${min} to ${max}.`);
+                }
+            }
+            if (config.sectorsGrow !== undefined && typeof config.sectorsGrow !== 'boolean') fail('The board setting sectorsGrow is not true/false.');
         }
         if (config.boardShape === 'country') {
             if (typeof config.country !== 'string' || !config.country.trim() || config.country.length > MAX_COUNTRY_NAME) {

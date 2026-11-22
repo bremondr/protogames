@@ -117,8 +117,8 @@ const AppState = (() => {
         state.boardConfig = { ...state.boardConfig, ...config };
     }
 
-    /** Board settings that only some shapes use (the country board); kept when present, absent otherwise. */
-    const SHAPE_SETTINGS = ['country', 'countryParts', 'countryBorders', 'countryMain'];
+    /** Board settings that only some shapes use (the country and radial boards); kept when present, absent otherwise. */
+    const SHAPE_SETTINGS = ['country', 'countryParts', 'countryBorders', 'countryMain', 'rings', 'sectors', 'hole', 'sectorsGrow'];
 
     /**
      * Replaces the board configuration with one from a file or link. Only known settings are kept and

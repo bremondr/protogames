@@ -231,14 +231,14 @@ test('a link without players or start markers is still version 1 and carries no 
     assert.equal(plain(ShareLink.pack({ projectName: 'x', boardConfig: CONFIG, paletteId: 'landscape', polygons: painted(), formatVersion: 5 })).v, 1, 'players left out entirely');
 });
 
-test('players and start markers make a link version 4 (version 5 only exists for circle boards) and come back unchanged', () => {
+test('players and start markers make a link version 4 (versions 5 and 6 only exist for circle and radial boards) and come back unchanged', () => {
     const polygons = painted();
     polygons[0].start = RED;
     polygons[7].start = RED.toUpperCase();
     polygons[8].start = BLUE;
     const data = packWith(polygons, PLAYERS);
     assert.equal(data.v, 4, 'older apps say "newer version" instead of dropping the players');
-    assert.equal(ShareLink.LINK_VERSION, 5);
+    assert.equal(ShareLink.LINK_VERSION, 6);
     assert.deepEqual(data.pl, [[RED, 'bottom', [['pawn', 4], ['cube', 2]]], [BLUE, 'top', [['meeple', 1]]]]);
     assert.deepEqual(data.sc, [RED, BLUE], 'start colours are kept once each, in lower case');
 
