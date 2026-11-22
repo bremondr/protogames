@@ -2,8 +2,9 @@
  * PROTOGAMES FEEDBACK
  * --------------------------------------------------------------
  * Wires the "Send feedback" button to feedback-kit (vendor/feedback-kit/, a copy of a web-kit release: see
- * vendor.json, and do not edit it here). The panel shows a picture of the board as it is at the tap, to draw
- * on, and links to a new GitHub issue filled in with what was on screen and a link that reopens this board.
+ * vendor.json, and do not edit it here). The panel opens with a picture of the whole page as it is at the tap,
+ * to draw on, with a switch to just the board; it links to a new GitHub issue filled in with what was on screen
+ * and a link that reopens this board.
  *
  * It is a module (the kit is made of ES modules) and sits outside app/js, whose files are the classic scripts that
  * index.html lists in order. It reads the app's globals (AppState, ShareLink), which are defined by then:
@@ -71,7 +72,15 @@ const feedback = createFeedback({
     repo: REPO,
     labels: ['feedback'],
     footer: 'Sent with Send feedback in the Protogames editor.',
+    // The whole page first. The editor fills the window and does not scroll (html and body are overflow: hidden), so
+    // 'screen' (what is visible) and 'full' would be the same picture; 'screen' says what is meant. The page uses only
+    // system fonts, so there are no web fonts to pass. Anything that should stay out of the picture has data-fk-skip
+    // (the preview badge does; see tools/preview-runtime.js).
+    page: { area: 'screen' },
+    // The board on its own stays available as a switch: it is a big canvas, and a picture of just it is the clearest
+    // way to point at a tile.
     picture: boardPicture,
+    pictureLabel: 'Just the board',
     describe
 });
 

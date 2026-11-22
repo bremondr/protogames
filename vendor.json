@@ -2,6 +2,7 @@
   "source": "bremondr/web-kit",
   "dir": "app/vendor",
   "modules": {
-    "feedback-kit": "1.0.1"
+    "feedback-kit": "2.0.0",
+    "git-store-kit": "1.0.0"
   }
 }

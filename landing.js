@@ -1,13 +1,14 @@
 'use strict';
 // Two jobs, both on the landing page only:
-//  1. Share links made before the app moved to app/ point at this page (".../#b=..."). Forward them to the app
-//     with the hash intact; every other visit, including the #features and #how anchors, stays here.
+//  1. Share links made before the app moved to app/ point at this page (".../#b=..."), and a link to a GitHub repo of
+//     projects (".../#repo=owner/name", see app/repo.js) may too. Forward them to the app with the hash intact; every
+//     other visit, including the #features and #how anchors, stays here.
 //  2. List the projects saved in this browser (see app/js/projectLibrary.js, loaded before this script), each a link
 //     that opens it in the app, with a delete button that asks twice.
 (function () {
     // A link can also arrive after the page is open (pasted into the address bar of this tab: only the hash changes).
     function forwardShareLink() {
-        if (!/^#b=/.test(location.hash)) return false;
+        if (!/^#(?:b|repo)=/.test(location.hash)) return false;
         location.replace('app/' + location.search + location.hash);
         return true;
     }

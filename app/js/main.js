@@ -83,8 +83,10 @@ const Main = (() => {
         const projectId = FileManager.projectIdFromUrl();
         if (projectId && FileManager.openStoredProject(projectId)) return;
 
-        // Nothing to open: a new project, which has to be named.
-        FileManager.startNewProject();
+        // Nothing to open: a new project, which has to be named. After a link to a GitHub repo (#repo=owner/name, see
+        // repo.js), the repo's projects are offered first.
+        const repo = typeof RepoProjects !== 'undefined' && RepoProjects.followedFromLink ? RepoProjects : null;
+        FileManager.startNewProject(repo ? { chooseFirst: (askName) => repo.offerOnStart(askName) } : {});
     }
 
     document.addEventListener('DOMContentLoaded', initializeApp);

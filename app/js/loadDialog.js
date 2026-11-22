@@ -51,27 +51,38 @@ const LoadDialog = (() => {
         el.empty.hidden = entries.some((entry) => entry.id !== currentId);
     }
 
-    function open() {
+    let onDismiss = null;
+
+    /** Shows the dialog. `onClose` runs when the person closes it without choosing (close button, Escape, outside). */
+    function open({ onClose = null } = {}) {
         if (!el.root) return;
         // The open project is written first (only when it changed, so looking does not bump its time).
         FileManager.autoSaveToLocalStorage();
         renderList();
+        onDismiss = onClose;
         el.root.classList.remove('hidden');
         el.close.focus();
+        // repo.js lists the projects of the followed GitHub repos in the dialog.
+        window.dispatchEvent?.(new CustomEvent('pg:loaddialogopen'));
     }
 
-    function close() {
-        if (isOpen()) el.root.classList.add('hidden');
+    function close(dismissed = false) {
+        if (!isOpen()) return;
+        el.root.classList.add('hidden');
+        const then = onDismiss;
+        onDismiss = null;
+        if (dismissed && then) then();
     }
 
     function init(uiRefs) {
         ui = uiRefs;
         el = { root: $('loadDialog'), close: $('loadClose'), list: $('loadList'), empty: $('loadEmpty') };
         if (!el.root) return;
-        $('loadProjectBtn')?.addEventListener('click', open);
-        el.close.addEventListener('click', close);
-        el.root.addEventListener('pointerdown', (event) => { if (event.target === el.root) close(); });
-        document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && isOpen()) close(); });
+        $('loadProjectBtn')?.addEventListener('click', () => open());
+        el.close.addEventListener('click', () => close(true));
+        el.root.addEventListener('pointerdown', (event) => { if (event.target === el.root) close(true); });
+        // An Escape the repo panel (git-store-kit, open over the dialog) used to close itself is not for the dialog.
+        document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && isOpen() && !event.defaultPrevented) close(true); });
         $('loadImport')?.addEventListener('click', () => {
             close();
             ui?.loadInput?.click();

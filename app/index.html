@@ -6,13 +6,16 @@
     <!-- Limits what injected markup could do. Scripts: this site and the analytics script only (the page has
          no inline scripts). Styles allow 'unsafe-inline' because the page and theme swatches set style attributes.
          Images: data: and blob: for textures and objects, https: for theme images given as web addresses.
+         Connections: this site, blob: (the Send feedback picture reads the page's own blob: textures and item images
+         to draw them; a blob: URL is made by the page itself and cannot send anything anywhere) and the analytics hosts.
          Not a header, so frame-ancestors cannot be set. See docs/DEPLOYMENT.md. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://scripts.simpleanalyticscdn.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://queue.simpleanalyticscdn.com https://*.simpleanalyticscdn.com; object-src 'none'; base-uri 'self'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://scripts.simpleanalyticscdn.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' blob: https://queue.simpleanalyticscdn.com https://*.simpleanalyticscdn.com https://api.github.com https://raw.githubusercontent.com; object-src 'none'; base-uri 'self'; form-action 'none'">
     <title>Protogames</title>
     <link rel="icon" href="images/favicon.ico" sizes="16x16 32x32 48x48">
     <link rel="icon" type="image/png" href="images/protogames%20proto%20logo.png">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="vendor/feedback-kit/feedback-kit.css">
+    <link rel="stylesheet" href="vendor/git-store-kit/git-store-kit.css">
 </head>
 <body>
     <!-- =========================================================
@@ -71,6 +74,17 @@
                         <button type="button" id="shareButton" class="secondary-button menu-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>Share Link</button>
                         <button type="button" id="loadProjectBtn" class="secondary-button menu-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>Load…</button>
                         <input type="file" id="loadProject" class="visually-hidden" aria-label="Load project file" accept=".json">
+                    </div>
+                    <!-- Where the project is kept in a GitHub repo (repo.js). Shown once a repo is followed. -->
+                    <div class="repo-block" id="repoBlock" hidden>
+                        <span class="field-label">GitHub repo</span>
+                        <p class="repo-where" id="repoWhere"></p>
+                        <p class="field-hint repo-state" id="repoState" role="status"></p>
+                        <div class="repo-block-buttons">
+                            <button type="button" id="repoSaveBtn" class="secondary-button menu-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V7"></path><path d="m7 12 5-5 5 5"></path><path d="M5 3h14"></path></svg>Save to repo</button>
+                            <button type="button" id="repoHistoryBtn" class="secondary-button menu-button" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path><path d="M3 3v5h5"></path><path d="M12 7v5l3 2"></path></svg>History</button>
+                            <button type="button" id="repoPanelBtn" class="link-button repo-panel-link">Repos and tokens…</button>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -603,6 +617,8 @@
             <h4 class="load-heading">In this browser</h4>
             <ul class="load-list" id="loadList"></ul>
             <p class="field-hint" id="loadEmpty" hidden>No other project is saved in this browser yet.</p>
+            <h4 class="load-heading">From a GitHub repo</h4>
+            <div class="load-repo" id="loadRepo"></div>
             <h4 class="load-heading">From a file</h4>
             <button type="button" id="loadImport" class="secondary-button">Import a project file…</button>
             <div class="theme-editor-foot">
@@ -711,6 +727,7 @@
     <script defer src="js/main.js"></script>
     <!-- Send feedback: a module, so it sits outside js/ (whose files are the classic scripts listed above) -->
     <script type="module" src="feedback.js"></script>
+    <script type="module" src="repo.js"></script>
     <!-- 100% privacy-first analytics -->
 <script async src="https://scripts.simpleanalyticscdn.com/latest.js"></script>
 

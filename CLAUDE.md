@@ -8,13 +8,15 @@ Browser-based drawing tool for tabletop board prototyping: plain scripts, no bui
 versions in `vendor.json`. Don't edit them here: change the module in web-kit, release it, then run
 `node tools/update-vendor.mjs` (or wait for the daily "Update vendored modules" pull request).
 
-The project's own code that uses a module stays outside the vendored folder (for `feedback-kit`: `app/feedback.js`).
+The project's own code that uses a module stays outside the vendored folder (for `feedback-kit`: `app/feedback.js`; for
+`git-store-kit`: `app/repo.js`, `app/repo-projects.js` and the dev-only `app/repo-practice.js`).
 
 ## Working from the issues
 
 Feedback from the app arrives as issues with the `feedback` label ("fix the open feedback issues" means those).
 Each one has a table of what was on screen (screen size, orientation, theme, browser, page) and, where the app
-makes one, a link that reopens the same view. The pasted picture shows only what the app drew, not the whole screen.
+makes one, a link that reopens the same view. The pasted picture is a redrawn copy of the page (or, if the person switched to it, of just the board canvas): close to what
+was on screen but not an exact screenshot, so images, fonts and CSS effects can differ slightly.
 
 ## Site build and previews
 

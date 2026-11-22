@@ -22,7 +22,7 @@ const PROPS = ['display', 'visibility', 'opacity', 'fill', 'fill-opacity', 'fill
 const SKIP = {display: 'inline', visibility: 'visible', opacity: '1', 'fill-opacity': '1', 'stroke-opacity': '1',
   'stroke-dashoffset': '0px', 'font-style': 'normal', 'paint-order': 'normal'};
 
-const dataUrl = blob => new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = no; fr.readAsDataURL(blob); });
+export const dataUrl = blob => new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = no; fr.readAsDataURL(blob); });
 
 function snapshot(svg, vars){
   const r = svg.getBoundingClientRect(), root = getComputedStyle(document.documentElement);
@@ -44,16 +44,20 @@ export async function svgPicture(svg, {fonts = null, vars = [], background = nul
   const {copy, style, w, h} = snapshot(svg, vars);
   const bg = background || getComputedStyle(document.body).backgroundColor;
   if (fonts) style.textContent += '\n' + await fonts;
+  return drawSvg(new XMLSerializer().serializeToString(copy), w, h, {background: bg, scale: Math.min(3, Math.max(1, maxSize / Math.max(w, h)))});
+}
+
+/* The canvas of an SVG given as text, w × h CSS pixels, drawn at `scale` over `background`. Shared with page.js. */
+export async function drawSvg(text, w, h, {background = '#fff', scale = 1} = {}){
   const img = new Image();
-  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(new XMLSerializer().serializeToString(copy));
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(text);
   await img.decode();
-  const scale = Math.min(3, Math.max(1, maxSize / Math.max(w, h)));
   const canvas = document.createElement('canvas');
-  canvas.width = Math.round(w * scale); canvas.height = Math.round(h * scale);
+  canvas.width = Math.max(1, Math.round(w * scale)); canvas.height = Math.max(1, Math.round(h * scale));
   const ctx = canvas.getContext('2d');
-  const draw = () => { ctx.fillStyle = bg; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0, canvas.width, canvas.height); };
+  const draw = () => { ctx.fillStyle = background; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.drawImage(img, 0, 0, canvas.width, canvas.height); };
   draw();
-  // Safari can draw an SVG image before its embedded fonts are ready: draw it again a moment later
+  // Safari can draw an SVG image before its embedded fonts and images are ready: draw it again a moment later
   await new Promise(ok => setTimeout(ok, 80));
   draw();
   return canvas;
