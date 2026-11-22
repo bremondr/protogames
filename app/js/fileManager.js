@@ -39,6 +39,8 @@ const FileManager = (() => {
     function syncProjectPanel() {
         const nameInput = document.getElementById('projectNameInput');
         if (nameInput) nameInput.value = AppState.getState().currentProjectName || '';
+        // repo.js shows where the open project is kept in a GitHub repo, if anywhere.
+        window.dispatchEvent?.(new CustomEvent('pg:projectchange'));
     }
 
     function renameProject(text) {
@@ -131,11 +133,19 @@ const FileManager = (() => {
         return true;
     }
 
-    /** A blank board and the question that every new project starts with: what is it called? */
-    async function startNewProject() {
+    /**
+     * A blank board and the question that every new project starts with: what is it called? `chooseFirst(askName)`
+     * offers something to open before that (a followed repo's projects, see repo.js) and asks for the name only when
+     * nothing was chosen.
+     */
+    async function startNewProject({ chooseFirst = null } = {}) {
         // A new board is made by the current generator, whatever board was open before.
         Interactions.generateBoard({ ...AppState.getState().boardConfig, generator: Config.GENERATOR_VERSION }, { skipDirtyFlag: true });
         await messageClosed;
+        if (chooseFirst) chooseFirst(askNewProjectName); else askNewProjectName();
+    }
+
+    function askNewProjectName() {
         promptForText('Name your project', DEFAULT_NEW_NAME, (name) => registerNewProject(name), {
             confirmLabel: 'Create',
             cancelLabel: 'Back to home',
@@ -687,6 +697,9 @@ const FileManager = (() => {
         startAnotherProject,
         downloadProject,
         openProjectById,
-        showMessage
+        showMessage,
+        presentChoice,
+        projectData: prepareProjectData,
+        isPainted
     };
 })();

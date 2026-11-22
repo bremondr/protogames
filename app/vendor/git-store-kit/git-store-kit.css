@@ -1,0 +1,68 @@
+/* git-store-kit: the panel (panel.js): the sources and their tokens, the conflict question, an item's history.
+   Theme it with these custom properties, on :root or on .gs (the defaults are neutral):
+     --gs-surface --gs-ink --gs-muted --gs-rule --gs-accent --gs-on-accent --gs-warn --gs-danger
+     --gs-font (text) --gs-display (heading) --gs-z (stacking order) */
+.gs{position:fixed;inset:0;z-index:var(--gs-z,1000);display:grid;place-items:center;background:rgba(10,15,12,.5);
+  padding:max(12px,env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) max(12px,env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px));
+  font-family:var(--gs-font,system-ui,-apple-system,"Segoe UI",sans-serif);color:var(--gs-ink,#18201b);font-size:15px;line-height:1.4}
+.gs[hidden],.gs [hidden]{display:none !important}
+.gs *{box-sizing:border-box}
+.gs-card{display:flex;flex-direction:column;width:min(680px,100%);max-height:min(860px,100%);background:var(--gs-surface,#fff);
+  border:1px solid var(--gs-rule,#d6dcd4);border-radius:16px;box-shadow:0 16px 48px rgba(0,0,0,.3);overflow:hidden}
+.gs-head{display:flex;align-items:flex-start;gap:12px;padding:14px 12px 8px 18px;border-bottom:1px solid var(--gs-rule,#d6dcd4)}
+.gs-head>div{flex:1;min-width:0}
+.gs h2{font-family:var(--gs-display,inherit);font-weight:700;font-size:21px;line-height:1.2;margin:0;overflow-wrap:anywhere}
+.gs-sub{margin:2px 0 0;font-size:13px;color:var(--gs-muted,#5b665e);overflow-wrap:anywhere}
+.gs-x{flex:none;width:44px;height:44px;border:0;border-radius:10px;background:transparent;color:inherit;font-size:28px;line-height:1;cursor:pointer}
+.gs-x:hover{background:color-mix(in srgb,currentColor 10%,transparent)}
+.gs-body{overflow-y:auto;padding:14px 18px 18px;display:flex;flex-direction:column;gap:12px;-webkit-overflow-scrolling:touch}
+
+.gs-sources,.gs-versions{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.gs-source,.gs-version{border:1px solid var(--gs-rule,#d6dcd4);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:6px;margin:0}
+.gs-line{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.gs-name{font-weight:600;color:inherit;overflow-wrap:anywhere}
+.gs-badges{display:flex;flex-wrap:wrap;gap:6px}
+.gs-badge{font-size:12px;line-height:1;padding:5px 8px;border-radius:999px;border:1px solid var(--gs-rule,#d6dcd4);color:var(--gs-muted,#5b665e);white-space:nowrap}
+.gs-badge.gs-on{border-color:var(--gs-accent,#1e6b39);color:var(--gs-accent,#1e6b39)}
+.gs-state,.gs-text{margin:0}
+.gs-note{margin:0;font-size:13px;color:var(--gs-muted,#5b665e)}
+.gs-note:empty{display:none}
+.gs-warn,.gs-note.gs-warn{color:var(--gs-warn,#b4500f)}
+.gs-note a{color:inherit}
+
+.gs-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.gs-confirm{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center}
+.gs-choices{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.gs-choices .gs-btn{width:100%}
+.gs-token{display:flex;flex-direction:column;gap:6px;padding-top:6px;border-top:1px dashed var(--gs-rule,#d6dcd4)}
+.gs-note.gs-done{color:var(--gs-accent,#1e6b39);font-weight:600}
+.gs-help{font-size:13px;color:var(--gs-muted,#5b665e)}
+.gs-help summary{display:flex;align-items:center;min-height:44px;cursor:pointer;font-weight:600;font-size:14px;color:var(--gs-ink,#18201b);list-style:none}
+.gs-help summary::-webkit-details-marker{display:none}
+.gs-help summary::before{content:"\25B8";flex:none;width:1em;margin-right:4px;font-size:14px}
+.gs-help[open] summary::before{content:"\25BE"}
+.gs-help summary:focus-visible{outline:3px solid var(--gs-accent,#1e6b39);outline-offset:2px;border-radius:6px}
+.gs-help ol{margin:0 0 4px;padding-left:22px;display:flex;flex-direction:column;gap:4px}
+.gs-help li{overflow-wrap:anywhere}
+.gs-help strong{color:var(--gs-ink,#18201b);font-weight:600}
+.gs-help a{color:inherit}
+.gs-help code{font:12px/1.3 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.gs-add{display:flex;flex-direction:column;gap:6px}
+.gs-label{font-weight:600;font-size:14px}
+.gs-input{flex:1 1 14em;min-width:0;min-height:44px;padding:8px 10px;border-radius:10px;border:1px solid var(--gs-rule,#d6dcd4);
+  background:transparent;color:inherit;font:inherit;font-size:16px}   /* 16px: iOS doesn't zoom into the field */
+.gs-btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:8px 14px;border-radius:10px;
+  border:1px solid var(--gs-rule,#d6dcd4);background:transparent;color:inherit;font:inherit;font-size:14px;cursor:pointer;text-decoration:none}
+.gs-btn:hover{background:color-mix(in srgb,currentColor 7%,transparent)}
+.gs-btn:disabled{opacity:.5;cursor:default}
+.gs-btn.gs-primary{background:var(--gs-accent,#1e6b39);border-color:var(--gs-accent,#1e6b39);color:var(--gs-on-accent,#fff);font-weight:600}
+.gs-btn.gs-danger{border-color:var(--gs-danger,#b3261e);color:var(--gs-danger,#b3261e);font-weight:600}
+.gs-btn.gs-quiet{border-color:transparent}
+.gs-btn:focus-visible,.gs-x:focus-visible,.gs-input:focus-visible{outline:3px solid var(--gs-accent,#1e6b39);outline-offset:2px}
+
+@media (max-width:520px){
+  .gs{padding:0}
+  .gs-card{width:100%;height:100%;max-height:none;border-radius:0;border:0}
+  .gs-head{padding-top:max(10px,env(safe-area-inset-top,0px))}
+  .gs-body{padding:12px 12px max(14px,env(safe-area-inset-bottom,0px))}
+}

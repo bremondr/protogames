@@ -114,7 +114,10 @@ test('the Project panel holds the name and three buttons: Export, Share and Load
     const panel = /<section class="panel" aria-labelledby="project-title">([\s\S]*?)<\/section>/.exec(html);
     assert.ok(panel, 'one Project panel');
     assert.ok(panel[1].includes('id="projectNameInput"'));
-    const buttons = [...panel[1].matchAll(/<button\b[^>]*id="([^"]+)"[^>]*>/g)].map((m) => m[1]);
+    // The GitHub repo block (repo.js) is hidden until a repo is followed, so most people see only the three buttons.
+    const repoBlock = /<div class="repo-block" id="repoBlock" hidden>[\s\S]*?<\/div>\s*<\/div>/.exec(panel[1]);
+    assert.ok(repoBlock, 'the repo block starts hidden');
+    const buttons = [...panel[1].replace(repoBlock[0], '').matchAll(/<button\b[^>]*id="([^"]+)"[^>]*>/g)].map((m) => m[1]);
     assert.deepEqual(buttons, ['exportButton', 'shareButton', 'loadProjectBtn']);
     assert.ok(!html.includes('File Management') && !html.includes('id="files-title"'), 'File Management is part of the Project panel now');
     for (const old of ['saveProjectBtn', 'exportPNGBtn', 'exportSVGBtn', 'printButton', 'newProjectButton', 'allProjectsLink']) {

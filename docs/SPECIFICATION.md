@@ -10,7 +10,7 @@ Purpose: the reference for every format and rule that other code, and other peop
 2. [Country boards](#country-boards) and [Infinite boards](#infinite-boards)
 3. [The v1 to v2 colour map](#v1-to-v2-colour-map)
 4. [Projects in the browser](#projects-in-the-browser) and [what is stored where](#what-is-stored-in-the-browser)
-5. [Share link format](#share-link-format)
+5. [Share link format](#share-link-format) and [Projects in GitHub repos](#projects-in-github-repos)
 6. [Boards built from the middle: centre and size](#boards-built-from-the-middle-centre-and-size)
 7. [Generator versions](#generator-versions) and [Square and rectangle boards](#square-and-rectangle-boards)
 8. [Themes and item sets](#themes-and-item-sets)
@@ -209,7 +209,7 @@ Tests: `tests/projectLibrary.test.js`, `tests/fileManager.test.js`, `tests/main.
 
 ### What is stored in the browser
 
-Everything the app keeps is in `localStorage` (no cookies, no `sessionStorage`, no IndexedDB). Every access is wrapped so that blocked storage never stops the app.
+Everything the app keeps is in `localStorage` (no cookies). The exceptions are the GitHub repos feature: git-store-kit keeps the last good copy of each followed repo in IndexedDB (database `git-store-kit`), and the dev-only practice GitHub uses `sessionStorage` (see "Projects in GitHub repos"). Every access is wrapped so that blocked storage never stops the app.
 
 | Key | Holds | Code |
 |---|---|---|
@@ -222,6 +222,9 @@ Everything the app keeps is in `localStorage` (no cookies, no `sessionStorage`, 
 | `protogames_minimap` | `on` or `off`; absent: on, except on windows narrower than 700 px | `app/js/viewControls.js` |
 | `protogames_color_view` | `on` for the colours-only view, `off` for textures | `app/js/viewControls.js` |
 | `protogames_eraser_size` | the eraser's own size, 1 to 7 | `app/js/interactions.js` |
+| `protogames:git-store:sources`, `protogames:git-store:tokens` | the followed GitHub repos, and a token per repo (see "Projects in GitHub repos") | `app/vendor/git-store-kit/store.js` |
+| `protogames_repo_links` | which project of this browser is which file of a repo | `app/repo-projects.js` |
+| `protogames-practice:…`, `protogames_repo_links_practice` | the same for the dev-only practice GitHub | `app/repo.js` |
 
 Selected tool, palette and brush size are not remembered between sessions, except through the open project (`currentColor`, `paletteId`, `isEraserActive`). A preview prefixes every key with `preview:pr-<n>:`.
 
@@ -259,6 +262,22 @@ A link in the address when the editor starts, or pasted into an already open tab
 Links are not capped in length, but the dialog warns: a note above 2,000 characters and a stronger one above 8,000 (rules of thumb for chat and email apps), always with a "Download project file instead" button. The link stays copyable at every size.
 
 When the link format changes, bump `v` (and keep reading the old one), or, if only the project format changed, nothing is needed here: `f` already routes old links through the project migrations. `tests/shareLink.test.js` covers both.
+
+## Projects in GitHub repos
+
+A project can also live in a GitHub repository, as one file with the history of every version. The kit is git-store-kit from [bremondr/web-kit](https://github.com/bremondr/web-kit) (copied into `app/vendor/git-store-kit/`, version in `vendor.json`), used in its *working folder* mode. The project's code is `app/repo-projects.js` (no DOM; `tests/repoProjects.test.js`) and `app/repo.js` (the page).
+
+- **Files.** Each project is `projects/<id>.json` in the repo's default branch. The content is a project file export (`version`, `projectName`, `created`, `appState`, as "Project file" above), written as JSON indented by two spaces with a newline at the end, so that GitHub's history shows what changed. `created` stays what it was when the file was made. `<id>` is the file name: letters, digits, `-` and `_`, up to 64; a new project gets its name in lower case with `-` for everything else (`Île de Ré` → `ile-de-re`, then `-2`, `-3` if taken), a copy made after a conflict `<name>-copy-<4 letters>`. Other files in the folder (a README, pictures) are ignored.
+- **Reading.** Every file goes through `ProjectFormat.parse`, like a file the person imports: older formats are upgraded, a file from a newer version of the app or one that is not a valid project is left out (the panel counts them). A public repo is read with no token (file contents from `raw.githubusercontent.com`, checked against git's hash); a private one needs a token.
+- **Size.** "Save to repo" refuses a file over 5 MB (`MAX_BYTES`). Indented, a board takes about 1 KB per tile, so the kit's default of 1 MB would refuse a 30 × 30 board already; 5 MB is about 5,000 tiles, more than the browser's storage keeps for one project in practice.
+- **Opening** a project from a repo (Load… > From a GitHub repo) makes it a project of this browser, linked to the file, and edited and autosaved like any other. Opening the same file again goes to that project; if the repo has a newer version, the project takes it, and if the project also has edits that are not in the repo, the person chooses: open their copy, or replace it with the newest.
+- **Saving** happens only on **Save to repo** (Project panel), with an optional note that becomes the commit message (otherwise `Update “<name>”`). It says which version it replaces; if the file changed meanwhile the kit's panel asks: overwrite with mine, keep theirs (the board takes the repo's version), or save mine as a copy (and the project saves to the copy from then on). Nothing is lost either way: git keeps every version.
+- **Links** are in `protogames_repo_links`: `{<project id>: {repo, id, sha, created, content, commit, at, saved}}`. `sha` is the version of the file the project was opened at or last saved as; `content` is a fingerprint of the design then (name, board settings, palette, players, dice and the painted tiles, but not where the tiles are drawn, which depends on the window), to tell whether it was edited since. Every entry is checked when it is read.
+- **History** (Project panel) lists the file's versions (note, date, author, commit). **Open** shows one as a picture, read only, with "Open as a new project" (an unlinked copy) and, for editors, "Restore this version", which saves it as the newest version and puts it on the board (after asking if the board has edits that are not in the repo).
+- **Following.** `app/#repo=owner/name` (also on the landing page, which forwards it) follows the repo on this device and tidies the address; at start-up without a project, the Load dialog lists its projects first and a new project is named only if none is chosen. The repo panel (**Repos and tokens…**) follows more by name, removes them, reloads them, and holds the tokens.
+- **Tokens** are fine-grained GitHub tokens, one per repo and device, pasted in the panel (which shows the steps): Contents: Read and write to save, Read-only to read a private repo. They are kept in `localStorage` under `protogames:git-store:tokens` and sent only to `api.github.com`. Previews prefix `localStorage`, so a token pasted on the live site is not used by a preview (the saved copies in IndexedDB are not prefixed).
+- **Content-Security-Policy.** `connect-src` allows `https://api.github.com https://raw.githubusercontent.com`.
+- **Practice (dev only).** `app/?fake-github` runs all of this against the kit's fake GitHub in the tab (`app/repo-practice.js`), with two sample repos made from the showcases (`practice/game-design`, public, and `practice/class-library`, private) and the tokens to paste shown in the header's **Practice GitHub** dialog, which can also change the open project "on another device" (to see the conflict question). Saves are replayed after a reload from `sessionStorage`; `?fake-github=off` turns it off.
 
 ## Boards built from the middle: centre and size
 

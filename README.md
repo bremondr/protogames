@@ -22,6 +22,7 @@ Protogames lets designers sketch and iterate on board layouts quickly—no build
 - Export options: PNG at 1× to 4× the size on screen, with or without textures, objects, grid lines, on a transparent or white background; SVG (flat colours, or with textures embedded as pictures) with or without objects and start markers, grid lines, background; the borders between countries of a region board are always drawn
 - Print: the **Print** tab of Export… makes a PDF at a real-world tile size (in mm): split across A4 / Letter / A3 home-printer pages with overlap, page labels and assembly hints, or one large sheet (fit to board, A3–A0) with crop marks; objects on the board, as cut-out tokens, or both; optional legend of the terrains and objects used; a live preview shows how the board sits on the paper. Settings are remembered per browser.
 - Sharing: **Share Link** puts the whole board in the address (nothing is uploaded); whoever opens it gets their own copy
+- GitHub repos: keep projects in a GitHub repository, one file each, and **Save to repo** writes a new version as one commit with an optional note; **History** shows, opens and restores earlier versions. A link `app/#repo=owner/name` lets playtesters follow the repo and open its projects (see [Projects in GitHub repos](#projects-in-github-repos))
 - Playtest: the play button locks editing so the board can be played on; pan and zoom keep working, **Esc** or the pill returns to editing. With **players** defined (a colour, a seat at one screen edge and a set of pieces each) and **start markers** painted on the map, every player gets a tray at their seat, turned to face outwards: click a piece to send it to a free start, drag it anywhere, roll the design's dice (d3 to d20) from the tray, undo moves, reset the game. Several people can move pieces at once on a touch screen. See [docs/PLAYTEST.md](docs/PLAYTEST.md)
 - Layout: the tools sit in a column at the right edge, under the full screen and playtest buttons; their settings open to the left
 - Input: Mouse, touch, stylus; responsive layout
@@ -69,6 +70,16 @@ The cluster in the bottom-right corner has zoom out / in, the zoom level (click 
 - **Print at real scale:** **Export…** > **Print**. Set the tile size in mm and choose **Home printer** (pages of A4, Letter or A3 that you tape together; overlap, page labels and assembly hints) or **Single sheet** (fit to board, or A3, A2, A1, A0, with crop marks). Print the PDF at 100% ("actual size", not "fit to page"). Choose whether objects stay on the board, become cut-out tokens, or both, and whether to add a legend.
 - **Examples:** the landing page links to showcase maps (a fantasy landscape, chess, island settlers, triangle peg solitaire, Chinese checkers); they open as new projects of your own.
 - **Themes and item sets** are stored in the browser, not inside projects or links (see below).
+
+### Projects in GitHub repos
+A game design can live in a GitHub repository: each project is one file, `projects/<id>.json` (a project file, indented so GitHub's history shows what changed), and every save is a commit.
+- **Follow a repo** with a link, `https://protogames.eu/app/#repo=owner/name` (**Copy link** next to a repo in Load… makes one), or under **Load…** > **Repos and tokens…**. Its projects are listed in **Load…** > **From a GitHub repo**.
+- **Open** one: it becomes a project of this browser, edited and autosaved as usual.
+- **Save to repo** (Project panel) writes it back as one commit, only when you tap it, with an optional note. If the file changed meanwhile, you choose: overwrite, keep theirs, or save yours as a copy. A project that is not in a repo yet can be saved to one of the repos you can write to.
+- **History** lists the versions; open one to look at it (read only), open it as a new project, or restore it.
+- **Public or private.** Anyone can read a public repo without a token. Saving, and reading a private repo, needs a fine-grained token for that repo, pasted once per device in the panel, which shows how to make one. Playtesters of a private repo need a read-only token.
+
+To set up a repo: make a repository on GitHub with a `projects/` folder (a `README.md` in it is enough), public or private; then make a fine-grained token (Settings → Developer settings → Fine-grained tokens: only that repository, Contents: Read and write) and paste it in the app. The details, limits (5 MB per file) and formats are in [docs/SPECIFICATION.md](docs/SPECIFICATION.md#projects-in-github-repos). To try it without GitHub, open `app/?fake-github` (dev only): a fake GitHub in the tab, with sample repos and the tokens to paste in the header's **Practice GitHub** dialog.
 
 ### Themes and item sets
 The **Themes** panel in the sidebar has two groups, **Tile themes** (a colour palette whose tiles may have a texture picture) and **Item sets** (the pictures of placeable objects). For each: **Create** opens an editor in the app, the file button imports a `.json` file or plain images (an image becomes a tile or an item named after its file), the export button saves a theme as JSON, and **JSON template** downloads an example to edit:
@@ -134,6 +145,8 @@ protogames/
 │  │  ├─ ui.js
 │  │  ├─ utils.js
 │  │  └─ main.js
+│  ├─ feedback.js, repo.js, repo-projects.js, repo-practice.js  (modules using the vendored web-kit modules)
+│  ├─ vendor/            (feedback-kit, git-store-kit: copies of web-kit releases, see vendor.json)
 │  ├─ showcases/         (example .protogames.json projects)
 │  ├─ images/            (the logo and the favicon)
 │  └─ data/              (countries-50m.json: outlines for the Country shape; its README has source and licence)
@@ -217,6 +230,8 @@ versions in `vendor.json`. Don't edit them here: change the module in web-kit, r
 `node tools/update-vendor.mjs` (or wait for the daily "Update vendored modules" pull request).
 
 The header's **Send feedback** button uses one of them, `feedback-kit`: a panel with a picture of the board to draw on, and a link to a new GitHub issue (label `feedback`) filled in with what was on screen and a link that reopens the board. The project's side of it is `app/feedback.js`, a module outside `app/js/` (whose files are the classic scripts `index.html` lists in order).
+
+The GitHub repos feature uses `git-store-kit`: the project's side is `app/repo-projects.js` (the store, the project format and the links, without a page; tested in `tests/repoProjects.test.js` against the kit's fake GitHub), `app/repo.js` (the Project panel's repo block, the Load dialog's list, Save to repo, History) and `app/repo-practice.js` (the dev-only practice GitHub, `?fake-github`).
 
 ### Continuous integration
 `.github/workflows/test.yml` runs `npm test` on every push to `main` and on every pull request, so a failing test fails the check.
