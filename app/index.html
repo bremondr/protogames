@@ -6,8 +6,10 @@
     <!-- Limits what injected markup could do. Scripts: this site and the analytics script only (the page has
          no inline scripts). Styles allow 'unsafe-inline' because the page and theme swatches set style attributes.
          Images: data: and blob: for textures and objects, https: for theme images given as web addresses.
+         Connections: this site, blob: (the Send feedback picture reads the page's own blob: textures and item images
+         to draw them; a blob: URL is made by the page itself and cannot send anything anywhere) and the analytics hosts.
          Not a header, so frame-ancestors cannot be set. See docs/DEPLOYMENT.md. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://scripts.simpleanalyticscdn.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://queue.simpleanalyticscdn.com https://*.simpleanalyticscdn.com; object-src 'none'; base-uri 'self'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://scripts.simpleanalyticscdn.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' blob: https://queue.simpleanalyticscdn.com https://*.simpleanalyticscdn.com; object-src 'none'; base-uri 'self'; form-action 'none'">
     <title>Protogames</title>
     <link rel="icon" href="images/favicon.ico" sizes="16x16 32x32 48x48">
     <link rel="icon" type="image/png" href="images/protogames%20proto%20logo.png">

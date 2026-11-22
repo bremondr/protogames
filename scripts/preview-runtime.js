@@ -58,6 +58,8 @@
     function showBadge(info, doc) {
         const badge = doc.createElement('div');
         badge.setAttribute('role', 'note');
+        // Left out of the Send feedback picture (feedback-kit skips what has this attribute): it is not part of the app.
+        badge.setAttribute('data-fk-skip', '');
         badge.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:9998;display:flex;align-items:center;gap:8px;'
             + 'padding:6px 8px 6px 12px;border-radius:999px;background:#7a3e00;color:#fff;font:600 12px/1.2 system-ui,sans-serif;'
             + 'box-shadow:0 4px 14px rgba(0,0,0,.35)';
