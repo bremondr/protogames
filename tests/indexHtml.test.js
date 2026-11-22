@@ -58,6 +58,12 @@ test('a Content-Security-Policy limits scripts to this site and the analytics sc
     assert.ok(policy['img-src'].includes('data:') && policy['img-src'].includes('blob:'), 'textures and objects are data and blob images');
     assert.ok(policy['style-src'].includes("'unsafe-inline'"), 'style attributes are used');
     assert.deepEqual(policy['object-src'], ["'none'"]);
+    // Connections go to this site and the analytics hosts, plus blob: (the page's own textures and item images, which the
+    // Send feedback picture reads to draw them). Never to another host: that is what keeps injected markup from sending data out.
+    assert.ok(policy['connect-src'].includes("'self'") && policy['connect-src'].includes('blob:'), 'the feedback picture can read blob: images');
+    // GitHub's API and raw files serve the projects kept in repos (repo.js, git-store-kit); nothing else is reached.
+    const github = ['https://api.github.com', 'https://raw.githubusercontent.com'];
+    assert.ok(policy['connect-src'].every((source) => ["'self'", 'blob:', ...github].includes(source) || /^https:\/\/(\*\.|[a-z0-9-]+\.)+simpleanalyticscdn\.com$/.test(source)), 'connect-src names no other host');
     // The policy only holds if the page really has no inline script or event handler attributes.
     const scripts = [...html.matchAll(/<script\b([^>]*)>/gi)].map((m) => m[1]);
     assert.ok(scripts.every((attrs) => /\bsrc=/.test(attrs)), 'every script is external');

@@ -3356,8 +3356,15 @@ kbd {
 .repo-buttons {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
+    align-items: center;
+    gap: 0.5rem 1rem;
     margin-top: 0.25rem;
+}
+
+.repo-guide {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
 }
 
 .modal.repo-dialog {

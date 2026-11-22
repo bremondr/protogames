@@ -27,6 +27,8 @@ import { hashValue, hashWithout } from './vendor/git-store-kit/sources.js';
 import { contentHash, createLinks, createProjectStore, FOLDER, LINKS_KEY, MAX_BYTES, PARAM, uniqueId } from './repo-projects.js';
 
 const PRACTICE_KEY = 'protogames_fake_github';
+/** The setup guide for people (creating the repo, the token, playtesters), linked from the Load dialog. */
+const GUIDE_URL = 'https://github.com/bremondr/protogames/blob/main/docs/GITHUB-REPOS.md';
 
 /* ---- practice mode (dev only): ?fake-github turns it on for this tab, ?fake-github=off turns it off ---- */
 function practiceWanted() {
@@ -488,6 +490,7 @@ function renderLoad() {
     if (!sources.length) {
         kids.push(h('p', { class: 'field-hint', text: 'Keep projects in a GitHub repository: every save is a commit, with the history of every version. Follow a repo to open its projects.' }));
     }
+    const guide = h('a', { class: 'link-button repo-guide', href: GUIDE_URL, target: '_blank', rel: 'noopener', text: 'How to set up a repo' });
     for (const s of sources) {
         const need = !s.loading && tokenNeed(s, { label: 'repo' });
         const status = s.loading && !s.loadedAt ? 'Loading…'
@@ -515,7 +518,8 @@ function renderLoad() {
         }
     }
     kids.push(h('div', { class: 'repo-buttons' },
-        h('button', { type: 'button', class: 'secondary-button', text: sources.length ? 'Repos and tokens…' : 'Follow a repo…', onclick: () => panel.open() })));
+        h('button', { type: 'button', class: 'secondary-button', text: sources.length ? 'Repos and tokens…' : 'Follow a repo…', onclick: () => panel.open() }),
+        guide));
     box.replaceChildren(...kids);
 }
 
