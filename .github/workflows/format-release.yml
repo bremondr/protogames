@@ -1,0 +1,46 @@
+# Keeps the Releases section of the repository in step with the project file format: whenever main has a
+# format version (ProjectFormat.CURRENT_VERSION) that has no release yet, this creates the release
+# "format-v<N>" with the History row from docs/SPECIFICATION.md as its notes. GitHub shows the newest
+# release in the repository's sidebar, so it always names the current format version.
+#
+# Releases are never edited or deleted here, and an existing one is left alone. A version that was
+# already released stays as it is (formats only move forward: see "Changing the format" in the spec).
+
+name: Format release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - app/js/projectFormat.js
+      - docs/SPECIFICATION.md
+      - tools/format-release.mjs
+      - .github/workflows/format-release.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Create the release for the current format version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(node tools/format-release.mjs tag)
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "$tag already has a release."
+            exit 0
+          fi
+          node tools/format-release.mjs notes > "$RUNNER_TEMP/notes.md"
+          gh release create "$tag" \
+            --target "$GITHUB_SHA" \
+            --title "Project file format v${tag#format-v}" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            --latest

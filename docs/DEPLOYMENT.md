@@ -6,7 +6,7 @@ Purpose: how Protogames is published (production and per-pull-request previews),
 
 ## Contents
 
-[Versions and addresses](#versions-and-addresses) · [Where the build comes from](#where-the-build-comes-from) · [Custom domain](#custom-domain) · [How to try something out](#how-to-try-something-out) · [What the workflow does](#what-the-workflow-does) · [What is different in a preview](#what-is-different-in-a-preview) · [Security](#security) · [Setting it up](#setting-it-up-once) · [The landing page](#the-landing-page)
+[Versions and addresses](#versions-and-addresses) · [Where the build comes from](#where-the-build-comes-from) · [Custom domain](#custom-domain) · [How to try something out](#how-to-try-something-out) · [What the workflow does](#what-the-workflow-does) · [Format releases](#format-releases) · [What is different in a preview](#what-is-different-in-a-preview) · [Security](#security) · [Setting it up](#setting-it-up-once) · [The landing page](#the-landing-page)
 
 ## Versions and addresses
 
@@ -76,6 +76,10 @@ python -m http.server 8000 --bind 127.0.0.1 --directory _site
 ```
 
 `_site/`, `previews.json` and `build-summary.json` are ignored by git. To run the editor without building anything, serve the repository root (`python -m http.server 8000 --bind 127.0.0.1`) and open `/` (landing page) or `/app/` (editor); showcases and country outlines are fetched, so opening `app/index.html` as a file is not enough for them. The tests need Node.js 22 or newer.
+
+## Format releases
+
+`.github/workflows/format-release.yml` ("Format release") keeps the repository's Releases section in step with the project file format. When `main` has a `ProjectFormat.CURRENT_VERSION` without a release, it creates the release `format-v<N>` (marked latest), with the matching row of the History table in `docs/SPECIFICATION.md` as its notes, so the repository sidebar always names the current format version. It runs on pushes to `main` that touch the format, the specification or the workflow itself, and by hand (`workflow_dispatch`, which also creates the first release, `format-v8`). An existing release is never changed. `node tools/format-release.mjs` prints the tag and notes it would use. Bumping the format therefore needs a History row in the specification, and `tests/formatRelease.test.js` fails without one.
 
 ## What is different in a preview
 
