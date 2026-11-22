@@ -61,7 +61,9 @@ test('a Content-Security-Policy limits scripts to this site and the analytics sc
     // Connections go to this site and the analytics hosts, plus blob: (the page's own textures and item images, which the
     // Send feedback picture reads to draw them). Never to another host: that is what keeps injected markup from sending data out.
     assert.ok(policy['connect-src'].includes("'self'") && policy['connect-src'].includes('blob:'), 'the feedback picture can read blob: images');
-    assert.ok(policy['connect-src'].every((source) => ["'self'", 'blob:'].includes(source) || /^https:\/\/(\*\.|[a-z0-9-]+\.)+simpleanalyticscdn\.com$/.test(source)), 'connect-src names no other host');
+    // GitHub's API and raw files serve the projects kept in repos (repo.js, git-store-kit); nothing else is reached.
+    const github = ['https://api.github.com', 'https://raw.githubusercontent.com'];
+    assert.ok(policy['connect-src'].every((source) => ["'self'", 'blob:', ...github].includes(source) || /^https:\/\/(\*\.|[a-z0-9-]+\.)+simpleanalyticscdn\.com$/.test(source)), 'connect-src names no other host');
     // The policy only holds if the page really has no inline script or event handler attributes.
     const scripts = [...html.matchAll(/<script\b([^>]*)>/gi)].map((m) => m[1]);
     assert.ok(scripts.every((attrs) => /\bsrc=/.test(attrs)), 'every script is external');
@@ -118,7 +120,10 @@ test('the Project panel holds the name and three buttons: Export, Share and Load
     const panel = /<section class="panel" aria-labelledby="project-title">([\s\S]*?)<\/section>/.exec(html);
     assert.ok(panel, 'one Project panel');
     assert.ok(panel[1].includes('id="projectNameInput"'));
-    const buttons = [...panel[1].matchAll(/<button\b[^>]*id="([^"]+)"[^>]*>/g)].map((m) => m[1]);
+    // The GitHub repo block (repo.js) is hidden until a repo is followed, so most people see only the three buttons.
+    const repoBlock = /<div class="repo-block" id="repoBlock" hidden>[\s\S]*?<\/div>\s*<\/div>/.exec(panel[1]);
+    assert.ok(repoBlock, 'the repo block starts hidden');
+    const buttons = [...panel[1].replace(repoBlock[0], '').matchAll(/<button\b[^>]*id="([^"]+)"[^>]*>/g)].map((m) => m[1]);
     assert.deepEqual(buttons, ['exportButton', 'shareButton', 'loadProjectBtn']);
     assert.ok(!html.includes('File Management') && !html.includes('id="files-title"'), 'File Management is part of the Project panel now');
     for (const old of ['saveProjectBtn', 'exportPNGBtn', 'exportSVGBtn', 'printButton', 'newProjectButton', 'allProjectsLink']) {

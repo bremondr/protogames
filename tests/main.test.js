@@ -8,9 +8,10 @@ const { makeUI } = require('./support/fakes');
  * Start-up opens, in this order: a shared link, a showcase, the project the address names, and otherwise a new
  * project that has to be named. Each step that opens something ends the start-up.
  */
-function fresh({ hasLink = false, linkResult = true, showcase = null, showcaseResult = true, projectId = null, projectResult = true } = {}) {
+function fresh({ hasLink = false, linkResult = true, showcase = null, showcaseResult = true, projectId = null, projectResult = true, repo = undefined } = {}) {
     const log = [];
     const app = loadApp(['app/js/main.js'], {
+        ...(repo === undefined ? {} : { RepoProjects: repo }),
         document: { addEventListener() {} },
         window: { addEventListener() {} },
         Utils: { debounce: (fn) => fn },
@@ -29,7 +30,7 @@ function fresh({ hasLink = false, linkResult = true, showcase = null, showcaseRe
             openShowcase: async (id) => { log.push('showcase:' + id); return showcaseResult; },
             projectIdFromUrl: () => projectId,
             openStoredProject: (id) => { log.push('project:' + id); return projectResult; },
-            startNewProject: () => log.push('new')
+            startNewProject: (options) => { log.push('new'); if (options && options.chooseFirst) options.chooseFirst(() => log.push('ask name')); }
         }
     });
     return { log, Main: app.run('Main') };
@@ -113,4 +114,19 @@ test('a resize to a new size lays the board out again and keeps an unsaved chang
     const clean = resizeEnv({ width: 700, height: 600, changed: true });
     clean.Main.handleResize();
     assert.equal(clean.state.isDirty, false);
+});
+
+test('after a link to a GitHub repo, the new project offers the repo\'s projects before asking for a name', async () => {
+    const offered = [];
+    const env = fresh({ repo: { followedFromLink: 'designer/game-design', offerOnStart: (askName) => { offered.push('offer'); askName(); } } });
+    await env.Main.startBoard();
+    assert.deepEqual(offered, ['offer']);
+    assert.deepEqual(env.log, ['import', 'new', 'ask name']);
+    // a project in the address still opens first; without a link nothing is offered
+    const project = fresh({ projectId: 'abcdef-1', repo: { followedFromLink: 'designer/game-design', offerOnStart: () => offered.push('again') } });
+    await project.Main.startBoard();
+    assert.deepEqual(project.log, ['import', 'project:abcdef-1']);
+    const none = fresh({ repo: { followedFromLink: null, offerOnStart: () => offered.push('again') } });
+    await none.Main.startBoard();
+    assert.deepEqual(offered, ['offer']);
 });

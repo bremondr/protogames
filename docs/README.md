@@ -16,6 +16,7 @@ Every document in `docs/`, what it is for, whether it can be trusted as current,
 |---|---|---|---|
 | [SPECIFICATION.md](SPECIFICATION.md) | Formats other code and saved files depend on: project file, share link, versions, migrations. | Current | see the document |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | How the site is built, hosted and released; CI and checks. | Current | see the document |
+| [GITHUB-REPOS.md](GITHUB-REPOS.md) | Setup guide for keeping projects in a GitHub repo: creating the repo, the token, sharing with playtesters, troubleshooting. | Current | 2026-11-22 |
 | [PLAYTEST.md](PLAYTEST.md) | How playtest works: players, start markers, trays, pieces, dice; how it is built; known gaps. | Current | see the document |
 | [TILE_GENERATION_EXPLANATION.md](TILE_GENERATION_EXPLANATION.md) | How tiles and maps are generated. | Current | see the document |
 

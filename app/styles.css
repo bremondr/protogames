@@ -39,6 +39,17 @@
     --fk-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     --fk-display: var(--fk-font);
     --fk-z: 10000;
+    /* The GitHub repos panel (vendor/git-store-kit), dark like the app's dialogs and above them (it opens over Load…). */
+    --gs-surface: #1f2430;
+    --gs-ink: #f4f4f4;
+    --gs-muted: rgba(255, 255, 255, 0.68);
+    --gs-rule: rgba(255, 255, 255, 0.16);
+    --gs-accent: var(--color-accent);
+    --gs-on-accent: #ffffff;
+    --gs-warn: #ffb27a;
+    --gs-danger: #ff8a8a;
+    --gs-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --gs-z: 10000;
 }
 
 /* ==============================================================
@@ -3241,4 +3252,224 @@ kbd {
 
 .load-dialog .theme-editor-head {
     padding: 0 0 0.25rem;
+}
+
+/* GitHub repos (repo.js): the Project panel's block, the Load dialog's list, the save and version dialogs */
+.repo-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.repo-where {
+    margin: 0;
+    font-size: 0.85rem;
+    overflow-wrap: anywhere;
+}
+
+.repo-where a {
+    color: #8fb3ff;
+}
+
+.repo-state {
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.5rem;
+    align-items: baseline;
+}
+
+.repo-state:empty {
+    display: none;
+}
+
+.repo-warn {
+    color: #ffb27a;
+}
+
+.repo-block-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.repo-panel-link {
+    align-self: flex-start;
+    min-height: 32px;
+}
+
+.load-repo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.load-repo .field-hint {
+    margin: 0;
+}
+
+.repo-source {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    margin-top: 0.25rem;
+}
+
+.repo-source + .repo-source {
+    margin-top: 0.6rem;
+}
+
+.repo-source-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.repo-source-name {
+    color: #f4f4f4;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
+.repo-source .load-detail {
+    margin: 0;
+}
+
+.repo-source .link-button,
+.repo-source .repo-token {
+    min-height: 32px;
+}
+
+.repo-source .repo-token {
+    align-self: flex-start;
+}
+
+.load-list.repo-list {
+    max-height: 220px;
+}
+
+.repo-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+    margin-top: 0.25rem;
+}
+
+.repo-guide {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+}
+
+.modal.repo-dialog {
+    max-width: 460px;
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+}
+
+.repo-dialog .repo-head {
+    padding: 0 0 0.5rem;
+}
+
+.repo-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.repo-label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.repo-label .modal-input {
+    margin: 0;
+}
+
+.repo-select {
+    min-height: 44px;
+    font-size: 16px;
+}
+
+.repo-form .modal-actions {
+    margin-top: 0.4rem;
+}
+
+.modal.repo-version {
+    max-width: min(760px, 100%);
+}
+
+.repo-picture {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
+    max-height: min(60dvh, 520px);
+    margin: 0.25rem 0 1rem;
+    padding: 0.5rem;
+    border-radius: var(--radius-sm);
+    background: var(--color-canvas);
+}
+
+.repo-picture img {
+    display: block;
+    max-width: 100%;
+    max-height: calc(min(60dvh, 520px) - 1rem);
+    object-fit: contain;
+}
+
+.repo-picture .modal-note {
+    color: #1f2933;
+}
+
+.repo-actions {
+    flex-wrap: wrap;
+}
+
+/* Dev only: the practice GitHub (?fake-github) */
+.practice-pill {
+    border-style: dashed;
+    font-size: 0.8rem;
+}
+
+.practice-code {
+    display: block;
+    margin: 0 0 0.75rem;
+    padding: 0.4rem 0.5rem;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.08);
+    font: 0.78rem/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    overflow-wrap: anywhere;
+    user-select: all;
+}
+
+.practice-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.repo-block [hidden] {
+    display: none !important;
+}
+
+@media (max-width: 600px) {
+    .practice-pill {
+        padding: 0.3rem 0.5rem;
+        font-size: 0.7rem;
+        white-space: nowrap;
+    }
+
+    .practice-wide {
+        display: none;
+    }
 }

@@ -29,6 +29,8 @@ function visit(hash, search = '') {
 test('an old share link addressed to the site root is forwarded to the app with its hash', () => {
     assert.equal(visit('#b=abc_DEF-123'), 'app/#b=abc_DEF-123');
     assert.equal(visit('#b=xyz', '?x=1'), 'app/?x=1#b=xyz');
+    // a link to a GitHub repo of projects (app/repo.js) goes to the app as well
+    assert.equal(visit('#repo=designer/game-design'), 'app/#repo=designer/game-design');
 });
 
 test('ordinary visits and in-page anchors stay on the landing page', () => {
