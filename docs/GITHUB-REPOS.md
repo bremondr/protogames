@@ -49,7 +49,7 @@ Do steps 2 and 3 on every device you edit on. The token stays in that browser an
 - **Open** a project: **Load…** → **From a GitHub repo**. It becomes a project of this browser, autosaved as you work, as usual.
 - **Save to repo** (Project panel) writes a new version, only when you tap it. Add a note to say what changed; it becomes the commit message.
 - **If it changed meanwhile** (another device, someone else, an edit on GitHub), the app asks: **Overwrite with mine**, **Keep theirs, drop mine**, or **Save mine as a copy**. Nothing is lost either way: the other version stays in the history.
-- **History** (Project panel) lists the versions. **Open** shows one as a picture, read only, where you can **Open as a new project** or **Restore this version** (it becomes the newest version and goes on your board).
+- **History** (Project panel) lists the versions. **Restore…** on one makes it the newest version again and puts it on your board; **Open** shows one as a picture, read only, where you can also **Open as a new project**. If someone saved a newer version since you opened the project, restoring asks first (overwrite, keep theirs, or save as a copy). If your board has edits that are not in the repo, the picture view asks first, and a restore from the list keeps them as a new project, "<name> (before restoring)".
 - The Project panel says when the repo has a newer version than your board ("A newer version is in the repo. Open it").
 
 ## Share with playtesters

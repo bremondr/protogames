@@ -11,12 +11,18 @@
      const store = createGitStore({..., fetch: fake.fetch});
 
    fake.log lists every request, with the token left out. fake.offline = true makes every request fail as offline;
-   fake.staleRaw = true makes raw.githubusercontent.com serve each file's previous version, as its cache can. */
+   fake.staleRaw = true makes raw.githubusercontent.com serve each file's previous version, as its cache can.
+
+   fake.export() gives its state as plain JSON-safe data (repos, files, commits, tokens, the limit), and
+   fake.import(state) or createFakeGitHub({state}) puts it back: a practice mode can keep it in sessionStorage and
+   survive a reload. */
 import { fromBase64, gitBlobSha, toBase64 } from './github.js';
 
 const API = 'https://api.github.com', RAW = 'https://raw.githubusercontent.com';
 
-export function createFakeGitHub({limit = 60, now = () => Date.now()} = {}){
+const STATE_FORMAT = 'git-store-kit/fake-github@1';
+
+export function createFakeGitHub({limit = 60, now = () => Date.now(), state = null} = {}){
   const repos = new Map();    // lower-case 'owner/name' → {name, private, files: Map path → {text, sha}, commits: []}
   const tokens = new Map();   // token → Map repoKey → 'read' | 'write'
   const blobs = new Map();    // sha → text
@@ -55,6 +61,47 @@ export function createFakeGitHub({limit = 60, now = () => Date.now()} = {}){
   };
   fake.file = (name, path) => { const f = repos.get(name.toLowerCase()).files.get(path); return f ? JSON.parse(f.text) : null; };
   fake.commits = name => repos.get(name.toLowerCase()).commits.map(c => ({sha: c.sha, message: c.message, author: c.author, paths: c.paths}));
+
+  /* ---- saving and restoring the whole state ---- */
+  /** Everything the fake keeps, as plain data that survives JSON.stringify: repos with their files and commits (each
+      commit with the files as they were then), the tokens, and the limit. Not the request log or the switches. */
+  fake.export = () => {
+    const tree = files => Object.fromEntries([...files].map(([path, f]) => [path, f.sha]));
+    const used = new Set();
+    const out = {
+      format: STATE_FORMAT, counter,
+      limit: {limit: fake.limit, used: fake.used, resetAt: fake.resetAt},
+      repos: [...repos.values()].map(r => ({
+        name: r.name, private: r.private, files: tree(r.files),
+        commits: r.commits.map(c => ({sha: c.sha, date: c.date, author: c.author, message: c.message, paths: [...c.paths], tree: tree(c.tree)}))
+      })),
+      tokens: [...tokens].map(([token, access]) => ({token, repos: Object.fromEntries(access)})),
+      blobs: {}
+    };
+    for (const r of out.repos){ Object.values(r.files).forEach(sha => used.add(sha)); r.commits.forEach(c => Object.values(c.tree).forEach(sha => used.add(sha))); }
+    for (const sha of used) if (blobs.has(sha)) out.blobs[sha] = blobs.get(sha);
+    return out;
+  };
+  /** Replaces the fake's state with one fake.export() gave (also after JSON.parse). Throws when it isn't one. */
+  fake.import = data => {
+    if (!data || data.format !== STATE_FORMAT || !Array.isArray(data.repos) || !Array.isArray(data.tokens) || !data.blobs || typeof data.blobs !== 'object')
+      throw new Error('Not a state from fake.export()');
+    const text = sha => { if (typeof data.blobs[sha] !== 'string') throw new Error(`The state has no file for ${sha}`); return data.blobs[sha]; };
+    const tree = files => new Map(Object.entries(files || {}).map(([path, sha]) => [path, {text: text(sha), sha}]));
+    const nextRepos = new Map(), nextBlobs = new Map(), nextTokens = new Map();
+    for (const r of data.repos){
+      nextRepos.set(String(r.name).toLowerCase(), {name: String(r.name), private: !!r.private, files: tree(r.files),
+        commits: (r.commits || []).map(c => ({sha: c.sha, date: c.date, author: c.author, message: c.message, paths: [...(c.paths || [])], tree: tree(c.tree)}))});
+    }
+    for (const [sha, t] of Object.entries(data.blobs)) if (typeof t === 'string') nextBlobs.set(sha, t);
+    for (const {token, repos: access} of data.tokens) nextTokens.set(String(token), new Map(Object.entries(access || {})));
+    repos.clear(); nextRepos.forEach((v, k) => repos.set(k, v));
+    blobs.clear(); nextBlobs.forEach((v, k) => blobs.set(k, v));
+    tokens.clear(); nextTokens.forEach((v, k) => tokens.set(k, v));
+    counter = Number(data.counter) || 0;
+    if (data.limit){ fake.limit = Number(data.limit.limit) || fake.limit; fake.used = Number(data.limit.used) || 0; fake.resetAt = Number(data.limit.resetAt) || fake.resetAt; }
+    return fake;
+  };
 
   /* ---- answering ---- */
   const json = (status, body, headers = {}) => new Response(body == null ? null : JSON.stringify(body), {status, headers: {'content-type': 'application/json', ...headers}});
@@ -159,5 +206,6 @@ export function createFakeGitHub({limit = 60, now = () => Date.now()} = {}){
     return json(404, {message: 'Not Found'});
   }
 
+  if (state) fake.import(state);
   return fake;
 }

@@ -183,7 +183,6 @@ export function createLinks(storage, key = LINKS_KEY) {
  */
 export function createProjectStore({ ProjectFormat, cleanName, practice = false, fetch, cache, storage } = {}) {
     const codec = projectCodec(ProjectFormat, cleanName);
-    let lastName = 'project';
     const random = (n) => Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => 'abcdefghijklmnopqrstuvwxyz0123456789'[b % 36]).join('');
     const verbs = { add: 'Add', update: 'Update', remove: 'Remove', copy: 'Add a copy of', restore: 'Restore' };
     return createGitStore({
@@ -191,10 +190,10 @@ export function createProjectStore({ ProjectFormat, cleanName, practice = false,
         folder: FOLDER,
         param: PARAM,
         read: codec.read,
-        // write is called before any copy is made, so the copy's file is named after the project being saved
-        write: (item) => { lastName = item.name; return codec.write(item); },
+        write: codec.write,
         name: (item) => item.name,
-        newId: () => `${slugify(lastName).slice(0, 40)}-copy-${random(4)}`,
+        // a copy after a conflict is named after its project (the kit passes the item being copied)
+        newId: (item) => `${slugify(item && item.name).slice(0, 40)}-copy-${random(4)}`,
         commitMessage: ({ op, name, note }) => note || `${verbs[op] || 'Update'} “${name}”`,
         maxBytes: MAX_BYTES,
         ...(fetch ? { fetch } : {}),
