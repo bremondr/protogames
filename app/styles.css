@@ -153,11 +153,23 @@ button {
     background: rgba(255, 255, 255, 0.15);
 }
 
-/* Shorter than the other secondary buttons, so it sits comfortably in the 56px header. */
-.feedback-button {
+/* Send feedback: a quiet text button in the header (no fill or border until hovered or focused). The selector
+   is .app-header .feedback-button so it wins over .secondary-button, which is defined further down. */
+.app-header .feedback-button {
     min-height: 40px;
-    padding: 0.4rem 0.9rem;
+    padding: 0.4rem 0.75rem;
     white-space: nowrap;
+    font-weight: 500;
+    font-size: 0.9rem;
+    background: transparent;
+    border-color: transparent;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.app-header .feedback-button:hover,
+.app-header .feedback-button:focus-visible {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
 }
 
 .header-tagline {
