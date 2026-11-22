@@ -2,7 +2,7 @@
 
 ## countries-50m.json
 
-Country outlines for the **Country** board shape (`js/countryBoard.js`, regions in `js/countryRegions.js`). The editor fetches the file (`data/countries-50m.json`, relative to the page) the first time a country board has to be generated, never earlier; opening a saved country board does not need it (see "Country boards" in `docs/SPECIFICATION.md`). `scripts/build-site.js` publishes it with `app/` to production and to every preview.
+Country outlines for the **Country** board shape (`js/countryBoard.js`, regions in `js/countryRegions.js`). The editor fetches the file (`data/countries-50m.json`, relative to the page) the first time a country board has to be generated, never earlier; opening a saved country board does not need it (see "Country boards" in `docs/SPECIFICATION.md`). `tools/build-site.mjs` publishes it with `app/` to production and to every preview.
 
 - Source: [world-atlas](https://github.com/topojson/world-atlas) 2.0.2, file `countries-50m.json` (TopoJSON, 1:50 million scale), built from [Natural Earth](https://www.naturalearthdata.com/) data. Natural Earth is in the public domain; world-atlas is ISC-licensed.
 - Fetched from `https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json`, stored unchanged.

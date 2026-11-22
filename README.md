@@ -81,6 +81,8 @@ The **Themes** panel in the sidebar has two groups, **Tile themes** (a colour pa
 ## Deployment and previews
 `main` is published as the production site at `https://protogames.eu/` (landing page at the root, the editor at `/app/`); every open pull request from this repository (at most 20) is published as a preview under `/preview/pr-<number>/` (editor at `/preview/pr-<number>/app/`), with its own saved data and a badge, and the link is commented on the pull request. Production loads one third-party script, anonymous page-view analytics; previews and the landing page do not. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
+The build (`tools/build-site.mjs`, `tools/preview-runtime.js`) and the workflow (`.github/workflows/pages.yml`) are copies of web-kit's shared files (`consumer/` in [bremondr/web-kit](https://github.com/bremondr/web-kit)); don't edit them here. What is particular to Protogames is in `site.json`. They are copied again from web-kit when its `consumer/CHANGELOG.md` says so.
+
 ## Project Structure
 File paths such as `js/shortcuts.js` in this README and in `docs/` are relative to `app/`, where the editor lives.
 
@@ -140,7 +142,9 @@ protogames/
 ├─ tests/                (node:test suites, roughly one per module, plus generatorVersion, scriptOrder and
 │                         others that guard the whole app; fixtures/ of old file formats; support/ with load.js and fakes.js)
 ├─ dev/                  (geometry-gallery.html, geometry-checks.js, build-showcases.js: writes the board-game showcases)
-├─ scripts/              (build-site.js: assembles production + previews for Pages; preview-runtime.js: storage prefix and badge of a preview)
+├─ tools/                (update-vendor.mjs; build-site.mjs: assembles production + previews for Pages; preview-runtime.js: storage
+│                         prefix and badge of a preview. All three are copies from web-kit, see Deployment and previews)
+├─ site.json             (what the site build publishes and checks: see docs/DEPLOYMENT.md)
 ├─ .github/              (workflows/ test.yml and pages.yml, issue templates, FUNDING.yml)
 └─ docs/
    ├─ README.md          (index of all documents, each marked reference / research / proposal / archive)

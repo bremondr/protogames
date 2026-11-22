@@ -1,0 +1,9 @@
+{
+  "name": "Protogames",
+  "paths": ["index.html", "landing.js", "app"],
+  "pages": ["index.html", "app/index.html"],
+  "dropFromPreviews": ["simpleanalyticscdn"],
+  "checks": ["npm test"],
+  "global": "PG_BUILD",
+  "commentMarker": "<!-- protogames-preview -->"
+}

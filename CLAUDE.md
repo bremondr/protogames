@@ -15,3 +15,9 @@ The project's own code that uses a module stays outside the vendored folder (for
 Feedback from the app arrives as issues with the `feedback` label ("fix the open feedback issues" means those).
 Each one has a table of what was on screen (screen size, orientation, theme, browser, page) and, where the app
 makes one, a link that reopens the same view. The pasted picture shows only what the app drew, not the whole screen.
+
+## Site build and previews
+
+`tools/build-site.mjs`, `tools/preview-runtime.js` and `.github/workflows/pages.yml` are copies of web-kit's
+`consumer/` files. Don't edit them here: what is particular to Protogames goes in `site.json`, and a change the
+copies need is made in web-kit. Copy them again when web-kit's `consumer/CHANGELOG.md` says so. See `docs/DEPLOYMENT.md`.
