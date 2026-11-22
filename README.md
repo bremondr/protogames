@@ -216,7 +216,7 @@ A change to anything that is saved (project file, share link, board generator) f
 versions in `vendor.json`. Don't edit them here: change the module in web-kit, release it, then run
 `node tools/update-vendor.mjs` (or wait for the daily "Update vendored modules" pull request).
 
-The header's **Send feedback** button uses one of them, `feedback-kit`: a panel with a picture of the board to draw on, and a link to a new GitHub issue (label `feedback`) filled in with what was on screen and a link that reopens the board. The project's side of it is `app/feedback.js`, a module outside `app/js/` (whose files are the classic scripts `index.html` lists in order).
+The header's **Send feedback** button uses one of them, `feedback-kit`: a panel with a picture of the whole page to draw on (with a switch to just the board), and a link to a new GitHub issue (label `feedback`) filled in with what was on screen and a link that reopens the board. The project's side of it is `app/feedback.js`, a module outside `app/js/` (whose files are the classic scripts `index.html` lists in order).
 
 ### Continuous integration
 `.github/workflows/test.yml` runs `npm test` on every push to `main` and on every pull request, so a failing test fails the check.
