@@ -1,0 +1,7 @@
+{
+  "source": "bremondr/web-kit",
+  "dir": "app/vendor",
+  "modules": {
+    "feedback-kit": "1.0.1"
+  }
+}

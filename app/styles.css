@@ -27,6 +27,18 @@
     --shadow-soft: 0 4px 12px rgba(31, 41, 55, 0.08);
     --sidebar-width: clamp(240px, 22vw, 300px);
     --header-height: 56px;
+    /* The Send feedback panel (vendor/feedback-kit), in the app's colours. --fk-z is above the modals (9999). */
+    --fk-surface: var(--color-panel);
+    --fk-ink: var(--color-text);
+    --fk-muted: var(--color-muted);
+    --fk-rule: var(--color-border);
+    --fk-accent: var(--color-accent);
+    --fk-on-accent: #ffffff;
+    --fk-warn: var(--color-danger);
+    --fk-stage: var(--color-canvas);
+    --fk-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --fk-display: var(--fk-font);
+    --fk-z: 10000;
 }
 
 /* ==============================================================
@@ -139,6 +151,25 @@ button {
     height: 32px;
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.15);
+}
+
+/* Send feedback: a quiet text button in the header (no fill or border until hovered or focused). The selector
+   is .app-header .feedback-button so it wins over .secondary-button, which is defined further down. */
+.app-header .feedback-button {
+    min-height: 40px;
+    padding: 0.4rem 0.75rem;
+    white-space: nowrap;
+    font-weight: 500;
+    font-size: 0.9rem;
+    background: transparent;
+    border-color: transparent;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.app-header .feedback-button:hover,
+.app-header .feedback-button:focus-visible {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
 }
 
 .header-tagline {

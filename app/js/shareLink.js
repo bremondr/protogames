@@ -384,6 +384,11 @@ const ShareLink = (() => {
         $('shareDialog')?.classList.add('hidden');
     }
 
+    /** The link that opens the board as it is now (a promise of the address); the share dialog and the feedback panel both use it. */
+    async function currentLink() {
+        return urlFor(location.origin && location.origin !== 'null' ? location.origin + location.pathname : location.href, await encode(currentPayload()));
+    }
+
     async function openDialog() {
         const state = AppState.getState();
         if (!state.polygons.length) {
@@ -397,7 +402,7 @@ const ShareLink = (() => {
             return;
         }
         try {
-            currentUrl = urlFor(location.origin && location.origin !== 'null' ? location.origin + location.pathname : location.href, await encode(currentPayload()));
+            currentUrl = await currentLink();
         } catch (error) {
             UI.showNotification(`Could not create link: ${error.message}`);
             return;
@@ -534,6 +539,7 @@ const ShareLink = (() => {
         describeLength,
         encode,
         decode,
+        currentLink,
         hasLink: () => hashPayload(typeof location !== 'undefined' ? location.hash : '') !== null,
         openFromHash,
         onHashChange,

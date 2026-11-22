@@ -1,0 +1,72 @@
+# Update the modules this project copies from web-kit (vendor.json) when a new release comes out.
+# The original of this workflow is consumer/update-vendor.yml in bremondr/web-kit; projects keep a copy in
+# .github/workflows/. It runs every day, by hand (Actions, Update vendored modules, Run workflow), and when web-kit
+# sends a "web-kit-released" notice. When there is something new it opens a pull request from the branch
+# vendor-update (or updates the one already open), so the change gets the project's checks and preview like any
+# other, and nothing changes until someone merges it.
+#
+# Secrets (Settings, Secrets and variables, Actions):
+#   VENDOR_PR_TOKEN    recommended: a fine-grained token (or GitHub App token) with Contents and Pull requests
+#                      read and write on this repository. Without it the pull request is opened with the workflow's
+#                      own token, and GitHub doesn't run other workflows (checks, previews) for such pull requests.
+#                      It then also needs Settings, Actions, General, "Allow GitHub Actions to create and approve
+#                      pull requests".
+#   VENDOR_GIT_TOKEN   only if web-kit is private: a token that can read it.
+name: Update vendored modules
+
+on:
+  schedule:
+    - cron: '23 4 * * *'
+  workflow_dispatch:
+  repository_dispatch:
+    types: [web-kit-released]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-vendor
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.VENDOR_PR_TOKEN || github.token }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Look for new releases
+        id: up
+        env:
+          VENDOR_GIT_TOKEN: ${{ secrets.VENDOR_GIT_TOKEN }}
+        run: node tools/update-vendor.mjs --github-output --notes "$RUNNER_TEMP/vendor-notes.md"
+
+      - name: Open or update the pull request
+        if: steps.up.outputs.updated == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.VENDOR_PR_TOKEN || github.token }}
+          OWN_TOKEN: ${{ secrets.VENDOR_PR_TOKEN == '' }}
+          TITLE: ${{ steps.up.outputs.title }}
+          NOTES: ${{ runner.temp }}/vendor-notes.md
+          BASE: ${{ github.event.repository.default_branch }}
+        run: |
+          if [ "$OWN_TOKEN" = "true" ]; then
+            printf '\n> Opened with the workflow'"'"'s own token, so checks and previews don'"'"'t start by themselves. Close and reopen this pull request to start them, or add a VENDOR_PR_TOKEN secret (see .github/workflows/update-vendor.yml).\n' >> "$NOTES"
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898315+github-actions[bot]@users.noreply.github.com'
+          git switch -C vendor-update
+          git add -A
+          git commit --quiet -m "$TITLE" -m "From tools/update-vendor.mjs; see the pull request for what changed."
+          git push --force origin vendor-update
+          if [ "$(gh pr view vendor-update --json state --jq .state 2>/dev/null)" = "OPEN" ]; then
+            gh pr edit vendor-update --title "$TITLE" --body-file "$NOTES"
+          else
+            gh pr create --head vendor-update --base "$BASE" --title "$TITLE" --body-file "$NOTES"
+          fi
