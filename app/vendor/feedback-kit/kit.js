@@ -1,14 +1,16 @@
-/* feedback-kit: "Send feedback" for a static web app, as a GitHub issue plus a picture to draw on.
+/* feedback-kit: "Send feedback" for a static web app, as a GitHub or GitLab issue plus a picture to draw on.
 
    The panel shows a picture of the page, taken at the moment of the tap, lets the person draw on it to point at the
    problem, keeps the picture on the clipboard (copied when the panel opens and again after every stroke), offers to
-   share or save it, and links to a new GitHub issue already filled in. Nothing here knows about the app: it gives
-   the description, and optionally a picture of its own part. No server and no token: the person signs in to
-   GitHub and taps Submit there.
+   share or save it, and links to a new issue already filled in, on GitHub or GitLab. Nothing here knows about the
+   app: it gives the description, and optionally a picture of its own part. No server and no token: the person signs
+   in to GitHub or GitLab and taps Submit there.
 
      import { createFeedback } from './feedback-kit/kit.js';
      const feedback = createFeedback({
-       repo: 'owner/name',
+       repo: 'owner/name',                       // on GitLab, 'group/project' or 'group/subgroup/project'
+       // provider: 'gitlab', host: 'https://gitlab.example.com',   // GitHub and its public host by default
+       // urlLimit: 8000,                         // the longest issue address, in characters
        labels: ['feedback'],
        page: {area: 'screen', fonts},            // the whole page (pagePicture in page.js), shown first
        picture: () => svgPicture(svgElement),   // optional: the app's own part, a switch in the panel. A promise of
@@ -25,7 +27,7 @@
    The issue also gets rows about the device: screen, theme, browser and page. Link feedback-kit.css for the panel;
    its colours and fonts come from --fk-* custom properties (see that file). Esc closes the panel, Ctrl/Cmd+Z undoes
    a stroke. See README.md in this folder. */
-import { issueUrl } from './issue.js';
+import { issueTarget, issueUrl } from './issue.js';
 import { createSketch } from './sketch.js';
 import { canCaptureScreen, pagePicture, screenPicture } from './page.js';
 
@@ -73,8 +75,9 @@ function element(tag, props = {}, ...kids){
   return e;
 }
 
-export function createFeedback({repo, labels = ['feedback'], picture = null, pictureLabel = 'Just this part', page = {},
-  capture = 'button', describe, footer = '', heading = 'Send feedback'}){
+export function createFeedback({repo, provider = 'github', host, urlLimit, labels = ['feedback'], picture = null,
+  pictureLabel = 'Just this part', page = {}, capture = 'button', describe, footer = '', heading = 'Send feedback'}){
+  const site = issueTarget({provider, host, repo, urlLimit, labels}).provider.name;   // throws now if one is wrong
   const captureMode = () => { const m = typeof capture === 'function' ? capture() : capture; return canCaptureScreen() ? m : 'off'; };
   let ui = null, run = 0, shown = 0, fileName = 'feedback.png', file = null, objectUrl = null;
   let pictures = {}, current = null;   // this time's pictures by kind ('page', 'part'), each a promise of a canvas
@@ -87,7 +90,7 @@ export function createFeedback({repo, labels = ['feedback'], picture = null, pic
     q.undo = element('button', {type: 'button', class: 'fk-btn', text: 'Undo'});
     q.clear = element('button', {type: 'button', class: 'fk-btn', text: 'Clear'});
     q.status = element('p', {class: 'fk-status', role: 'status'});
-    q.open = element('a', {class: 'fk-primary', target: '_blank', rel: 'noopener', 'aria-disabled': 'true', text: 'Write the issue on GitHub'});
+    q.open = element('a', {class: 'fk-primary', target: '_blank', rel: 'noopener', 'aria-disabled': 'true', text: `Write the issue on ${site}`});
     q.long = element('p', {class: 'fk-note', hidden: true});
     q.copy = element('button', {type: 'button', class: 'fk-btn', text: 'Copy picture'});
     q.kinds = {
@@ -117,7 +120,7 @@ export function createFeedback({repo, labels = ['feedback'], picture = null, pic
             element('p', {class: 'fk-note', text: 'Draw on the picture to point at the problem.'}),
             q.status, q.open, q.long,
             element('div', {class: 'fk-row'}, q.copy, q.share, q.save),
-            element('p', {class: 'fk-note', text: 'The issue opens on GitHub with what was on screen filled in. Sign in, paste the picture, say what’s wrong, and tap Submit.'})))));
+            element('p', {class: 'fk-note', text: `The issue opens on ${site} with what was on screen filled in. Sign in, paste the picture, say what’s wrong, and tap Submit.`})))));
     document.body.appendChild(q.root);
 
     q.sketch = createSketch(q.canvas, {onChange: () => refresh(true)});
@@ -279,7 +282,7 @@ export function createFeedback({repo, labels = ['feedback'], picture = null, pic
     const mine = run;
     Promise.resolve(info.issue).then(issue => {
       if (mine !== run) return;
-      const {url, shortened} = issueUrl({repo, labels, footer, ...issue, rows: [...(issue.rows || []), ...deviceRows()]});
+      const {url, shortened} = issueUrl({provider, host, repo, urlLimit, labels, footer, ...issue, rows: [...(issue.rows || []), ...deviceRows()]});
       ui.open.href = url; ui.open.removeAttribute('aria-disabled');
       ui.long.textContent = shortened ? 'Some of what was on screen was too long to put in the issue.' : '';
       ui.long.hidden = !shortened;
