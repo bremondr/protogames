@@ -14,6 +14,12 @@
 # pull_request_target is used on purpose: the workflow, the build script and site.json that run are always the
 # ones on main, and a pull request's files are only copied out of git, never run here. Pull requests from forks are
 # skipped, because every version on the site shares one origin (and so one browser storage).
+#
+# Building and publishing are two jobs, as in GitHub's own Pages workflows: deploy-pages, run in the same job right
+# after upload-pages-artifact, sometimes finds no artifact ("No artifacts named github-pages were found"), because
+# GitHub lists a new artifact a moment after the upload says it is done. A failed publish can be tried again with
+# "Re-run failed jobs" (only the deploy job runs again); "Re-run all jobs" uploads a second artifact and fails with
+# "Multiple artifacts", so run the workflow by hand instead (gh workflow run pages.yml).
 
 name: Deploy site
 
@@ -30,21 +36,23 @@ permissions:
   id-token: write
   pull-requests: write
 
+# The latest run wins: every run builds all versions, so a new run cancels the one in progress. A run that
+# publishes nothing gets a group of its own, so it can't cancel one that does: a fork's pull request, and the
+# pull request closed by a merge (the push to main that the merge makes publishes the site without its preview).
+concurrency:
+  group: ${{ github.event_name == 'pull_request_target' && (github.event.pull_request.head.repo.full_name != github.repository || (github.event.action == 'closed' && github.event.pull_request.merged)) && format('pages-skipped-{0}', github.run_id) || 'pages' }}
+  cancel-in-progress: true
+
 env:
   SITE_TOOLS: tools
 
 jobs:
-  deploy:
-    if: github.event_name != 'pull_request_target' || github.event.pull_request.head.repo.full_name == github.repository
-    # The latest run wins: every run builds all versions. Set on the job, not the workflow, so a skipped run
-    # (a fork's pull request) can't cancel a deploy in flight.
-    concurrency:
-      group: pages
-      cancel-in-progress: true
+  build:
+    # The same test as the concurrency group's above: forks' pull requests and pull requests closed by a merge.
+    if: github.event_name != 'pull_request_target' || (github.event.pull_request.head.repo.full_name == github.repository && !(github.event.action == 'closed' && github.event.pull_request.merged))
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      summary: ${{ steps.summary.outputs.json }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -80,6 +88,24 @@ jobs:
         with:
           path: _site
 
+      # For the comments after the deploy, which runs in its own job.
+      - name: Pass on the build summary
+        id: summary
+        run: |
+          {
+            echo 'json<<SUMMARY_END'
+            cat build-summary.json
+            echo
+            echo 'SUMMARY_END'
+          } >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
@@ -90,10 +116,10 @@ jobs:
         uses: actions/github-script@v9
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          BUILD_SUMMARY: ${{ needs.build.outputs.summary }}
         with:
           script: |
-            const fs = require('fs');
-            const summary = JSON.parse(fs.readFileSync('build-summary.json', 'utf8'));
+            const summary = JSON.parse(process.env.BUILD_SUMMARY);
             const marker = (summary.comment && summary.comment.marker) || '<!-- site-preview -->';
             const note = (summary.comment && summary.comment.note) || '';
             const base = process.env.PAGE_URL.replace(/\/?$/, '/');
