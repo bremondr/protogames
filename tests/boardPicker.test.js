@@ -104,6 +104,13 @@ test('a picture exists for every board shape, tile shape and orientation, and is
     }
 });
 
+test('a radial picture colours its rings from the middle outwards', () => {
+    const svg = markup('radial', { tile: 'hexagon', orientation: 'pointy-top', center: 'tile' });
+    const ringClasses = ['bp-l0', 'bp-l1', 'bp-l2', 'bp-l3'].map((c) => (svg.match(new RegExp(`class="${c}"`, 'g')) || []).length);
+    assert.deepEqual(ringClasses, [8, 13, 19, 24]);
+    assert.equal(markup('radial', { tile: 'square', orientation: 'flat-top', center: 'point' }), svg, 'tile shape, orientation and centre do not apply');
+});
+
 test('on boards built from the middle every layer has its colour, the middle being layer 1', () => {
     const svg = markup('hexagon', { tile: 'hexagon', orientation: 'pointy-top', center: 'tile' });
     assert.equal((svg.match(/class="bp-l0"/g) || []).length, 1, 'one centre tile');

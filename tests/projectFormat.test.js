@@ -642,7 +642,7 @@ test('v5 to v6 keeps players and dice a file already has', () => {
 test('a v5 file loads through parse() as a current project with the standard dice', () => {
     const loaded = plain(PF.parse(JSON.stringify(v5Project())));
     assert.equal(loaded.version, PF.CURRENT_VERSION);
-    assert.equal(PF.CURRENT_VERSION, 8);
+    assert.equal(PF.CURRENT_VERSION, 9);
     assert.deepEqual(loaded.appState.players, []);
     assert.deepEqual(loaded.appState.dice, STANDARD_DICE);
 });
@@ -836,7 +836,7 @@ test('v7 to v8 changes nothing else, keeps a generator a file already has, and d
 test('every older fixture arrives with generator 1; what the app saves now carries the current one', () => {
     for (const name of ['v0-legacy-project.protogames.json', 'v1-space-arctic.protogames.json', 'v2-space-arctic.protogames.json', 'v3-space-arctic.protogames.json', 'v4-space-arctic.protogames.json', 'v4-square-board.protogames.json', 'v5-space-arctic.protogames.json', 'v6-space-arctic.protogames.json', ...V7_FIXTURES]) {
         const loaded = plain(PF.parse(JSON.stringify(fixture(name))));
-        assert.equal(loaded.version, 8, name);
+        assert.equal(loaded.version, PF.CURRENT_VERSION, name);
         assert.equal(loaded.appState.boardConfig.generator, 1, name);
     }
     assert.equal(app.run('Config.DEFAULT_BOARD_CONFIG.generator'), 2);

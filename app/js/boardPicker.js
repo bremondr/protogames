@@ -20,7 +20,8 @@ const BoardPicker = (() => {
         { value: 'triangle', name: 'Triangle' },
         { value: 'circle', name: 'Circle' },
         { value: 'infinite', name: 'Infinite canvas' },
-        { value: 'country', name: 'Country' }
+        { value: 'country', name: 'Country' },
+        { value: 'radial', name: 'Radial' }
     ];
     const LAYER_CLASSES = ['bp-l0', 'bp-l1', 'bp-l2', 'bp-l3', 'bp-l4', 'bp-l5'];
     const PREVIEW_CANVAS = { width: 600, height: 700 };
@@ -35,6 +36,13 @@ const BoardPicker = (() => {
      * their own, so they are drawn from a rectangle (infinite) or not at all (country).
      */
     function previewConfig(shape, choice) {
+        // Rings have no tile shape, orientation or centre: they are the same for every choice.
+        if (shape === 'radial') {
+            return {
+                gridType: 'hexagon', orientation: 'pointy-top', boardShape: 'radial', radius: 3, size: 4, width: 9, height: 9,
+                triangleOrientation: 'point-up', center: 'tile', rings: 4, sectors: 8, hole: 1, sectorsGrow: true
+            };
+        }
         const gridType = choice.tile || 'hexagon';
         const center = isCentral(shape) && choice.center === 'point' ? 'point' : 'tile';
         // The saved radius counts layers from the first ring for hexagons and squares, as layers for triangles.
@@ -111,7 +119,8 @@ const BoardPicker = (() => {
         const minY = Math.min(...ys);
         const maxY = Math.max(...ys);
         const pad = Math.max(maxX - minX, maxY - minY) * 0.04;
-        const layers = isCentral(shape) ? layersOf(polygons) : null;
+        // Hexagon and circle boards colour the layers from the centre; a radial board colours its rings.
+        const layers = isCentral(shape) ? layersOf(polygons) : shape === 'radial' ? polygons.map((p) => Number(p.id.split('_')[1])) : null;
         const mid = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
         const far = Math.hypot(maxX - minX, maxY - minY) / 2;
         const shapes = polygons.map((p, i) => {

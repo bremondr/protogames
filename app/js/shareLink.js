@@ -15,12 +15,13 @@
 const ShareLink = (() => {
     /**
      * Version of the link payload (not the project file format). 2 added infinite boards, 3 country
-     * boards, 4 players and start markers and 5 the board generator of circle boards (key `g`); links without
+     * boards, 4 players and start markers, 5 the board generator of circle boards (key `g`) and 6 radial boards; links without
      * any of these are still written as version 1 so older apps can open them.
      */
-    const LINK_VERSION = 5;
+    const LINK_VERSION = 6;
     const GENERATOR_LINK_VERSION = 5;
     const PLAYER_LINK_VERSION = 4;
+    const RADIAL_LINK_VERSION = 6;
     // First project file format that has players and dice; links made before it get them from the migration.
     const FORMAT_WITH_PLAYERS = 6;
     const SEATS = ['bottom', 'top', 'left', 'right'];
@@ -31,8 +32,8 @@ const ShareLink = (() => {
     const COUNTRY_MAX_SPAN = 201;
     // The link version a board shape needs. Circle boards carry their generator (`g`); a circle link without it is
     // still valid (generator 1), so unlike the others the shape does not require its version when reading.
-    const LINK_VERSION_FOR_SHAPE = { infinite: 2, country: 3, circle: GENERATOR_LINK_VERSION };
-    const SHAPES_REQUIRING_VERSION = ['infinite', 'country'];
+    const LINK_VERSION_FOR_SHAPE = { infinite: 2, country: 3, circle: GENERATOR_LINK_VERSION, radial: RADIAL_LINK_VERSION };
+    const SHAPES_REQUIRING_VERSION = ['infinite', 'country', 'radial'];
     const MAX_TILES = 20000;
     // The same caps as the project file validator, which owns them.
     const MAX_DIMENSION = ProjectFormat.MAX_BOARD_DIMENSION;

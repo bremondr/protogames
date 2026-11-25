@@ -21,6 +21,7 @@ const GEOMETRY_SCRIPTS = [
     'app/js/geometry/hex.js',
     'app/js/geometry/triangle.js',
     'app/js/geometry/square.js',
+    'app/js/geometry/radial.js',
     'app/js/geometry/neighbors.js',
     'app/js/geometry.js',
     'dev/geometry-checks.js'

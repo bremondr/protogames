@@ -46,13 +46,14 @@ const RULES = [
     ['config.js', ['state.js', 'interactions.js', 'infinite.js'], 'they read Config while they load'],
     ['textureUtils.js', ['textures.js', 'objects.js'], 'both are built from TextureUtils'],
     ['utils.js', ['main.js'], 'Main takes Utils at start-up'],
-    ['geometry/helpers.js', ['geometry/hex.js', 'geometry/triangle.js', 'geometry/square.js', 'geometry.js', 'infinite.js'], 'the tile shapes destructure the helpers'],
+    ['geometry/helpers.js', ['geometry/hex.js', 'geometry/triangle.js', 'geometry/square.js', 'geometry/radial.js', 'geometry.js', 'infinite.js'], 'the tile shapes destructure the helpers'],
     ['geometry/neighbors.js', ['geometry.js'], 'Geometry re-exports the neighbour functions'],
     ['geometry.js', ['infinite.js', 'countryBoard.js', 'countryRegions.js'], 'they wrap Geometry.generateGrid'],
     ['state.js', ['infinite.js'], 'Infinite wraps the AppState setters'],
     ['viewMath.js', ['infinite.js'], 'Infinite wraps ViewMath.clampToBounds'],
     ['renderer.js', ['countryRegions.js'], 'CountryRegions wraps Renderer.paint'],
-    ['countryBoard.js', ['countryRegions.js'], 'CountryRegions builds on CountryBoard']
+    ['countryBoard.js', ['countryRegions.js'], 'CountryRegions builds on CountryBoard'],
+    ['geometry/radial.js', ['radialBoard.js'], 'RadialBoard reads its limits while it loads']
 ];
 
 test('the scripts are listed in an order where each module comes after the ones it is built from', () => {
