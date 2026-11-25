@@ -27,8 +27,11 @@ You don't have to do anything for this. It can take a while, because someone has
    ```
 
    The script stops at the first conflict and never pushes. It keeps the original authors.
-3. **Open a draft pull request** from `try-<number>` to `main`: say it is from #<number> by the contributor, what it does,
-   and a short list of what to try on the preview. Don't `@`-mention the contributor in it. Link the issue it fixes.
+3. **Open a draft pull request** from `try-<number>` to `main` and give it the label `outside-source`: say in it that it is
+   from #<number> by the contributor, what it does, and a short list of what to try on the preview. Don't `@`-mention
+   the contributor in it. Link the issue it fixes. The label puts its preview in the section "From outside
+   contributors" on the list of previews (`/preview/`), apart from the maintainers' own (see `site.json`'s
+   `previewSections`).
 4. **Try the preview**, mark the draft ready and merge it. Merge the mirror, never the original.
 5. **Close the original** with a comment linking the mirror (or its merge commit), thanking the contributor. If the
    change is not wanted, close it with the reason instead; no mirror is needed.

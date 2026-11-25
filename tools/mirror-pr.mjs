@@ -36,4 +36,4 @@ try {
 console.log(`${commits.length} commit(s) of #${number} are on ${branch}:`);
 console.log(git('log', '--format=  %h %an: %s', `${base}..${branch}`));
 if (!args.includes('--no-test')) execFileSync('npm', ['test'], { stdio: 'inherit' });
-console.log(`\nLooks good? Push it and open a draft pull request:\n  git push -u origin ${branch}`);
+console.log(`\nLooks good? Push it, open a draft pull request and label it \`outside-source\`:\n  git push -u origin ${branch}`);

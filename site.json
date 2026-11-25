@@ -19,5 +19,12 @@
   "commentMarker": "<!-- protogames-preview -->",
   "exclude": [
     "app/package.json"
+  ],
+  "previewSections": [
+    {
+      "label": "outside-source",
+      "title": "From outside contributors",
+      "note": "Copied from a fork by a maintainer after reading the diff. Try it here before it is merged."
+    }
   ]
 }
