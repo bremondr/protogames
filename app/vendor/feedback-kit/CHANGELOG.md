@@ -2,6 +2,18 @@
 
 Each version is released as the tag `feedback-kit-vX.Y.Z`. A new major version (the first number) means a project using the kit may need changes; the notes say which.
 
+## 2.1.0 (2026-11-24)
+
+GitLab, including a self-hosted server, as well as GitHub.
+
+- **New options** for `createFeedback` and `issueUrl`: `provider` (`'github'`, the default, or `'gitlab'`), `host` (the server; by default https://github.com or https://gitlab.com; also GitHub Enterprise Server) and `urlLimit` (the longest issue address, 8000 characters by default).
+- **GitLab:** the issue opens at `{host}/{repo}/-/issues/new` with the title and description filled in. `repo` can have nested groups (`group/subgroup/project`), and `host` a path (`https://example.org/gitlab`). The labels are a `/label ~feedback` line at the end of the description, because GitLab's new-issue page takes no labels from the address; GitLab removes the line when the issue is submitted.
+- **Checked at once:** a wrong `provider`, `host` (not `https://`, or with a query, fragment or user name), `repo`, `urlLimit` or GitLab label throws when `createFeedback` is called.
+- The button and the panel's note name the provider: "Write the issue on GitLab".
+- New `issueTarget(options)` and `PROVIDERS` in `issue.js`.
+
+GitHub addresses are exactly as before. **Nothing to change in a project** that stays on GitHub. To move one to GitLab, set `provider` (and `host` if it isn't gitlab.com), and create the label there (see "Setting it up in a project" in the README).
+
 ## 2.0.0 (2026-11-22)
 
 The picture is now the whole page, taken at the tap, and the app's own picture becomes a switch in the panel.
