@@ -23,6 +23,9 @@
        "maxPreviews": 20,
        "feedback": {"labels": ["feedback"], "event": "app:feedback"},
                                              a Feedback link on the preview badge (see preview-runtime.js)
+       "previewSections": [{"label": "outside-source", "title": "From outside contributors", "note": "..."}],
+                                             pull requests with this label are listed in a section of their own on
+                                             the list of previews, after the others ("note" is optional)
        "global": "APP_PREVIEW",              another global name for the preview's description
        "commentMarker": "<!-- site-preview -->", "commentNote": "..."   the bot comment on pull requests
      }
@@ -34,7 +37,8 @@
      node tools/build-site.mjs --out _site --main main [--previews previews.json] [--repo owner/name] [--summary build-summary.json] [--config site.json]
      node tools/build-site.mjs --run-checks [--config site.json]
 
-   previews.json:       [{"number": 16, "title": "...", "ref": "refs/previews/pr-16", "isDraft": false}, ...]
+   previews.json:       [{"number": 16, "title": "...", "ref": "refs/previews/pr-16", "isDraft": false, "labels": ["outside-source"]}, ...]
+                        ("labels" is optional; it only matters for "previewSections")
    build-summary.json:  (not published) for each pull request asked for: built (with the commit), skipped (and why)
                         or over the cap, and the comment's marker, note and link. The workflow turns it into one
                         comment per pull request.
@@ -73,6 +77,7 @@ export const DEFAULTS = {
   checks: ['node --test'],
   maxPreviews: 20,
   feedback: null,
+  previewSections: [],
   global: '',
   commentMarker: '<!-- site-preview -->',
   commentNote: 'It keeps its own saved data, separate from the live site, and doesn\'t work offline. It is removed when this pull request is closed or merged.'
@@ -97,6 +102,9 @@ export function readConfig(raw = {}) {
   if (!config.pages.length) throw new Error('site.json: "pages" needs at least one page.');
   if (!Number.isInteger(config.maxPreviews) || config.maxPreviews < 0) throw new Error('site.json: "maxPreviews" must be a whole number.');
   if (config.feedback !== null && typeof config.feedback !== 'object') throw new Error('site.json: "feedback" must be an object.');
+  if (!Array.isArray(config.previewSections) || config.previewSections.some(x => !x || typeof x.label !== 'string' || !x.label || typeof x.title !== 'string' || !x.title || (x.note !== undefined && typeof x.note !== 'string'))) {
+    throw new Error('site.json: "previewSections" must be a list of {"label", "title", "note"} (note is optional).');
+  }
   config.root = path.posix.normalize(String(config.root || '.')).replace(/\/$/, '');
   if (config.root.startsWith('..') || config.root.startsWith('/')) throw new Error('site.json: "root" must be a folder inside the repository.');
   config.pages = config.pages.map(p => path.posix.normalize(p));
@@ -187,17 +195,40 @@ export function runtimeSource(template, info) {
   return template.replace(marker, () => JSON.stringify(info));
 }
 
+/** One entry of the list of previews. */
+function previewItem(p, repo, start) {
+  const title = p.title ? ` <span class="title">${escapeHtml(p.title)}</span>` : '';
+  const draft = p.isDraft ? ' <span class="tag">draft</span>' : '';
+  const sha = p.sha ? ` <code>${escapeHtml(p.sha)}</code>` : '';
+  const source = repo ? ` <a class="src" href="https://github.com/${escapeHtml(repo)}/pull/${Number(p.number)}">PR #${Number(p.number)}</a>` : '';
+  return `    <li><a href="${escapeHtml(previewName(p.number))}/${escapeHtml(start)}">${escapeHtml(previewName(p.number))}</a>${title}${draft}${sha}${source}</li>`;
+}
+
+/** The previews in the order shown: the ones in no section first, then one group per section that has any
+    (a preview goes to the first section whose label it has). Without sections, one group with no heading. */
+export function groupPreviews(previews, sections = []) {
+  const rest = [];
+  const groups = sections.map(section => ({section, previews: []}));
+  for (const p of previews) {
+    const labels = Array.isArray(p.labels) ? p.labels : [];
+    const group = groups.find(g => labels.includes(g.section.label));
+    (group ? group.previews : rest).push(p);
+  }
+  const shown = groups.filter(g => g.previews.length);
+  if (!shown.length) return [{section: null, previews: rest}];
+  return rest.length ? [{section: null, previews: rest}, ...shown] : shown;
+}
+
 /** /preview/index.html: the live previews and where each came from. */
-export function previewsIndexHtml(previews, repo, { name = '', start = '' } = {}) {
+export function previewsIndexHtml(previews, repo, { name = '', start = '', sections = [] } = {}) {
   const heading = `${name ? `${escapeHtml(name)} previews` : 'Previews'}`;
-  const items = previews.map(p => {
-    const title = p.title ? ` <span class="title">${escapeHtml(p.title)}</span>` : '';
-    const draft = p.isDraft ? ' <span class="tag">draft</span>' : '';
-    const sha = p.sha ? ` <code>${escapeHtml(p.sha)}</code>` : '';
-    const source = repo ? ` <a class="src" href="https://github.com/${escapeHtml(repo)}/pull/${Number(p.number)}">PR #${Number(p.number)}</a>` : '';
-    return `    <li><a href="${escapeHtml(previewName(p.number))}/${escapeHtml(start)}">${escapeHtml(previewName(p.number))}</a>${title}${draft}${sha}${source}</li>`;
-  });
-  const body = items.length ? `  <ul>\n${items.join('\n')}\n  </ul>` : '  <p>No previews right now. Open a pull request to get one.</p>';
+  const groups = groupPreviews(previews, sections);
+  const sectioned = groups.length > 1;
+  const list = items => `  <ul>\n${items.map(p => previewItem(p, repo, start)).join('\n')}\n  </ul>`;
+  const body = !previews.length ? '  <p>No previews right now. Open a pull request to get one.</p>'
+    : groups.map(g => g.section
+      ? `  <h2>${escapeHtml(g.section.title)}</h2>${g.section.note ? `\n  <p class="note">${escapeHtml(g.section.note)}</p>` : ''}\n${list(g.previews)}`
+      : `${sectioned ? '  <h2>Pull requests</h2>\n' : ''}${list(g.previews)}`).join('\n');
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -214,6 +245,8 @@ export function previewsIndexHtml(previews, repo, { name = '', start = '' } = {}
   .title, code { color: var(--muted); }
   .tag { font-size: 0.75rem; background: var(--tag); border-radius: 4px; padding: 0 0.35rem; }
   .src { font-size: 0.85rem; }
+  h2 { font-size: 1.1rem; margin: 1.5rem 0 0; }
+  .note { color: var(--muted); font-size: 0.9rem; margin: 0.25rem 0 0; }
 </style>
 </head>
 <body>
@@ -382,7 +415,7 @@ export function build({ out, main, previews = [], repo = '', config: raw = {}, c
     }
   }
   fs.mkdirSync(path.join(out, 'preview'), {recursive: true});
-  fs.writeFileSync(path.join(out, 'preview', 'index.html'), previewsIndexHtml(built, repo, {name: config.name, start}));
+  fs.writeFileSync(path.join(out, 'preview', 'index.html'), previewsIndexHtml(built, repo, {name: config.name, start, sections: config.previewSections}));
   return summary;
 }
 
