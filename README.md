@@ -245,6 +245,7 @@ The GitHub repos feature uses `git-store-kit`: the project's side is `app/repo-p
 ## Contributing
 - Report a bug or suggest a feature with an [issue](https://github.com/bremondr/protogames/issues/new/choose); the templates ask for what is needed to reproduce a bug (browser, address, project file).
 - Work on a branch and open a pull request against `main`. The tests must pass; the pull request gets its own preview of the site (see [Deployment and previews](#deployment-and-previews)), so you can try a change before it is merged.
+- Pull requests from a fork get no preview and are not merged directly: a maintainer copies them to a branch here first. See [CONTRIBUTING.md](CONTRIBUTING.md).
 - Where things are written down: [docs/README.md](docs/README.md) is the index of all documents; [docs/SPECIFICATION.md](docs/SPECIFICATION.md) specifies the saved formats; [docs/audits/](docs/audits/README.md) holds the audits of the code (read `audits/README.md` for the rules; `audits/register.md` is the one file with the current state of every finding, dated reports are frozen).
 
 ## Roadmap

@@ -1,0 +1,26 @@
+# Tells the author of a pull request from a fork what happens to it: there is no preview, and a maintainer copies
+# it ("mirrors" it) to a branch of this repository to try it (see CONTRIBUTING.md). It only posts a comment.
+#
+# pull_request_target runs the workflow from main with a write token, so nothing from the pull request is checked out
+# or run here, and the pull request's text is never put into a command: only its number is read, from the environment.
+
+name: Fork pull request notice
+
+on:
+  pull_request_target:
+    types: [opened]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  notice:
+    if: github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr comment "$NUMBER" --repo "$GITHUB_REPOSITORY" --body "Thanks for the pull request. Pull requests from a fork get no preview of the site, and the unit tests do not run for them. A maintainer will read the change and, if it is wanted, copy it with your commits and your name as author to a branch here, where it can be tried on a preview and merged. This one is then closed with a link. See [CONTRIBUTING.md](https://github.com/$GITHUB_REPOSITORY/blob/main/CONTRIBUTING.md)."

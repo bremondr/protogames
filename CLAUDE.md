@@ -23,3 +23,9 @@ was on screen but not an exact screenshot, so images, fonts and CSS effects can 
 `tools/build-site.mjs`, `tools/preview-runtime.js` and `.github/workflows/pages.yml` are copies of web-kit's
 `consumer/` files. Don't edit them here: what is particular to Protogames goes in `site.json`, and a change the
 copies need is made in web-kit. Copy them again when web-kit's `consumer/CHANGELOG.md` says so. See `docs/DEPLOYMENT.md`.
+
+## Pull requests from forks
+
+Never merge a pull request whose head is in a fork: it has no preview and its checks do not run. Read the diff, then
+mirror it with `node tools/mirror-pr.mjs <number>` and merge the mirror (see `CONTRIBUTING.md`). Don't `@`-mention
+outside contributors in text you write unless asked. "Merge all pull requests" does not include forks: list them and ask.
