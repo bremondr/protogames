@@ -23,19 +23,19 @@ Projects are saved as `<name>.protogames.json`, and the editor also keeps every 
 
 ### Version
 
-Every file has a top-level integer `version`. The current version is **8** (`ProjectFormat.CURRENT_VERSION`).
+Every file has a top-level integer `version`. The current version is **9** (`ProjectFormat.CURRENT_VERSION`).
 
 | `version` in the file | Meaning |
 |---|---|
 | missing, or the string `"1.0"` | **v0**: written before versioning existed. Migrated to v1 on load. |
-| integer `0` to `7` | older format: migrated one step at a time up to v8 on load (what each step does: see "History") |
-| integer `8` | current format |
+| integer `0` to `8` | older format: migrated one step at a time up to v9 on load (what each step does: see "History") |
+| integer `9` | current format |
 | integer greater than the app's current version | rejected: "saved by a newer version of Protogames, update to open it" |
 | anything else (`1.5`, `-1`, `"abc"`, `null`, ...) | rejected as unreadable |
 
 (An integer `0` is read as v0 as well.)
 
-### Project file (v8)
+### Project file (v9)
 
 ```jsonc
 {
