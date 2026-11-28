@@ -5,9 +5,10 @@
    error, or anything returned.
 
    - Lists and file contents with a token go through the API (5,000 requests an hour).
-   - Without a token, the list goes through the API (60 requests an hour for each IP address, but a 304 for an
-     unchanged folder doesn't count), and file contents come from raw.githubusercontent.com, which has no limit. */
-import { encodePath } from './sources.js';
+   - Without a token, the list comes from the repo's index (git-store-index.json) on raw.githubusercontent.com when
+     it has one, or else through the API (60 requests an hour for each IP address, a 304 included), and file contents
+     come from raw.githubusercontent.com, which has no limit. */
+import { encodePath, INDEX_FILE } from './sources.js';
 
 export const API = 'https://api.github.com';
 export const RAW = 'https://raw.githubusercontent.com';
@@ -143,6 +144,14 @@ export async function readBlob(ctx, repo, sha){
 export async function readRaw(ctx, repo, path, branch = null){
   const res = await send(ctx, `${RAW}/${repo}/${branch ? encodePath(branch) : 'HEAD'}/${encodePath(path)}`, {cache: 'no-cache'});
   return res.ok ? res.text() : null;
+}
+
+/** The repo's index (git-store-index.json) from raw.githubusercontent.com, parsed but not checked: null when there is
+    none, or it isn't JSON. Throws `offline` when the host can't be reached. */
+export async function readIndex(ctx, repo, branch = null){
+  const text = await readRaw(ctx, repo, INDEX_FILE, branch);
+  if (text == null) return null;
+  try { return JSON.parse(text); } catch { return null; }
 }
 
 /** A file as it is now (or at `ref`, a branch or a commit): {sha, text}, or null when there is no such file. */

@@ -8,6 +8,7 @@
        shortName: n => `bremondr/ultimate-playbook-${n}`,
        read: json => checkedItemOrNull(json), // every item read from a repo goes through this
        write: item => jsonForTheFile(item),
+       defaults: ['bremondr/ultimate-playbook-demo'],   // followed on a first visit; removing one is remembered
      });
      store.followFromHash(location.hash);
      await store.load();                      // store.sources(): [{repo, items: [{id, name, item, sha}], …}]
@@ -15,9 +16,10 @@
 
    A "source" is a repo the viewer follows. Anyone can read a public one; a private one, and every write, needs a
    GitHub token for that repo, pasted once per device (setToken). The module knows nothing about the items: `read`,
-   `write`, `id` and `name` say what they are. See README.md in this folder. */
-import { deleteFile, fileHistory, gitBlobSha, GitHubError, listFolder, readBlob, readFile, readRaw, repoInfo, writeFile } from './github.js';
-import { checkBranch, checkFolder, checkRepo, hashValue, ID, idOfFile, itemPath, parseRepo, repoKey } from './sources.js';
+   `write`, `id` and `name` say what they are. Without a token, a repo with an index (git-store-index.json, see
+   index/) is read with no API requests at all. See README.md in this folder. */
+import { deleteFile, fileHistory, gitBlobSha, GitHubError, listFolder, readBlob, readFile, readIndex, readRaw, repoInfo, writeFile } from './github.js';
+import { checkBranch, checkFolder, checkRepo, hashValue, ID, idOfFile, indexedFiles, itemPath, parseRepo, repoKey } from './sources.js';
 import { indexedCache } from './cache.js';
 
 export { GitHubError } from './github.js';
@@ -71,14 +73,22 @@ export function createGitStore({
   read, write, id: idOf = item => item && item.id, name: nameOf = item => item && item.name,
   setId = (item, id) => ({...item, id}), newId = randomId,
   commitMessage = ({op, name, note}) => note || `${{add: 'Add', update: 'Update', remove: 'Remove', copy: 'Add a copy of', restore: 'Restore'}[op]} ${name}`,
-  indent = 2, maxBytes = 1e6, fetch: fetchFn = (...a) => globalThis.fetch(...a), storage, cache = indexedCache()
+  indent = 2, maxBytes = 1e6, fetch: fetchFn = (...a) => globalThis.fetch(...a), storage, cache = indexedCache(),
+  index = 'auto', defaults = []
 } = {}){
   if (!/^[A-Za-z0-9._-]{1,40}$/.test(app || '')) throw new Error('createGitStore needs an `app` name: letters, digits, ".", "-" or "_"');
   if (typeof read !== 'function' || typeof write !== 'function') throw new Error('createGitStore needs `read` and `write`');
   folder = checkFolder(folder);
   branch = checkBranch(branch);
+  if (index !== 'auto' && index !== false) throw new Error("createGitStore's `index` is 'auto' or false");
+  if (!Array.isArray(defaults)) throw new Error("createGitStore's `defaults` is a list of repos");
+  const defaultRepos = defaults.map(v => {
+    const r = parseRepo(v, shortName);
+    if (!r) throw new Error(`Not a repo for defaults: ${String(v).slice(0, 120)}`);
+    return r;
+  });
   const local = localStore(storage);
-  const SOURCES_KEY = `${app}:git-store:sources`, TOKENS_KEY = `${app}:git-store:tokens`;
+  const SOURCES_KEY = `${app}:git-store:sources`, TOKENS_KEY = `${app}:git-store:tokens`, DEFAULTS_KEY = `${app}:git-store:defaults`;
   const cacheKey = repo => `${app}:${repoKey(repo)}`;
 
   /* ---- local storage: the followed repos and the tokens ---- */
@@ -95,7 +105,7 @@ export function createGitStore({
 
   function stateOf(repo){
     const k = repoKey(repo);
-    if (!states.has(k)) states.set(k, {repo, items: new Map(), loadedAt: 0, error: null, stale: false, private: null, canWrite: null, dropped: 0, loading: null, cached: undefined});
+    if (!states.has(k)) states.set(k, {repo, items: new Map(), loadedAt: 0, error: null, stale: false, private: null, canWrite: null, dropped: 0, loading: null, cached: undefined, fromIndex: false, outdated: 0});
     return states.get(k);
   }
   function needRepo(repo){
@@ -118,6 +128,8 @@ export function createGitStore({
       if (e) st.items.set(id, e); else st.dropped++;
     }
     st.loadedAt = entry.loadedAt;
+    st.fromIndex = !!entry.fromIndex;
+    st.outdated = entry.outdated || 0;
     if (entry.private != null) st.private = entry.private;
     if (entry.canWrite != null) st.canWrite = entry.canWrite;
   }
@@ -146,7 +158,7 @@ export function createGitStore({
     return {
       repo: st.repo, items: [...st.items.values()], loadedAt: st.loadedAt, error: st.error, stale: st.stale,
       private: st.private, canWrite: !!tokenOf(st.repo) && st.canWrite !== false, hasToken: !!tokenOf(st.repo),
-      dropped: st.dropped, loading: !!st.loading
+      dropped: st.dropped, loading: !!st.loading, fromIndex: st.fromIndex, outdated: st.outdated
     };
   }
 
@@ -165,6 +177,20 @@ export function createGitStore({
     stateOf(known || repo);
     emit();
     return known || repo;
+  }
+  // the defaults: each one is followed once per device and app, so one the person removed stays removed
+  if (defaultRepos.length){
+    if (local){
+      const offered = loadJson(DEFAULTS_KEY, []);
+      const done = new Set(Array.isArray(offered) ? offered.filter(k => typeof k === 'string') : []);
+      const fresh = defaultRepos.filter(r => !done.has(repoKey(r)));
+      if (fresh.length){
+        const list = following();
+        for (const r of fresh){ if (!list.some(x => repoKey(x) === repoKey(r))) list.push(r); done.add(repoKey(r)); }
+        saveJson(SOURCES_KEY, list);
+        saveJson(DEFAULTS_KEY, [...done]);
+      }
+    } else defaultRepos.forEach(stateOf);   // nothing is kept: followed for this page
   }
   async function unfollow(repo){
     const k = repoKey(repo);
@@ -187,25 +213,48 @@ export function createGitStore({
     return readBlob(ctx, st.repo, f.sha);
   }
 
+  // no token, from the index: a file raw.githubusercontent.com doesn't have in this version yet is null, never an
+  // API request (raw can be a few minutes behind the index, or the index behind raw)
+  async function indexedText(ctx, st, f){
+    const text = await readRaw(ctx, st.repo, f.path, branch).catch(() => null);
+    if (text == null) return null;
+    const sha = await gitBlobSha(text);
+    return sha === null || sha === f.sha ? text : null;
+  }
+  // without a token: the folder's files from the repo's index, or null to list it through the API
+  async function fromIndex(ctx, repo){
+    if (index === false || ctx.token) return null;
+    const idx = await readIndex(ctx, repo, branch).catch(() => null);
+    return idx ? indexedFiles(idx, folder) : null;
+  }
+
   async function loadSource(st){
     const cached = await cachedOf(st);
     if (!st.loadedAt && cached){ apply(st, cached); st.stale = true; emit(); }   // the saved copy at once
     const ctx = ctxFor(st.repo);
     try {
+      const indexed = await fromIndex(ctx, st.repo);
       const info = ctx.token ? await repoInfo(ctx, st.repo) : null;
-      const list = await listFolder(ctx, st.repo, folder, {branch, etag: cached && cached.etag});
+      const list = indexed ? {etag: null, files: indexed} : await listFolder(ctx, st.repo, folder, {branch, etag: cached && cached.etag});
       let entry;
-      if (list.notModified) entry = {...cached, loadedAt: Date.now()};
+      if (list.notModified) entry = {...cached, loadedAt: Date.now(), fromIndex: false, outdated: 0};
       else {
         const files = {}, old = (cached && cached.files) || {};
         const wanted = list.files.map(f => ({...f, id: idOfFile(f.name)})).filter(f => f.id);
+        let outdated = 0;
         await eachLimited(wanted, 6, async f => {
           if (old[f.id] && old[f.id].sha === f.sha){ files[f.id] = old[f.id]; return; }
+          let text;
+          if (indexed){
+            text = await indexedText(ctx, st, f);
+            // not there yet: keep the version on the device, if there is one, and try again at the next load
+            if (text == null){ outdated++; if (old[f.id]) files[f.id] = old[f.id]; return; }
+          }
           let json;
-          try { json = JSON.parse(await fileText(ctx, st, f)); } catch (e){ if (e instanceof GitHubError) throw e; json = undefined; }
+          try { json = JSON.parse(text ?? await fileText(ctx, st, f)); } catch (e){ if (e instanceof GitHubError) throw e; json = undefined; }
           files[f.id] = {sha: f.sha, json};
         });
-        entry = {etag: list.etag, files, loadedAt: Date.now()};
+        entry = {etag: list.etag, files, loadedAt: Date.now(), fromIndex: !!indexed, outdated};
       }
       entry.private = info ? info.private : false;   // listed without a token: public
       entry.canWrite = info ? info.canWrite : false;

@@ -19,9 +19,10 @@ It began in [Ultimate Playbook](https://github.com/bremondr/ultimate-playbook) b
 |---|---|
 | `kit.js` | `createFeedback(options)`: the panel, the clipboard, Share and Save, the device's rows in the issue |
 | `page.js` | `pagePicture(element, options)`: a picture of the whole page (or of one element), redrawn from what is on screen. `screenPicture(options)`: a real screenshot from the browser's screen capture, on desktop browsers (`canCaptureScreen()` says if there is one) |
-| `picture.js` | `svgPicture(svg, options)`: a PNG-ready canvas of an SVG as it looks now. `embedFonts({stylesheet, family, unicode})`: web fonts inlined for it, from a stylesheet on Google Fonts or the app's own (`unicode` picks subsets by `unicode-range`, Latin by default; rules without one are always kept) |
+| `picture.js` | `svgPicture(svg, options)`: a PNG-ready canvas of an SVG as it looks now. `embedFonts({stylesheet, family, unicode})`: web fonts inlined for it, from a stylesheet on Google Fonts or the app's own (`unicode` picks subsets by `unicode-range`; by default Latin and Latin Extended, see "The pictures"; rules without one are always kept). `fontFaces(css, family, unicode)`: the rules it keeps |
 | `sketch.js` | `createSketch(canvas)`: drawing on a picture |
-| `issue.js` | `issueUrl(issue)`: the new-issue address on GitHub or GitLab, kept under the length limit. `issueTarget(options)`: checks `provider`, `host`, `repo`, `urlLimit` and `labels`. No DOM, so it runs in Node |
+| `strings.js` | every text the kit shows or writes, in English and Czech (`STRINGS`); `texts(language, strings)` picks them, `format(template, values)` fills one in, `listOf(items, language)` joins names as the language does |
+| `issue.js` | `issueUrl(issue)`: the new-issue address on GitHub or GitLab, kept under the length limit, and which sections gave way to fit (`{url, shortened, gaveWay}`). `issueTarget(options)`: checks `provider`, `host`, `repo`, `urlLimit` and `labels`. No DOM, so it runs in Node |
 | `feedback-kit.css` | the panel; themed with `--fk-*` custom properties |
 
 ## Using it
@@ -47,6 +48,7 @@ const feedback = createFeedback({
   picture: () => svgPicture(document.querySelector('#chart'), {fonts}),
   pictureLabel: 'Just the chart',
   capture: 'button',                     // a real screen capture on desktop browsers: 'button', 'tap' or 'off'
+  // language: 'cs',                     // the kit's own texts: English by default, see "Languages" below
   // what was on screen, also called in the tap
   describe: () => ({
     subtitle: 'Sales chart, March',      // under the panel's heading
@@ -67,7 +69,7 @@ The issue body has these parts, in order:
 - your `sections`;
 - an "On screen" table: your `rows`, then the screen, theme, browser and page.
 
-If the address would be longer than `urlLimit` (8000 characters by default; GitHub accepts about 8 KB), sections give way to their `fallback` text, the longest first, until it fits.
+If the address would be longer than `urlLimit` (8000 characters by default; GitHub accepts about 8 KB), sections give way to their `fallback` text, the longest first, until it fits. The panel then names them by heading ("Too long to put in the issue: Reopen. It has a shorter note in its place, so add that part by hand if it matters."). `issueUrl(issue)` returns `{url, shortened, gaveWay}`: `shortened` is true when a section gave way, and `gaveWay` lists their headings, in the order they are in the issue.
 
 ### GitHub or GitLab
 
@@ -95,6 +97,25 @@ What GitLab does differently (checked in November 2026 against gitlab.com and Gi
 - **Length.** gitlab.com accepted new-issue addresses up to about 10,200 characters and refused longer ones (error 400). The default `urlLimit` of 8000 leaves room for a self-hosted server, whose proxy may accept less (nginx's default is about 8 KB for the whole request line). If people on your server get an error instead of the form, lower it.
 - **The rest is the same**: the table, the hidden `<!-- -->` note and the `<sub>` footer render on GitLab, and pasting the picture into the description works.
 
+### Languages
+
+The kit's own texts (the panel, the issue's headings and the device's rows) are English by default. For Czech:
+
+```js
+createFeedback({
+  language: 'cs',                        // 'en' (default) or 'cs'
+  strings: {openIssue: 'Nahlásit na {provider}'},   // optional: single texts over the language's
+  pictureLabel: 'Jen graf',              // your own texts stay yours: write them in the same language
+  // ...the rest as above
+});
+```
+
+- `language: 'cs'` makes every text Czech: "Napsat hlášení na GitHub", "Zpět", "Vymazat", the messages under the picture, the pens' names, the issue's headings ("Co je špatně a co by se mělo stát", "Snímek obrazovky", "Na obrazovce") and the device's rows ("Obrazovka: 1180 × 820 px, na šířku, poměr pixelů 2, světlý režim"). Only the browser's user agent stays as the browser gives it. The panel gets `lang="cs"`.
+- The default `heading` ("Poslat zpětnou vazbu") and `pictureLabel` ("Jen tato část") follow the language; if you give them, yours win. What `describe` gives (subtitle, title, rows, sections) and `footer` are yours, so write them in the same language.
+- `strings` changes single texts: `{key: text}`, with the keys of `STRINGS.en` in `strings.js`. An unknown key throws, so a typo shows at once.
+- **Another language**: give its code and all its texts in `strings` (`language: 'de', strings: {...}`); what you leave out is English. Better still, add it to `strings.js` in web-kit, where a test checks that every language has every key.
+- Texts with `{name}` in them are templates, filled in by the kit: `openIssue` and `issueNote` get `{provider}`, which is the provider's own entry for that language (`provider.github`, `provider.gitlab`; in English and Czech just "GitHub" and "GitLab", but a language whose grammar changes the name can give its own form). `penLabel` gets `{pen}`; the device rows get sizes, `{orientation}`, `{theme}` and `{ratio}` (with the language's `decimal` point).
+
 ### The pictures
 
 Both are taken in the tap, so they show the same moment.
@@ -102,6 +123,8 @@ Both are taken in the tap, so they show the same moment.
 - **The whole page** comes first. `pagePicture` copies the page with every computed style written inline and draws the copy, in every browser, with no prompt. The `page` option is passed to it:
   - `area`: `'screen'` (default) for what is visible, like a screenshot, or `'full'` for the whole scrollable page;
   - `fonts`: web fonts the page uses, through `embedFonts`, or the picture falls back to other fonts;
+
+    `embedFonts` keeps the `@font-face` rules of the family whose `unicode-range` matches `unicode`, a regular expression tested on the rule. The default, `LATIN`, keeps the rules with a range that starts at U+0000 or U+0100: Google Fonts' `latin` (`U+0000-00FF, …`) and `latin-ext` (`U+0100-02BA, …`) subsets, which together cover Latin Extended-A and -B, so Czech, Slovak, Polish and the like (ě š č ř ž ů ł ő …) are drawn in the font. Cyrillic, Greek, Vietnamese and other subsets are left out. To keep others, give `unicode`, for example `/U\+0*(?:0|100|400)-/i` for Cyrillic too, or `/U\+0000-00FF/i` for basic Latin only, which was the default before 2.2.0. A rule without a `unicode-range`, as is usual for a self-hosted font, covers every character and is always kept.
   - `element`: picture one element instead of the page; `maxSize`: the longer side in pixels, at most (default 2400); `background`.
   
   It keeps what is typed in fields, where scrolled areas are scrolled to, fixed and sticky parts where they are, canvases, and `::before`/`::after`. Give `data-fk-skip` to anything that shouldn't be in it; the panel has it. See Limits for what it can't copy.
@@ -142,6 +165,7 @@ With the kit copied into the project (see [web-kit's setup guide](../docs/setup-
    Or on the web: the project, then **Manage › Labels › New label**, name `feedback`, and **Create label**. A label made in a group (the group's **Manage › Labels**) works in all its projects. If it's missing, the `/label` line does nothing.
 2. **The styles.** Link `js/vendor/feedback-kit/feedback-kit.css`, and set the `--fk-*` properties to the project's colours and fonts (see Theming). Set `--fk-z` above anything else that covers the page.
 3. **The adapter.** Write one project file, for example `js/features/feedback.js`, that calls `createFeedback` with:
+   - `language: 'cs'` if the app is in Czech (see "Languages");
    - `repo` and `labels`, and for GitLab `provider: 'gitlab'` and, if it isn't gitlab.com, `host` (see "GitHub or GitLab");
    - `page`: `{fonts}` with the web fonts the page uses (through `embedFonts`), and `area: 'full'` if the whole scrollable page is more useful than what is on screen. Give `data-fk-skip` to anything that shouldn't be in the picture;
    - `capture`: `'button'` (default), `'tap'` if every report should start with a real screenshot on desktop, or `'off'`;
@@ -149,7 +173,7 @@ With the kit copied into the project (see [web-kit's setup guide](../docs/setup-
    - `describe`: what is on screen (`subtitle`, `fileName`, and `issue` with `title`, `rows` and `sections`). Most useful is a section with a link that reopens exactly this view, if the app can make one. Give it a `fallback` text, because long links may not fit.
    Keep this file out of the vendored folder.
 4. **The button.** Call `feedback.open()` from a tap: the kit copies the picture to the clipboard during that tap. Pause any animation first if the picture should match what the person saw.
-5. **Offline.** If a service worker keeps a list of files, add the kit's six files (`kit.js`, `page.js`, `picture.js`, `sketch.js`, `issue.js`, `feedback-kit.css`). If it also caches web fonts, see Offline below.
+5. **Offline.** If a service worker keeps a list of files, add the kit's seven files (`kit.js`, `page.js`, `picture.js`, `sketch.js`, `issue.js`, `strings.js`, `feedback-kit.css`). If it also caches web fonts, see Offline below.
 6. **Preview builds (optional).** A preview banner or a debug page can open the panel without importing the app. The app listens for an event and cancels it to show it handled it:
    ```js
    document.addEventListener('myapp:feedback', e => { e.preventDefault(); feedback.open(); });
@@ -171,7 +195,7 @@ part), close to what was on screen but not an exact screenshot.
 
 ## Limits
 
-- **A copy, not a screenshot.** A page can't take a screenshot of itself on iPad Safari, so the whole page is redrawn from its elements and styles. It is close, but not exact: images, backgrounds and fonts from other sites appear only if their server allows CORS; iframes, video and plugins come out as empty boxes; the browser's own parts (scrollbars, the address bar) aren't in it; and a rare CSS effect can look slightly different, mostly in Safari.
+- **A copy, not a screenshot.** A page can't take a screenshot of itself on iPad Safari, so the whole page is redrawn from its elements and styles. It is close, but not exact: images, backgrounds and fonts from other sites appear only if their server allows CORS; iframes, video and plugins come out as empty boxes; the browser's own parts (the address bar, and scrollbars except classic ones the screen shows, as on Windows) aren't in it; and a rare CSS effect can look slightly different, mostly in Safari.
 - **Screen capture** is only on desktop browsers, and the browser asks every time. It isn't copied at once (it comes after the prompt, not in the tap): the person copies it after a stroke or with Copy picture.
 - **Clipboard.** Safari allows writing to the clipboard only during a tap, so the kit copies when the panel opens and after each stroke. Where copying is refused, Save and Share still work.
 - **Sign-in.** The person needs an account on GitHub, or on the GitLab server. Labels are applied only if they may label issues in the repository (on GitLab, members with the Planner role or higher can); the owner always can.
