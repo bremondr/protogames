@@ -2,8 +2,12 @@
 
    It answers the requests the store makes, the way GitHub does: the API on api.github.com (repos, folders with ETag
    and 304, files, blobs, saves and removals with sha checks, commits of a file) and file contents on
-   raw.githubusercontent.com. Repos are public or private; tokens are given per repo, to read or to write. Reads
-   without a token count against a limit of 60 (a 304 doesn't), like GitHub's limit for each IP address.
+   raw.githubusercontent.com. Repos are public or private; tokens are given per repo, to read or to write. API
+   requests without a token count against a limit of 60, a 304 included, like GitHub's limit for each IP address.
+   fake.requests counts the requests to each host: {api, raw}.
+
+   A repo can keep an index (git-store-index.json) the way a data repo's update-index workflow does: addRepo(name,
+   {index: true}) rebuilds it after every change, as a commit of its own; fake.writeIndex(name) writes it once.
 
      const fake = createFakeGitHub();
      fake.addRepo('me/team', {private: false, files: {'drills/a1.json': {name: 'Angel'}}});
@@ -11,12 +15,14 @@
      const store = createGitStore({..., fetch: fake.fetch});
 
    fake.log lists every request, with the token left out. fake.offline = true makes every request fail as offline;
-   fake.staleRaw = true makes raw.githubusercontent.com serve each file's previous version, as its cache can.
+   fake.staleRaw = true makes raw.githubusercontent.com serve each file's previous version, as its cache can (the
+   index too); a list of paths makes it do that for those files only, and a 404 for one of them that is new.
 
    fake.export() gives its state as plain JSON-safe data (repos, files, commits, tokens, the limit), and
    fake.import(state) or createFakeGitHub({state}) puts it back: a practice mode can keep it in sessionStorage and
    survive a reload. */
 import { fromBase64, gitBlobSha, toBase64 } from './github.js';
+import { idOfFile, INDEX_FILE } from './sources.js';
 
 const API = 'https://api.github.com', RAW = 'https://raw.githubusercontent.com';
 
@@ -26,7 +32,7 @@ export function createFakeGitHub({limit = 60, now = () => Date.now(), state = nu
   const repos = new Map();    // lower-case 'owner/name' → {name, private, files: Map path → {text, sha}, commits: []}
   const tokens = new Map();   // token → Map repoKey → 'read' | 'write'
   const blobs = new Map();    // sha → text
-  const fake = {log: [], offline: false, staleRaw: false, used: 0, limit, resetAt: now() + 3600e3};
+  const fake = {log: [], offline: false, staleRaw: false, used: 0, limit, resetAt: now() + 3600e3, requests: {api: 0, raw: 0}};
   let counter = 0;
 
   async function put(repo, path, text, {message, author = 'someone'}){
@@ -34,7 +40,30 @@ export function createFakeGitHub({limit = 60, now = () => Date.now(), state = nu
     blobs.set(sha, text);
     repo.files.set(path, {text, sha});
     await commit(repo, message, author, [path]);
+    if (repo.index && path !== INDEX_FILE) await writeIndex(repo, {onlyIfChanged: true});
     return sha;
+  }
+  // what index/build-index.mjs writes: every top-level folder (not hidden), with the item files directly in it
+  function indexFolders(repo){
+    const folders = {};
+    for (const [path, f] of repo.files){
+      const parts = path.split('/');
+      if (parts.length < 2 || parts[0].startsWith('.')) continue;
+      const list = folders[parts[0]] || (folders[parts[0]] = []);
+      if (parts.length === 2 && idOfFile(parts[1])) list.push({name: parts[1], path, sha: f.sha, size: new TextEncoder().encode(f.text).length});
+    }
+    const sorted = {};
+    for (const k of Object.keys(folders).sort()) sorted[k] = folders[k].sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+    return sorted;
+  }
+  async function writeIndex(repo, {onlyIfChanged = false} = {}){
+    const folders = indexFolders(repo), old = repo.files.get(INDEX_FILE);
+    if (onlyIfChanged && old){ try { if (JSON.stringify(JSON.parse(old.text).folders) === JSON.stringify(folders)) return; } catch { /* rewrite it */ } }
+    const text = JSON.stringify({type: 'git-store-index', version: 1, generatedAt: new Date(now()).toISOString(), commit: repo.commits[0] ? repo.commits[0].sha : null, folders}, null, 2) + '\n';
+    const sha = await gitBlobSha(text);
+    blobs.set(sha, text);
+    repo.files.set(INDEX_FILE, {text, sha});
+    await commit(repo, `Update ${INDEX_FILE}`, 'github-actions[bot]', [INDEX_FILE]);
   }
   async function commit(repo, message, author, paths){
     counter++;
@@ -43,12 +72,15 @@ export function createFakeGitHub({limit = 60, now = () => Date.now(), state = nu
     return c;
   }
 
-  fake.addRepo = async (name, {private: priv = false, files = {}} = {}) => {
-    const repo = {name, private: priv, files: new Map(), commits: []};
+  fake.addRepo = async (name, {private: priv = false, files = {}, index = false} = {}) => {
+    const repo = {name, private: priv, files: new Map(), commits: [], index: false};
     repos.set(name.toLowerCase(), repo);
     for (const [path, json] of Object.entries(files)) await put(repo, path, typeof json === 'string' ? json : JSON.stringify(json, null, 2) + '\n', {message: `Add ${path}`, author: 'owner'});
+    if (index){ repo.index = true; await writeIndex(repo); }
     return repo;
   };
+  /** Writes the repo's index now, as one commit (what running the update-index workflow by hand does). */
+  fake.writeIndex = name => writeIndex(repos.get(name.toLowerCase()));
   fake.addToken = (token, name, access = 'write') => {
     if (!tokens.has(token)) tokens.set(token, new Map());
     tokens.get(token).set(name.toLowerCase(), access);
@@ -56,7 +88,11 @@ export function createFakeGitHub({limit = 60, now = () => Date.now(), state = nu
   /** A change made somewhere else (another device, someone on GitHub): json, or null to remove the file. */
   fake.edit = async (name, path, json, {author = 'another device', message} = {}) => {
     const repo = repos.get(name.toLowerCase());
-    if (json === null){ repo.files.delete(path); await commit(repo, message || `Remove ${path}`, author, [path]); return null; }
+    if (json === null){
+      repo.files.delete(path); await commit(repo, message || `Remove ${path}`, author, [path]);
+      if (repo.index && path !== INDEX_FILE) await writeIndex(repo, {onlyIfChanged: true});
+      return null;
+    }
     return put(repo, path, typeof json === 'string' ? json : JSON.stringify(json, null, 2) + '\n', {message: message || `Update ${path}`, author});
   };
   fake.file = (name, path) => { const f = repos.get(name.toLowerCase()).files.get(path); return f ? JSON.parse(f.text) : null; };
@@ -72,7 +108,7 @@ export function createFakeGitHub({limit = 60, now = () => Date.now(), state = nu
       format: STATE_FORMAT, counter,
       limit: {limit: fake.limit, used: fake.used, resetAt: fake.resetAt},
       repos: [...repos.values()].map(r => ({
-        name: r.name, private: r.private, files: tree(r.files),
+        name: r.name, private: r.private, index: !!r.index, files: tree(r.files),
         commits: r.commits.map(c => ({sha: c.sha, date: c.date, author: c.author, message: c.message, paths: [...c.paths], tree: tree(c.tree)}))
       })),
       tokens: [...tokens].map(([token, access]) => ({token, repos: Object.fromEntries(access)})),
@@ -90,7 +126,7 @@ export function createFakeGitHub({limit = 60, now = () => Date.now(), state = nu
     const tree = files => new Map(Object.entries(files || {}).map(([path, sha]) => [path, {text: text(sha), sha}]));
     const nextRepos = new Map(), nextBlobs = new Map(), nextTokens = new Map();
     for (const r of data.repos){
-      nextRepos.set(String(r.name).toLowerCase(), {name: String(r.name), private: !!r.private, files: tree(r.files),
+      nextRepos.set(String(r.name).toLowerCase(), {name: String(r.name), private: !!r.private, index: !!r.index, files: tree(r.files),
         commits: (r.commits || []).map(c => ({sha: c.sha, date: c.date, author: c.author, message: c.message, paths: [...(c.paths || [])], tree: tree(c.tree)}))});
     }
     for (const [sha, t] of Object.entries(data.blobs)) if (typeof t === 'string') nextBlobs.set(sha, t);
@@ -117,6 +153,7 @@ export function createFakeGitHub({limit = 60, now = () => Date.now(), state = nu
     fake.log.push(entry);
     if (init.body){ try { const b = JSON.parse(init.body); entry.body = {message: b.message, sha: b.sha, content: b.content ? `${b.content.length} characters of base64` : undefined}; } catch { /* not JSON */ } }
     if (fake.offline){ entry.status = 'offline'; throw new TypeError('Failed to fetch'); }
+    if (url.origin === API) fake.requests.api++; else if (url.origin === RAW) fake.requests.raw++;
     const res = await answer(url, method, headers, auth, init);
     entry.status = res.status;
     return res;
@@ -129,7 +166,13 @@ export function createFakeGitHub({limit = 60, now = () => Date.now(), state = nu
       if (!repo || repo.private || (ref !== 'HEAD' && ref !== 'main')) return text(404, '404: Not Found');
       const path = rest.join('/');
       let f = repo.files.get(path);
-      if (fake.staleRaw){ const older = repo.commits.slice(1).find(c => c.tree.has(path)); if (older) f = older.tree.get(path); }
+      // the version before the newest one: the newest commit that has the file with other content
+      const stale = Array.isArray(fake.staleRaw) ? fake.staleRaw.includes(path) : !!fake.staleRaw;
+      if (stale && f){
+        const older = repo.commits.find(c => c.tree.has(path) && c.tree.get(path).sha !== f.sha);
+        if (older) f = older.tree.get(path);
+        else if (Array.isArray(fake.staleRaw)) f = null;   // named, and new: not on raw yet
+      }
       return f ? text(200, f.text, {'access-control-allow-origin': '*'}) : text(404, '404: Not Found');
     }
     if (url.origin !== API) return text(404, 'not GitHub');
@@ -142,9 +185,8 @@ export function createFakeGitHub({limit = 60, now = () => Date.now(), state = nu
     if (!m) return json(404, {message: 'Not Found'});
     const key = `${decodeURIComponent(m[1])}/${decodeURIComponent(m[2])}`.toLowerCase(), repo = repos.get(key);
     if (token) access = tokens.get(token[1]).get(key) || null;
-    if (!token){
-      if (fake.used >= fake.limit && !headers.get('if-none-match')) return json(403, {message: 'API rate limit exceeded for 127.0.0.1.'}, rateHeaders());
-    }
+    // without a token every request counts, a 304 too (GitHub: a 304 is free only "while correctly authorized")
+    if (!token && fake.used >= fake.limit) return json(403, {message: 'API rate limit exceeded for 127.0.0.1.'}, rateHeaders());
     if (!repo || (repo.private && !access)) { if (!token) fake.used++; return json(404, {message: 'Not Found'}, rateHeaders()); }
     const rest = m[3] || '';
     const count = () => { if (!token) fake.used++; };
@@ -170,9 +212,8 @@ export function createFakeGitHub({limit = 60, now = () => Date.now(), state = nu
         if (!names.size){ count(); return json(404, {message: 'Not Found'}, rateHeaders()); }
         const list = [...names.values()].sort((a, b) => a.name.localeCompare(b.name));
         const etag = `"${(await gitBlobSha(JSON.stringify(list) + (token ? 'auth' : ''))).slice(0, 32)}"`;
-        if (headers.get('if-none-match') === etag) return new Response(null, {status: 304, headers: {etag, ...rateHeaders()}});
-        if (!token && fake.used >= fake.limit) return json(403, {message: 'API rate limit exceeded for 127.0.0.1.'}, rateHeaders());
         count();
+        if (headers.get('if-none-match') === etag) return new Response(null, {status: 304, headers: {etag, ...rateHeaders()}});
         return json(200, list, {etag, ...rateHeaders()});
       }
       if (method === 'PUT' || method === 'DELETE'){

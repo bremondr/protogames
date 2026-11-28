@@ -85,3 +85,37 @@ export function idOfFile(name){
 
 /** A path for a URL: each part encoded, the slashes kept. */
 export const encodePath = path => path.split('/').map(encodeURIComponent).join('/');
+
+/* ---- the index: git-store-index.json at the root of a repo ----
+
+   {"type": "git-store-index", "version": 1, "generatedAt": "<ISO date>", "commit": "<commit sha or null>",
+    "folders": {"drills": [{"name": "abc.json", "path": "drills/abc.json", "sha": "<git blob sha>", "size": 1234}]}}
+
+   Made by index/build-index.mjs in the data repo, on every push. Someone else wrote it, so every field is checked. */
+export const INDEX_FILE = 'git-store-index.json';
+const SHA = /^[0-9a-f]{40}$/;
+
+/** The files of `folder` in an index ([{name, path, sha, size}], like a folder listing), or null when the index
+    isn't a valid one or doesn't list that folder. One bad entry makes the whole index unusable. */
+export function indexedFiles(index, folder){
+  if (!index || typeof index !== 'object' || Array.isArray(index)) return null;
+  if (index.type !== 'git-store-index' || index.version !== 1) return null;
+  if (index.commit != null && !SHA.test(index.commit)) return null;
+  if (index.generatedAt != null && (typeof index.generatedAt !== 'string' || isNaN(Date.parse(index.generatedAt)))) return null;
+  const folders = index.folders;
+  if (!folders || typeof folders !== 'object' || Array.isArray(folders)) return null;
+  if (!Object.prototype.hasOwnProperty.call(folders, folder)) return null;
+  const list = folders[folder];
+  if (!Array.isArray(list)) return null;
+  const prefix = folder ? folder + '/' : '', seen = new Set(), out = [];
+  for (const f of list){
+    if (!f || typeof f !== 'object') return null;
+    const {name, path, sha, size} = f;
+    if (typeof name !== 'string' || !idOfFile(name) || path !== prefix + name || seen.has(name)) return null;
+    if (typeof sha !== 'string' || !SHA.test(sha)) return null;
+    if (size != null && !(Number.isSafeInteger(size) && size >= 0)) return null;
+    seen.add(name);
+    out.push({name, path, sha, size: size ?? null});
+  }
+  return out;
+}

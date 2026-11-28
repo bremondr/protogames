@@ -20,7 +20,8 @@
          fileName: 'feedback-angel-step-2.png',
          issue: {title, rows: [[name, value]], sections: [{heading, text, fallback}]}   // or a promise of it
        }),
-       footer: 'Sent with Send feedback in the app.'
+       footer: 'Sent with Send feedback in the app.',
+       // language: 'cs', strings: {heading: 'Nahlásit chybu'},   // English by default; see strings.js
      });
      button.addEventListener('click', feedback.open);
 
@@ -30,24 +31,25 @@
 import { issueTarget, issueUrl } from './issue.js';
 import { createSketch } from './sketch.js';
 import { canCaptureScreen, pagePicture, screenPicture } from './page.js';
+import { format, listOf, STRINGS, texts } from './strings.js';
 
-const PENS = [['#ff2d55', 'Red'], ['#ffffff', 'White'], ['#1f6feb', 'Blue'], ['#111111', 'Black']];
+const PENS = [['#ff2d55', 'penRed'], ['#ffffff', 'penWhite'], ['#1f6feb', 'penBlue'], ['#111111', 'penBlack']];
 
-export function deviceRows(){
+// the rows about the device for the issue, in the language of `t` (the texts from strings.js)
+export function deviceRows(t = STRINGS.en){
   const dark = matchMedia('(prefers-color-scheme: dark)').matches;
   const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
   const desktop = matchMedia('(pointer: fine)').matches && !matchMedia('(pointer: coarse)').matches;
   return [
-    ['Screen', `${innerWidth} × ${innerHeight} px, ${innerWidth >= innerHeight ? 'landscape' : 'portrait'}, pixel ratio ${Math.round((devicePixelRatio || 1) * 100) / 100}, ${dark ? 'dark' : 'light'} mode${standalone ? ', home screen app' : ''}`],
+    [t.rowScreen, format(standalone ? t.screenApp : t.screen, {width: innerWidth, height: innerHeight,
+      orientation: innerWidth >= innerHeight ? t.landscape : t.portrait, theme: dark ? t.darkMode : t.lightMode,
+      ratio: String(Math.round((devicePixelRatio || 1) * 100) / 100).replace('.', t.decimal)})],
     // on a desktop the page is a window on a bigger screen: say how big both are
-    ...(desktop ? [['Window', `${outerWidth} × ${outerHeight} px on a ${screen.width} × ${screen.height} px screen`]] : []),
-    ['Browser', navigator.userAgent],
-    ['Page', location.origin + location.pathname]
+    ...(desktop ? [[t.rowWindow, format(t.window, {width: outerWidth, height: outerHeight, screenWidth: screen.width, screenHeight: screen.height})]] : []),
+    [t.rowBrowser, navigator.userAgent],
+    [t.rowPage, location.origin + location.pathname]
   ];
 }
-
-const COPIED = 'The picture is copied. Paste it into the issue, or draw on it first.';
-const NOT_COPIED = 'Couldn’t copy the picture here. Save or share it, then attach it to the issue.';
 
 // the first picture file in a paste or a drop
 const imageIn = data => [...(data?.files || [])].find(f => f.type.startsWith('image/'))
@@ -76,39 +78,43 @@ function element(tag, props = {}, ...kids){
 }
 
 export function createFeedback({repo, provider = 'github', host, urlLimit, labels = ['feedback'], picture = null,
-  pictureLabel = 'Just this part', page = {}, capture = 'button', describe, footer = '', heading = 'Send feedback'}){
-  const site = issueTarget({provider, host, repo, urlLimit, labels}).provider.name;   // throws now if one is wrong
+  pictureLabel, page = {}, capture = 'button', describe, footer = '', heading, language, strings}){
+  const name = issueTarget({provider, host, repo, urlLimit, labels}).provider.name;   // throws now if one is wrong
+  const t = texts(language, strings);   // this too
+  const site = t[`provider.${provider}`] ?? name;   // the provider's name, in the form the texts need
+  heading ??= t.heading; pictureLabel ??= t.pictureLabel;
+  const COPIED = t.copied, NOT_COPIED = t.notCopied;
   const captureMode = () => { const m = typeof capture === 'function' ? capture() : capture; return canCaptureScreen() ? m : 'off'; };
-  let ui = null, run = 0, shown = 0, fileName = 'feedback.png', file = null, objectUrl = null;
+  let ui = null, run = 0, shown = 0, fileName = t.fileName, file = null, objectUrl = null;
   let pictures = {}, current = null;   // this time's pictures by kind ('page', 'part'), each a promise of a canvas
 
   function build(){
     const q = {};
-    q.canvas = element('canvas', {class: 'fk-canvas', 'aria-label': 'Picture of the screen. Draw on it to point at the problem.'});
-    q.wait = element('p', {class: 'fk-wait', text: 'Making the picture…'});
-    q.pens = PENS.map(([c, name], k) => element('button', {type: 'button', class: 'fk-pen', title: name, 'aria-label': `${name} pen`, 'aria-pressed': String(k === 0), style: `--pen:${c}`}));
-    q.undo = element('button', {type: 'button', class: 'fk-btn', text: 'Undo'});
-    q.clear = element('button', {type: 'button', class: 'fk-btn', text: 'Clear'});
+    q.canvas = element('canvas', {class: 'fk-canvas', 'aria-label': t.canvasLabel});
+    q.wait = element('p', {class: 'fk-wait', text: t.making});
+    q.pens = PENS.map(([c, key], k) => element('button', {type: 'button', class: 'fk-pen', title: t[key], 'aria-label': format(t.penLabel, {pen: t[key]}), 'aria-pressed': String(k === 0), style: `--pen:${c}`}));
+    q.undo = element('button', {type: 'button', class: 'fk-btn', text: t.undo});
+    q.clear = element('button', {type: 'button', class: 'fk-btn', text: t.clear});
     q.status = element('p', {class: 'fk-status', role: 'status'});
-    q.open = element('a', {class: 'fk-primary', target: '_blank', rel: 'noopener', 'aria-disabled': 'true', text: `Write the issue on ${site}`});
-    q.long = element('p', {class: 'fk-note', hidden: true});
-    q.copy = element('button', {type: 'button', class: 'fk-btn', text: 'Copy picture'});
+    q.open = element('a', {class: 'fk-primary', target: '_blank', rel: 'noopener', 'aria-disabled': 'true', text: format(t.openIssue, {provider: site})});
+    q.long = element('p', {class: 'fk-note fk-long', hidden: true});
+    q.copy = element('button', {type: 'button', class: 'fk-btn', text: t.copy});
     q.kinds = {
-      page: element('button', {type: 'button', class: 'fk-btn', 'aria-pressed': 'true', text: 'Whole page'}),
+      page: element('button', {type: 'button', class: 'fk-btn', 'aria-pressed': 'true', text: t.kindPage}),
       part: element('button', {type: 'button', class: 'fk-btn', 'aria-pressed': 'false', text: pictureLabel}),
-      own: element('button', {type: 'button', class: 'fk-btn', 'aria-pressed': 'false', text: 'Your screenshot', hidden: true}),
-      screen: element('button', {type: 'button', class: 'fk-btn', 'aria-pressed': 'false', text: 'Screen capture', hidden: true})
+      own: element('button', {type: 'button', class: 'fk-btn', 'aria-pressed': 'false', text: t.kindOwn, hidden: true}),
+      screen: element('button', {type: 'button', class: 'fk-btn', 'aria-pressed': 'false', text: t.kindScreen, hidden: true})
     };
-    q.pick = element('div', {class: 'fk-pick', role: 'group', 'aria-label': 'Picture'}, ...Object.values(q.kinds));
+    q.pick = element('div', {class: 'fk-pick', role: 'group', 'aria-label': t.pickLabel}, ...Object.values(q.kinds));
     q.file = element('input', {type: 'file', accept: 'image/*', hidden: true, tabindex: '-1', 'aria-hidden': 'true'});
-    q.mine = element('button', {type: 'button', class: 'fk-btn fk-mine', text: 'Use my screenshot…'});
-    q.grab = element('button', {type: 'button', class: 'fk-btn', text: 'Take a real screenshot', hidden: true});
-    q.mineNote = element('p', {class: 'fk-note', text: 'Or paste a screenshot (Ctrl+V, ⌘V) or drop one on the picture.'});
-    q.share = element('button', {type: 'button', class: 'fk-btn', text: 'Share…', hidden: true});
-    q.save = element('a', {class: 'fk-btn', 'aria-disabled': 'true', text: 'Save picture'});
-    q.close = element('button', {type: 'button', class: 'fk-x', 'aria-label': 'Close', text: '×'});
+    q.mine = element('button', {type: 'button', class: 'fk-btn fk-mine', text: t.mine});
+    q.grab = element('button', {type: 'button', class: 'fk-btn', text: t.grab, hidden: true});
+    q.mineNote = element('p', {class: 'fk-note', text: t.mineNote});
+    q.share = element('button', {type: 'button', class: 'fk-btn', text: t.share, hidden: true});
+    q.save = element('a', {class: 'fk-btn', 'aria-disabled': 'true', text: t.save});
+    q.close = element('button', {type: 'button', class: 'fk-x', 'aria-label': t.close, text: '×'});
     q.sub = element('p', {class: 'fk-sub'});
-    q.root = element('div', {class: 'fk', role: 'dialog', 'aria-modal': 'true', 'aria-label': heading, hidden: true, 'data-fk-skip': ''},
+    q.root = element('div', {class: 'fk', role: 'dialog', 'aria-modal': 'true', 'aria-label': heading, hidden: true, 'data-fk-skip': '', ...(language ? {lang: language} : {})},
       element('div', {class: 'fk-card'},
         element('header', {class: 'fk-head'}, element('div', {}, element('h2', {text: heading}), q.sub), q.close),
         element('div', {class: 'fk-body'},
@@ -116,11 +122,11 @@ export function createFeedback({repo, provider = 'github', host, urlLimit, label
           element('div', {class: 'fk-side'},
             q.pick,
             element('div', {class: 'fk-own'}, q.grab, q.mine, q.file, q.mineNote),
-            element('div', {class: 'fk-tools'}, element('div', {class: 'fk-pens', role: 'group', 'aria-label': 'Pen colour'}, ...q.pens), q.undo, q.clear),
-            element('p', {class: 'fk-note', text: 'Draw on the picture to point at the problem.'}),
+            element('div', {class: 'fk-tools'}, element('div', {class: 'fk-pens', role: 'group', 'aria-label': t.pensLabel}, ...q.pens), q.undo, q.clear),
+            element('p', {class: 'fk-note', text: t.drawNote}),
             q.status, q.open, q.long,
             element('div', {class: 'fk-row'}, q.copy, q.share, q.save),
-            element('p', {class: 'fk-note', text: `The issue opens on ${site} with what was on screen filled in. Sign in, paste the picture, say what’s wrong, and tap Submit.`})))));
+            element('p', {class: 'fk-note', text: format(t.issueNote, {provider: site})})))));
     document.body.appendChild(q.root);
 
     q.sketch = createSketch(q.canvas, {onChange: () => refresh(true)});
@@ -146,7 +152,7 @@ export function createFeedback({repo, provider = 'github', host, urlLimit, label
       q.root.classList.remove('fk-drop');
       const f = imageIn(e.dataTransfer);
       if (f || e.dataTransfer?.files.length) e.preventDefault();
-      if (f) useOwn(f); else if (e.dataTransfer?.files.length) say('That isn’t a picture. Drop a screenshot (PNG or JPEG).', true);
+      if (f) useOwn(f); else if (e.dataTransfer?.files.length) say(t.notPicture, true);
     });
     q.share.addEventListener('click', () => { if (file) navigator.share({files: [file], title: heading}).catch(() => {}); });
     q.open.addEventListener('click', e => { if (q.open.getAttribute('aria-disabled')) e.preventDefault(); });
@@ -177,7 +183,7 @@ export function createFeedback({repo, provider = 'github', host, urlLimit, label
       ui.share.hidden = !(navigator.canShare && navigator.canShare({files: [file]}) && window.top === window);
     }, () => {});
     if (copied) copied.then(
-      () => { if (mine === shown) say(ui.sketch.strokes ? 'The picture is copied, with your drawing. Paste it into the issue.' : COPIED); },
+      () => { if (mine === shown) say(ui.sketch.strokes ? t.copiedDrawing : COPIED); },
       () => { if (mine === shown) say(NOT_COPIED, true); });
   }
 
@@ -189,10 +195,10 @@ export function createFeedback({repo, provider = 'github', host, urlLimit, label
     current = kind;
     for (const [k, b] of Object.entries(ui.kinds)) b.setAttribute('aria-pressed', String(k === kind));
     const copied = toClipboard ? copy(pic.then(toBlob)) : null;
-    ui.canvas.hidden = true; ui.wait.hidden = false; ui.wait.textContent = 'Making the picture…';
+    ui.canvas.hidden = true; ui.wait.hidden = false; ui.wait.textContent = t.making;
     ui.save.removeAttribute('href'); ui.save.setAttribute('aria-disabled', 'true'); ui.share.hidden = true;
     ui.undo.disabled = ui.clear.disabled = true;
-    say('Making the picture…');
+    say(t.making);
     pic.then(canvas => {
       if (mine !== shown) return;
       ui.sketch.setPicture(canvas);
@@ -200,13 +206,13 @@ export function createFeedback({repo, provider = 'github', host, urlLimit, label
       refresh(false);
       if (note) say(note, true);
       else if (copied) copied.then(() => { if (mine === shown) say(COPIED); }, () => { if (mine === shown) say(NOT_COPIED, true); });
-      else say(kind === 'own' ? 'Your screenshot is in. Draw on it, then copy, save or share it for the issue.' : 'Draw on the picture, then copy, save or share it for the issue.');
+      else say(kind === 'own' ? t.ownIn : t.drawThen);
     }, () => {
       if (mine !== shown) return;
-      if (kind === 'own'){ ui.kinds.own.hidden = true; ui.pick.hidden = !pictures.part; show('page', false); say('That picture couldn’t be read. Try a PNG or JPEG screenshot.', true); return; }
+      if (kind === 'own'){ ui.kinds.own.hidden = true; ui.pick.hidden = !pictures.part; show('page', false); say(t.unreadable, true); return; }
       if (kind === 'page' && pictures.part){ show('part', false); return; }
-      ui.wait.textContent = 'No picture in this browser.';
-      say('Couldn’t make a picture here. The issue still says what was on screen.', true);
+      ui.wait.textContent = t.noPicture;
+      say(t.noPictureNote, true);
     });
   }
 
@@ -247,7 +253,7 @@ export function createFeedback({repo, provider = 'github', host, urlLimit, label
     }, () => {
       if (mine !== run) return;
       ui.root.hidden = false;
-      show(had || 'page', false, 'No screen capture, so the picture is the one made from the page. Your own screenshot works too.');
+      show(had || 'page', false, t.noCapture);
     }).finally(() => { if (mine === run) ui.close.focus({preventScroll: true}); });
   }
 
@@ -260,7 +266,7 @@ export function createFeedback({repo, provider = 'github', host, urlLimit, label
     for (const p of Object.values(pictures)) p.catch(() => {});
     ui = ui || build();
     run++;
-    fileName = info.fileName || 'feedback.png'; file = null;
+    fileName = info.fileName || t.fileName; file = null;
     const mode = captureMode();
     ui.kinds.part.hidden = !picture;
     ui.kinds.own.hidden = ui.kinds.screen.hidden = true;
@@ -282,9 +288,9 @@ export function createFeedback({repo, provider = 'github', host, urlLimit, label
     const mine = run;
     Promise.resolve(info.issue).then(issue => {
       if (mine !== run) return;
-      const {url, shortened} = issueUrl({provider, host, repo, urlLimit, labels, footer, ...issue, rows: [...(issue.rows || []), ...deviceRows()]});
+      const {url, shortened, gaveWay} = issueUrl({provider, host, repo, urlLimit, labels, footer, ...issue, language, strings, rows: [...(issue.rows || []), ...deviceRows(t)]});
       ui.open.href = url; ui.open.removeAttribute('aria-disabled');
-      ui.long.textContent = shortened ? 'Some of what was on screen was too long to put in the issue.' : '';
+      ui.long.textContent = shortened ? format(t.tooLong, {sections: listOf(gaveWay, language)}) : '';
       ui.long.hidden = !shortened;
     });
   }

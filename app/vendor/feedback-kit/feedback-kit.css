@@ -17,7 +17,8 @@
 
 /* the picture beside the controls on a wide screen, above them on an upright one */
 .fk-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:14px;padding:0 14px 14px}
-.fk-stage{min-width:0;min-height:0;display:grid;place-items:center;background:var(--fk-stage,#e9ede7);border-radius:10px;overflow:hidden;position:relative}
+/* one row and column the size of the stage, not of the picture, so max-height:100% on the canvas has a height to fit */
+.fk-stage{min-width:0;min-height:0;display:grid;grid-template:minmax(0,1fr) / minmax(0,1fr);place-items:center;background:var(--fk-stage,#e9ede7);border-radius:10px;overflow:hidden;position:relative}
 .fk-canvas{display:block;max-width:100%;max-height:100%;touch-action:none;cursor:crosshair;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .fk-wait{margin:0;color:var(--fk-muted,#5b665e)}
 .fk-side{display:flex;flex-direction:column;gap:10px;overflow-y:auto;min-height:0;padding:5px 2px 2px 5px}   /* room for the chosen pen's ring */

@@ -12,8 +12,14 @@
 
    embedFonts({stylesheet, family, unicode}) → Promise<string>
      The @font-face rules of `family` from a stylesheet that allows CORS (Google Fonts does), with the font files
-     inlined as data: URLs. `unicode` picks the subsets by their unicode-range (default: Latin); a rule without a
-     unicode-range covers every character and is always kept. Resolves to '' when it can't be read. */
+     inlined as data: URLs. `unicode` is a regular expression that picks the subsets by their unicode-range. The
+     default, LATIN, keeps Latin and Latin Extended: the rules with a range that starts at U+0000 or U+0100, which
+     are Google Fonts' `latin` (U+0000-00FF, …) and `latin-ext` (U+0100-02BA, …), so Czech, Slovak, Polish and the
+     like come out in the font; Cyrillic, Greek, Vietnamese and the rest are left out. A rule without a unicode-range
+     covers every character and is always kept. Resolves to '' when it can't be read.
+
+   fontFaces(css, family, unicode = LATIN) → string[]
+     The @font-face rules embedFonts keeps from a stylesheet's text, before their files are fetched. */
 
 const NS = 'http://www.w3.org/2000/svg';
 const PROPS = ['display', 'visibility', 'opacity', 'fill', 'fill-opacity', 'fill-rule', 'stroke', 'stroke-opacity',
@@ -63,13 +69,20 @@ export async function drawSvg(text, w, h, {background = '#fff', scale = 1} = {})
   return canvas;
 }
 
+// a unicode-range with a range that starts at U+0000 (Latin) or U+0100 (Latin Extended), with or without leading zeros
+export const LATIN = /U\+0*(?:0|100)-/i;
+
+export function fontFaces(css, family, unicode = LATIN){
+  return (css.match(/@font-face\s*{[^}]*}/g) || []).filter(f => f.includes(family) && (unicode.test(f) || !/unicode-range/i.test(f)));
+}
+
 const fontCache = new Map();
-export function embedFonts({stylesheet, family, unicode = /U\+0000-00FF/i}){
+export function embedFonts({stylesheet, family, unicode = LATIN}){
   const key = stylesheet + '|' + family;
   if (fontCache.has(key)) return fontCache.get(key);
   const p = (async () => {
     const css = await (await fetch(stylesheet, {mode: 'cors'})).text();
-    const faces = (css.match(/@font-face\s*{[^}]*}/g) || []).filter(f => f.includes(family) && (unicode.test(f) || !/unicode-range/i.test(f)));
+    const faces = fontFaces(css, family, unicode);
     const out = await Promise.all(faces.map(async f => {
       const m = /url\(\s*['"]?([^'")]+)['"]?\s*\)/.exec(f);
       if (!m) return '';

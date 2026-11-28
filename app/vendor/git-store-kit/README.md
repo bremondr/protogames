@@ -6,9 +6,10 @@ The module knows nothing about the items: the project says how to read and write
 
 ## What it does
 
-- **Sources.** A source is a repo the viewer follows, several at once, remembered on the device. A link adds one: `#team=sunset` (a short name the project turns into `owner/repo`) or `#team=owner/repo`. Every name is checked against GitHub's rules before it becomes part of a URL.
+- **Sources.** A source is a repo the viewer follows, several at once, remembered on the device. A link adds one: `#team=sunset` (a short name the project turns into `owner/repo`) or `#team=owner/repo`. Every name is checked against GitHub's rules before it becomes part of a URL. The project can name **default sources**, followed on a first visit; one the person removes stays removed.
 - **Reading.**
-  - The folder is listed through GitHub's API, and only files whose content changed since the last load are fetched.
+  - Without a token, a repo with an **index** (`git-store-index.json`, rebuilt by a workflow in the data repo on every push) is read entirely from `raw.githubusercontent.com`: **no API requests at all**. See [The index](#the-index-reading-public-repos-with-no-api-requests).
+  - Otherwise the folder is listed through GitHub's API. Either way, only files whose content changed since the last load are fetched.
   - Without a token, file contents come from `raw.githubusercontent.com`, which has no rate limit. Each file is checked against git's hash for that version, because that host can serve a copy a few minutes old.
   - With a token, everything goes through the API.
   - Every item goes through the project's `read`, which drops anything it can't use.
@@ -34,6 +35,7 @@ The module knows nothing about the items: the project says how to read and write
 | `fake-github.js` | `createFakeGitHub()`: a small GitHub in memory, for a project's tests and for the demo. Its state can be exported and imported |
 | `package.json` | only `{"type": "module"}`: tells Node the `.js` files are ES modules, so a project's Node tests import them without a warning. Not a dependency; browsers ignore it |
 | `git-store-kit.css` | the panel; themed with `--gs-*` custom properties |
+| `index/build-index.mjs`, `index/update-index.yml` | not for apps: what a data repo copies to keep its index up to date (see [Setting up the index in a data repo](#setting-up-the-index-in-a-data-repo)). Apps never load them |
 
 ## Using it
 
@@ -57,6 +59,8 @@ const store = createGitStore({
   setId: (item, id) => ({...item, id}),       // default as shown: a copy of the item under a new id
   newId: item => `${slug(item.name)}-copy`,   // optional: the id of a copy, given the item being copied. Default: random
   commitMessage: ({op, name, note}) => note || `${op} ${name}`,   // op: add, update, remove, copy, restore
+  defaults: ['bremondr/ultimate-playbook-demo'],   // optional: followed on a first visit (see below)
+  index: 'auto',                              // default: without a token, read git-store-index.json when the repo has one; false: never
 });
 const panel = createPanel(store, {title: 'Teams', noun: 'drill', sourceLabel: 'team'});
 
@@ -79,8 +83,39 @@ await store.load();
 | `private`, `canWrite`, `hasToken` | what the repo is, and what this device can do there |
 | `dropped` | how many `.json` files `read` refused |
 | `loading` | a load is under way |
+| `fromIndex` | the last load read the repo's index (no API requests), rather than listing the folder through the API |
+| `outdated` | files the index lists that `raw.githubusercontent.com` didn't serve in that version yet: the version on the device is kept (a new file is left out) until a later load |
 
 Also: `store.items()` (every item of every source, each with its `repo`), `store.source(repo)`, `store.following()`, `store.follow(value)` (returns the repo, or null for a bad value), `store.unfollow(repo)` (also forgets its token and saved copy), `store.load(repo)` for one source.
+
+### Default sources
+
+`defaults: ['owner/repo', 'sunset']` (full names, or short names through `shortName`) are followed for a person who hasn't followed or removed them yet, so a first visit shows something without a link. Each default is offered once per device and app: `createGitStore` adds the ones not offered before to the end of the followed list and remembers them (local storage, `<app>:git-store:defaults`). After `unfollow` (the panel's Remove) it stays removed; `follow` brings it back as usual. A repo added to `defaults` later reaches people who already use the app, once. Without local storage the defaults are followed for the page. A default that isn't a repo name throws, as it is a mistake in the app.
+
+### The index: reading public repos with no API requests
+
+Without a token, GitHub allows 60 API requests an hour for each IP address, shared by everyone on the same Wi-Fi, and listing a folder costs one per load and per store. A data repo can carry an index of its item files instead, `git-store-index.json` at its root, made by `index/build-index.mjs` and kept up to date by `index/update-index.yml` (see [Setting up the index in a data repo](#setting-up-the-index-in-a-data-repo)):
+
+```json
+{
+  "type": "git-store-index",
+  "version": 1,
+  "generatedAt": "2026-12-01T10:00:00.000Z",
+  "commit": "<the commit it was built from>",
+  "folders": {
+    "drills": [{"name": "abc.json", "path": "drills/abc.json", "sha": "<git blob sha>", "size": 1234}],
+    "plans": []
+  }
+}
+```
+
+- One file for the whole repo: every top-level folder (not hidden ones like `.github`), so several stores (Ultimate Playbook's `drills` and `plans`) share it. A folder with no items is listed as `[]`.
+- Only `<id>.json` files directly in each folder are listed (ids as for items); a `README.md` or a subfolder is left out. `sha` is the file's git blob sha, the same as GitHub's folder listing gives.
+- With `index: 'auto'` (the default) and **no token**, a load reads the index from `raw.githubusercontent.com`, then only the files whose `sha` changed, from there too: no API request. It falls back to listing through the API, as before, when the index is missing, isn't valid (every field is checked; one bad entry and the whole index is ignored), or doesn't list the store's folder.
+- **With a token** the folder is listed through the API as before (5,000 an hour, and always fresh); the index isn't read.
+- `raw.githubusercontent.com` can serve the index and each file up to about 5 minutes old. A file whose text doesn't match the index's `sha` costs no API request: the version on the device is kept (a new file is left out) and picked up at a later load. `source.outdated` counts them.
+- Saving and removing are unchanged. The editor sees a save at once; other devices see it once the workflow has rebuilt the index (a minute or so after the push) and raw serves it (up to 5 more minutes).
+- The index is kept on the device like the folder listing, so offline works the same. `index: false` turns it off.
 
 ### Saving
 
@@ -180,7 +215,15 @@ const again = createFakeGitHub({state: JSON.parse(sessionStorage.getItem('practi
 fake.import(state);                                                   // the same, into an existing fake
 ```
 
-`export()` gives plain data that survives `JSON.stringify`; `import()` replaces everything the fake keeps (not its request log, `offline` or `staleRaw`), and throws for anything that isn't such a state.
+`export()` gives plain data that survives `JSON.stringify`; `import()` replaces everything the fake keeps (not its request log, `requests`, `offline` or `staleRaw`), and throws for anything that isn't such a state.
+
+Like GitHub, the fake counts every API request without a token against its limit (`fake.used` of `fake.limit`), a `304` included. `fake.requests` counts requests by host (`{api, raw}`), so a test can check that a load made none to the API. For the index:
+
+```js
+await fake.addRepo('me/demo', {files, index: true});   // keeps git-store-index.json up to date after every change, as the workflow does
+await fake.writeIndex('me/plain');                     // writes it once, as running the workflow by hand does
+fake.staleRaw = ['drills/a1.json'];                    // raw serves these files' previous version (a new one: not at all); true: every file, the index too
+```
 
 ## Setting it up in a project
 
@@ -203,9 +246,42 @@ With the kit copied into the project (see [web-kit's setup guide](../docs/setup-
 3. **The adapter.** Write one project file, for example `js/features/team.js`, that calls `createGitStore` and `createPanel` with the project's `app`, `folder`, `param`, `shortName`, and `read` and `write` for its items. `read` must check every field, because data in a repo was written by someone else. It draws the items into the app's lists and adds the buttons ("Publish to team", "Save to repo", "History"). Keep this file out of the vendored folder.
 4. **The styles.** Link `git-store-kit.css` and set the `--gs-*` properties to the project's colours and fonts.
 5. **Content-Security-Policy.** If the page has one, its `connect-src` must allow `https://api.github.com https://raw.githubusercontent.com`. Those two hosts serve every repo of every owner.
-6. **Service worker.** The module never reads from the app's own site, so a service worker doesn't get in the way. Still, it must not cache requests to `api.github.com` or `raw.githubusercontent.com`: the module keeps its own copy, and a cached answer would hide changes. A worker that handles only its own site's files is fine. If it keeps a list of files, add the kit's files (`store.js`, `panel.js`, `github.js`, `sources.js`, `cache.js`, `git-store-kit.css`). `fake-github.js` is only for tests.
+6. **Service worker.** The module never reads from the app's own site, so a service worker doesn't get in the way. Still, it must not cache requests to `api.github.com` or `raw.githubusercontent.com`: the module keeps its own copy, and a cached answer would hide changes. A worker that handles only its own site's files is fine. If it keeps a list of files, add the kit's files (`store.js`, `panel.js`, `github.js`, `sources.js`, `cache.js`, `git-store-kit.css`). `fake-github.js` is only for tests, and `index/` only for data repos.
 7. **Previews.** If pull request previews give local storage a prefix per preview, as both of bremondr's apps do, a token pasted on the live app isn't seen in a preview. That stops a preview from writing to the real data by accident. Paste a token in the preview only to try saving on purpose.
 8. **Links.** A link to a source is the app's address with `#<param>=<short name or owner/repo>`. `store.followFromHash()` follows it; `hashWithout(hash, param)` from `sources.js` tidies the address afterwards, if wanted.
+9. **Default sources and the index** (optional). To show a public repo on a first visit, pass it in `defaults`, to every store of the app that should follow it. Give that repo, and every public repo many people read without a token, the index (next section), so they read it with no API requests.
+
+### Setting up the index in a data repo
+
+The two files are in this folder's `index/`, versioned with the module. A data repo copies them from a release (here 1.2.0); it needs no other part of the module, and nothing but the workflow runs them. Windows PowerShell and other shells alike, in the data repo's root:
+
+```sh
+mkdir .github/workflows
+curl.exe -fsSL -o .github/build-index.mjs https://raw.githubusercontent.com/bremondr/web-kit/git-store-kit-v1.2.0/git-store-kit/index/build-index.mjs
+curl.exe -fsSL -o .github/workflows/update-index.yml https://raw.githubusercontent.com/bremondr/web-kit/git-store-kit-v1.2.0/git-store-kit/index/update-index.yml
+node .github/build-index.mjs
+git add .github git-store-index.json
+git commit -m "Keep an index of the items for git-store-kit"
+git push
+```
+
+(`curl.exe` is in Windows 10 and later; elsewhere `curl` works the same, and `mkdir -p` makes `.github` too. Without Node, skip `node .github/build-index.mjs` and `git-store-index.json`: the workflow writes it after the push.)
+
+1. **The workflow** (`.github/workflows/update-index.yml`) runs on every push to the default branch, an app's "Publish" included, and when started by hand. It runs `node .github/build-index.mjs` and commits `git-store-index.json` only when the listed files changed. Its own commit doesn't start it again.
+2. **Permission to push.** The workflow asks for `contents: write`. On a personal repo that is enough. If the run fails with a 403 on `git push`, the organisation or repo limits workflows to reading; allow writing (replace `OWNER/REPO`):
+   ```sh
+   gh api -X PUT repos/OWNER/REPO/actions/permissions/workflow -f default_workflow_permissions=write
+   ```
+   A branch protection rule that requires pull requests on the default branch also stops it; the data repo shouldn't have one.
+3. **Run it once by hand and check:**
+   ```sh
+   gh workflow run update-index.yml -R OWNER/REPO
+   gh run list -R OWNER/REPO -w update-index.yml -L 1
+   gh api repos/OWNER/REPO/contents/git-store-index.json -q .path
+   ```
+   The last one prints `git-store-index.json`. In the app, without a token, the source loads with `fromIndex: true` and the browser's network tab shows no request to `api.github.com`.
+4. **Only some folders:** name them in the workflow's `run` line, for example `node .github/build-index.mjs drills plans`. A folder deeper down works too (`data/boards`), for a store whose `folder` is one.
+5. **Updating them:** copy both files again from a newer release when this changelog says so. `node .github/build-index.mjs --check` exits with 1 when the index is missing or out of date, for a data repo's own checks.
 
 [web-kit's demo](https://github.com/bremondr/web-kit/blob/main/demo/git-store-kit.js) is a short, complete example of both modes.
 
@@ -214,8 +290,11 @@ With the kit copied into the project (see [web-kit's setup guide](../docs/setup-
 - **Public repos are public.** Anyone with the repo's name can read every item and its whole history. Use a private repo for anything else.
 - **Tokens are as safe as the site.** A token is kept in the browser's local storage, where every page of the same site can read it. On `<owner>.github.io` that is every app and preview of that owner. So give each token one repo, only *Contents*, and an expiry date: if one leaks, the worst case is changes to that one repo, which git's history can undo. The module sends a token only in the `Authorization` header to `api.github.com`, never in a URL, an error, the saved copy or a log.
 - **The saved copy of a private repo** is kept in IndexedDB, also readable by every page of the same site, and also by previews, which don't prefix IndexedDB.
-- **Rate limits.** Without a token, GitHub allows 60 API requests an hour for each IP address: a team on one Wi-Fi shares them. One load costs one request for the folder (none when nothing changed: a `304` doesn't count), plus one for each file that `raw.githubusercontent.com` served out of date. A reader who needs more can use a read token (5,000 an hour).
+- **Rate limits.** Without a token, GitHub allows 60 API requests an hour for each IP address: a team on one Wi-Fi shares them.
+  - A repo with an index costs **none**: the index and the files come from `raw.githubusercontent.com`, which has no limit.
+  - A repo without one costs one request per load for each store's folder, also when nothing changed: GitHub doesn't count a `304` only when the request carries a token ("made while correctly authorized with an Authorization header", in GitHub's docs on conditional requests), so without one it counts. Plus one for each file that `raw.githubusercontent.com` served out of date. Ultimate Playbook's two stores make that 2 per team per app start, about 30 starts an hour for a whole Wi-Fi.
+  - A reader who needs more can use a read token (5,000 an hour; there a `304` is free).
 - **Sizes.** At most 1,000 files are listed in a folder (GitHub's limit for listing a folder). Items up to 100 MB can be read; saving refuses items over `maxBytes` (1 MB unless set).
 - **Editors.** Fine-grained tokens only reach repos owned by the account or organisation they are made for. Someone who is only a collaborator on another person's repo may not be able to make one. For several editors, put the data repos in an organisation.
 - **No "Sign in with GitHub".** That needs a server: GitHub's sign-in doesn't allow requests from a web page. So tokens are pasted.
-- **A few minutes for readers.** The editor sees a save at once. Other devices see it at their next load; `raw.githubusercontent.com` can lag a few minutes, and the module then reads the file through the API instead.
+- **A few minutes for readers.** The editor sees a save at once. Other devices see it at their next load. `raw.githubusercontent.com` can lag a few minutes: without an index the module then reads the file through the API instead; with an index it keeps the version it has and picks up the new one at a later load (up to about 5 minutes, plus the minute or so the workflow takes).

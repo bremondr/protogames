@@ -2,6 +2,17 @@
 
 Each version is released as the tag `git-store-kit-vX.Y.Z`. A new major version (the first number) means a project using the kit may need changes; the notes say which.
 
+## 1.2.0 (2026-11-27)
+
+Reading public repos with no API requests, and default sources. Nothing to change in a project: without the new options a store works as before, and `index: 'auto'` only changes what happens when a repo has an index.
+
+- **The index.** A data repo can carry `git-store-index.json`, a list of its item files with their git blob sha. Without a token a store reads it, and the files, from `raw.githubusercontent.com`: no API requests at all, so a whole Wi-Fi of readers no longer shares 60 an hour. It falls back to listing the folder through the API when the index is missing, isn't valid, or doesn't list the store's folder. A file that raw serves older than the index is kept as it was (or left out, when new) until a later load, without an API request. With a token, nothing changes. The option `index: false` turns it off.
+- `index/build-index.mjs` and `index/update-index.yml`: what a data repo copies (to `.github/`) to rebuild the index on every push. Not for apps; see "Setting up the index in a data repo" in the README.
+- **Default sources:** `defaults: ['owner/repo']` follows repos on a first visit. A default the person removes stays removed; a default added later reaches existing users once.
+- Each source says `fromIndex` (the last load read the index) and `outdated` (files raw didn't serve in the index's version yet).
+- **Fix (README):** without a token a `304` counts against GitHub's limit; only requests with a token get it free. The Limits section says so now.
+- `createFakeGitHub()`: like GitHub, a `304` without a token counts against the limit, and conditional requests are refused too when it is used up. `fake.requests` counts requests by host (`{api, raw}`). `addRepo(name, {index: true})` keeps the repo's index up to date after every change; `fake.writeIndex(name)` writes it once. `fake.staleRaw` also takes a list of paths. With `staleRaw`, raw now serves a file's previous content, not the file as it was one commit earlier (which was often the same).
+
 ## 1.1.0 (2026-11-22)
 
 Additions found while setting the kit up in Protogames (working folder mode). Nothing to change in a project; working folder apps should pass `base` to the history (see the fix below).
